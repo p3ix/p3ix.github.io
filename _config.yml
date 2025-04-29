@@ -19,9 +19,7 @@ title: Asier Lara Arroyo # the main title
 tagline: Hackeando el conocimiento # it will display as the subtitle
 
 description: "Artículos, tutoriales y reflexiones sobre ciberseguridad y hacking ético."
->- # used by seo meta and the atom feed
-  A minimal, responsive and feature-rich Jekyll theme for technical writing.
-
+# used by seo meta and the atom feed A minimal, responsive and feature-rich Jekyll theme for technical writing.
 # Fill in the protocol & hostname for your site.
 # E.g. 'https://username.github.io', note that it does not end with a '/'.
 url: "https://p3ix.github.io"
@@ -44,7 +42,6 @@ social:
     # Uncomment below to add more social links
     # - https://www.facebook.com/username
     # - https://www.linkedin.com/in/username
-    https://x.com/pirul4s
 
 # Site Verification Settings
 webmaster_verifications:
