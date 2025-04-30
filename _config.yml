@@ -64,11 +64,11 @@ theme_mode: dark
 cdn:
 
 # Avatar y Favicon (debes subir los archivos a /assets/img/)
-avatar: /assets/img/avatar.png
-favicon: /assets/img/favicon.ico
+avatar: /assets/avatar.png
+favicon: /assets/favicon.ico
 
 # Imagen por defecto para previsualización en redes sociales
-social_preview_image: /assets/img/preview.png
+social_preview_image: /assets/preview.png
 
 # TOC en posts (tabla de contenidos)
 toc: true
