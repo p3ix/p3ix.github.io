@@ -26,7 +26,7 @@ En esta página comparto mis aprendizajes, investigaciones, herramientas y refle
 - [GitHub](https://github.com/p3ix)
 - [LinkedIn](https://linkedin.com/in/tuusuario)
 - [Email](mailto:tuemail@ejemplo.com)
-
+tesst
 ---
 
 👉 Puedes acceder a mis artículos desde la sección [Blog](/blog/)
