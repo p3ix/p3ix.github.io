@@ -1,6 +1,6 @@
 ---
 layout: page
-title: Asier Lara Arroyo
+title: Home
 permalink: /
 ---
 
