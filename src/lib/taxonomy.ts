@@ -76,10 +76,10 @@ export const ctfPlatforms: Record<CtfPlatformId, { label: string; short: string 
 };
 
 /**
- * Plataformas donde solo se puede publicar contenido retirado (HTB por sus ToS; un evento CTF
- * mientras sigue abierto). El schema de ctf rechaza `retired: false` para estas.
+ * Plataformas donde solo se puede publicar contenido retirado (HTB y TryHackMe por sus ToS; un
+ * evento CTF mientras sigue abierto). El schema de ctf rechaza `retired: false` para estas.
  */
-export const RETIRED_ONLY_PLATFORMS: readonly CtfPlatformId[] = ['htb', 'ctf'];
+export const RETIRED_ONLY_PLATFORMS: readonly CtfPlatformId[] = ['htb', 'thm', 'ctf'];
 
 export const TARGET_OS_IDS = ['linux', 'windows', 'otro'] as const;
 export type TargetOsId = (typeof TARGET_OS_IDS)[number];
