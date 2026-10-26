@@ -1,0 +1,40 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import EmptyState from '@/components/EmptyState.astro';
+import EntryCard from '@/components/EntryCard.astro';
+import PageHeader from '@/components/PageHeader.astro';
+import { ctfCard } from '@/lib/cards';
+import { getPublished } from '@/lib/content';
+import { sectionById } from '@/lib/sections';
+import { TARGET_OS_IDS, targetOs } from '@/lib/taxonomy';
+
+const entries = await getPublished('ctf');
+
+const byOs = TARGET_OS_IDS.map((os) => ({ os, count: entries.filter((e) => e.data.os === os).length }))
+  .filter((x) => x.count > 0)
+  .map((x) => `${x.count} ${targetOs[x.os]}`);
+const summary = [`${entries.length} ${entries.length === 1 ? 'máquina' : 'máquinas'}`, ...byOs].join(' · ');
+
+const description =
+  'Máquinas retiradas de Hack The Box, Proving Grounds y CTFs. Cada writeup explica por qué funciona cada paso y cómo se detecta.';
+---
+
+<BaseLayout title="Writeups CTF" description={description} section="ctf" path={['ctf']} ogImage="/og/ctf.png">
+  <PageHeader section={sectionById.ctf} title="Writeups CTF" description={description}>
+    {entries.length > 0 && <p class="font-mono text-sm text-subtle">{summary}</p>}
+  </PageHeader>
+
+  {
+    entries.length > 0 ? (
+      <ul class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {entries.map((entry) => (
+          <li class="grid">
+            <EntryCard {...ctfCard(entry)} />
+          </li>
+        ))}
+      </ul>
+    ) : (
+      <EmptyState>Aún no hay writeups publicados. El primero está en camino.</EmptyState>
+    )
+  }
+</BaseLayout>

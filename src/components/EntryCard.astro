@@ -1,0 +1,44 @@
+---
+import { Image } from 'astro:assets';
+import Icon from './Icon.astro';
+import type { EntryCardProps } from '@/lib/cards';
+import { tone } from '@/lib/tone';
+
+type Props = EntryCardProps;
+
+const { href, title, meta, color, accent, cover, badge } = Astro.props;
+---
+
+<a
+  href={href}
+  style={tone(color)}
+  class="tone-border group flex min-w-0 flex-col gap-3 rounded-2xl border bg-panel/90 p-3 pb-4 transition-transform hover:-translate-y-0.5"
+>
+  <div class="tone-cover relative grid h-[150px] place-items-center overflow-hidden rounded-[10px]">
+    {
+      cover.kind === 'image' ? (
+        <Image src={cover.src} alt={cover.alt} widths={[360, 720]} sizes="(min-width: 640px) 280px, 100vw" class="absolute inset-0 size-full object-cover" />
+      ) : cover.kind === 'icon' ? (
+        <Icon name={cover.icon} size={64} strokeWidth={1.6} class="tone-drop text-fg-strong" />
+      ) : (
+        <span aria-hidden="true" class="tone-glow font-mono text-[64px] font-extrabold tracking-[-0.06em] text-fg-strong">
+          {cover.text}
+        </span>
+      )
+    }
+    {
+      badge && (
+        <span class="tone-border tone-text absolute top-2 right-2 inline-flex items-center gap-1.5 rounded-full border bg-code/85 px-2 py-0.5 font-mono text-[10px] font-bold tracking-widest">
+          <span class="tone-pill size-1.5 rounded-full" />
+          {badge}
+        </span>
+      )
+    }
+  </div>
+  <div class="flex flex-col gap-1 px-1">
+    <h3 class="font-mono text-base font-bold text-fg-strong transition-colors group-hover:tone-text">{title}</h3>
+    <p class="font-mono text-xs text-subtle">
+      {meta}{accent && <> · <span style={tone(accent.color)} class="tone-text">{accent.text}</span></>}
+    </p>
+  </div>
+</a>

@@ -1,0 +1,44 @@
+# Publica la web en GitHub Pages (https://p3ix.github.io) en cada push a main.
+# Requisito una sola vez: Settings → Pages → Build and deployment → Source: "GitHub Actions".
+name: Deploy a GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  # Permite lanzarlo a mano desde la pestaña Actions.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Un solo despliegue a la vez; si llega otro push, espera a que termine el que está en curso.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v7
+
+      - name: Comprobar, construir y subir la web
+        uses: withastro/action@v6
+        with:
+          node-version: 24
+          # astro check primero: si un writeup rompe un schema o una regla de publicación, no se despliega.
+          build-cmd: npm run check && npm run build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publicar en GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

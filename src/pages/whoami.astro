@@ -1,0 +1,214 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Avatar from '@/components/Avatar.astro';
+import Icon from '@/components/Icon.astro';
+import Prompt from '@/components/Prompt.astro';
+import TerminalWindow from '@/components/TerminalWindow.astro';
+import {
+  certifications,
+  education,
+  experience,
+  languages,
+  platforms,
+  profile,
+  skills,
+  socials,
+  tools,
+} from '@/data/profile';
+import { tone } from '@/lib/tone';
+
+// El botón del CV solo aparece si existe src/assets/cv.pdf (la versión sin teléfono).
+const cvFiles = import.meta.glob<string>('/src/assets/cv.pdf', { query: '?url', import: 'default', eager: true });
+const cvUrl = Object.values(cvFiles)[0];
+const github = socials.find((s) => s.icon === 'github');
+const linkedin = socials.find((s) => s.icon === 'linkedin');
+
+const description = `${profile.name} (${profile.handle}): ${profile.role}. Hall of fame, herramientas, experiencia y formación.`;
+---
+
+<BaseLayout title="whoami" description={description} section="whoami" path={['whoami']} ogImage="/og/whoami.png">
+  <TerminalWindow title="p3i@kali: ~/whoami" label="Perfil">
+    <Prompt>whoami</Prompt>
+    <div class="flex flex-wrap items-center gap-8">
+      <Avatar size="lg" />
+      <div class="flex min-w-[260px] flex-1 flex-col gap-3">
+        <h1 class="font-mono text-[34px] leading-tight font-extrabold tracking-tight text-brand text-glow-soft">{profile.name}</h1>
+        <p class="font-mono text-sm text-fg-strong">@{profile.handle} · {profile.role}</p>
+        <p class="inline-flex items-center gap-2 font-mono text-[13px] text-subtle">
+          <Icon name="pin" size={15} />
+          {profile.location}
+        </p>
+        <div aria-hidden="true" class="h-0.5 bg-spectrum"></div>
+        <p class="text-[17px] leading-[1.7] text-fg">{profile.bio}</p>
+        <div class="flex flex-wrap gap-3 pt-1">
+          {
+            github && (
+              <a href={github.href} target="_blank" rel="me noopener" class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line-strong px-4 font-mono text-sm text-fg-strong hover:border-brand/45 hover:text-brand">
+                <Icon name="github" size={17} />
+                GitHub
+              </a>
+            )
+          }
+          {
+            linkedin && (
+              <a href={linkedin.href} target="_blank" rel="me noopener" class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line-strong px-4 font-mono text-sm text-fg-strong hover:border-brand/45 hover:text-brand">
+                <Icon name="linkedin" size={17} />
+                LinkedIn
+              </a>
+            )
+          }
+          {
+            cvUrl && (
+              <a href={cvUrl} download="cv-asier-lara.pdf" class="inline-flex min-h-11 items-center gap-2 rounded-xl bg-brand px-4 font-mono text-sm font-bold text-on-accent">
+                <Icon name="download" size={17} />
+                CV en PDF
+              </a>
+            )
+          }
+        </div>
+      </div>
+    </div>
+  </TerminalWindow>
+
+  <section aria-labelledby="hof-title" class="flex flex-col gap-4" style={tone('bb')}>
+    <h2 id="hof-title" class="font-mono text-xl font-bold text-fg-strong"><span class="tone-text">##</span> Hall of fame</h2>
+    <ul class="grid gap-3.5 md:grid-cols-3">
+      {
+        platforms.map((p) => (
+          <li class="grid">
+            <a href={p.url} target="_blank" rel="noopener" class="tone-border tone-faint group flex flex-col gap-2 rounded-2xl border p-5 transition-transform hover:-translate-y-0.5">
+              <span class="flex items-center justify-between gap-3">
+                <span class="text-lg font-semibold text-fg-strong">{p.name}</span>
+                <Icon name="external" size={15} class="tone-text opacity-70 group-hover:opacity-100" />
+              </span>
+              <span class="tone-text font-mono text-xs">@{p.handle}</span>
+              <span class="text-[15px] leading-relaxed text-muted">{p.note}</span>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+
+  <section aria-labelledby="tools-title" class="flex flex-col gap-4" style={tone('tools')}>
+    <h2 id="tools-title" class="font-mono text-xl font-bold text-fg-strong"><span class="tone-text">##</span> Herramientas propias</h2>
+    <ul class="grid gap-3.5 md:grid-cols-3">
+      {
+        tools.map((t) => (
+          <li class="tone-border flex flex-col gap-2 rounded-2xl border bg-panel/90 p-5">
+            <span class="tone-text inline-flex items-center gap-2 font-mono text-base font-bold">
+              <Icon name="wrench" size={16} />
+              {t.name}
+            </span>
+            <span class="text-[15px] leading-relaxed text-muted">{t.description}</span>
+          </li>
+        ))
+      }
+    </ul>
+    {github && <a href={github.href} target="_blank" rel="noopener" class="self-start font-mono text-sm text-tools hover:underline">Código en github.com/p3ix →</a>}
+  </section>
+
+  <div class="grid gap-7 lg:grid-cols-2">
+    <section aria-labelledby="exp-title" class="flex flex-col gap-4 rounded-2xl border border-line bg-panel/80 p-5 sm:p-6" style={tone('whoami')}>
+      <h2 id="exp-title" class="inline-flex items-center gap-2.5 font-mono text-xl font-bold text-fg-strong">
+        <Icon name="briefcase" size={20} class="tone-text" />
+        Experiencia
+      </h2>
+      <ol class="flex flex-col gap-5 border-l border-line pl-6">
+        {
+          experience.map((e, i) => (
+            <li class="relative">
+              <span aria-hidden="true" class:list={['absolute top-1.5 -left-[29px] size-2.5 rounded-full ring-4 ring-panel', i === 0 ? 'tone-pill' : 'bg-line-strong']} />
+              <p class="font-mono text-xs text-subtle">{e.period} · {e.place}</p>
+              <p class="font-semibold text-fg-strong">{e.role} <span class="font-normal text-muted">· {e.org}</span></p>
+              {
+                e.points.length > 0 && (
+                  <ul class="mt-2 flex flex-col gap-1.5 text-[15px] leading-relaxed text-muted">
+                    {e.points.map((pt) => (
+                      <li class="flex gap-2">
+                        <span class="tone-text">▹</span>
+                        {pt}
+                      </li>
+                    ))}
+                  </ul>
+                )
+              }
+            </li>
+          ))
+        }
+      </ol>
+    </section>
+
+    <div class="flex flex-col gap-7">
+      <section aria-labelledby="edu-title" class="flex flex-col gap-4 rounded-2xl border border-line bg-panel/80 p-5 sm:p-6" style={tone('whoami')}>
+        <h2 id="edu-title" class="inline-flex items-center gap-2.5 font-mono text-xl font-bold text-fg-strong">
+          <Icon name="cap" size={20} class="tone-text" />
+          Formación
+        </h2>
+        <ul class="flex flex-col gap-4">
+          {
+            education.map((e) => (
+              <li>
+                <p class="font-semibold text-fg-strong">{e.title}</p>
+                <p class="font-mono text-xs text-subtle">{[e.org, e.period].filter(Boolean).join(' · ')}</p>
+              </li>
+            ))
+          }
+        </ul>
+      </section>
+
+      <section aria-labelledby="cert-title" class="flex flex-col gap-4 rounded-2xl border border-line bg-panel/80 p-5 sm:p-6" style={tone('home')}>
+        <h2 id="cert-title" class="inline-flex items-center gap-2.5 font-mono text-xl font-bold text-fg-strong">
+          <Icon name="badge" size={20} class="tone-text" />
+          Certificaciones
+        </h2>
+        <ul class="flex flex-col gap-3">
+          {
+            certifications.map((c) => (
+              <li class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span class="tone-text font-mono text-lg font-extrabold">{c.name}</span>
+                <span class="text-[15px] text-muted">{c.full}</span>
+                <span class="w-full font-mono text-xs text-subtle">{c.status}</span>
+              </li>
+            ))
+          }
+        </ul>
+      </section>
+    </div>
+  </div>
+
+  <section aria-labelledby="stack-title" class="flex flex-col gap-4">
+    <h2 id="stack-title" class="font-mono text-xl font-bold text-fg-strong"><span class="text-brand">##</span> Stack</h2>
+    <div class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+      {
+        skills.map((g) => (
+          <div style={tone(g.color)} class="tone-border flex flex-col gap-3 rounded-2xl border bg-panel/90 p-4">
+            <p class="tone-text font-mono text-xs font-bold tracking-[0.16em] uppercase">{g.area}</p>
+            <ul class="flex flex-wrap gap-2">
+              {g.items.map((item) => (
+                <li class="tone-soft rounded-md px-2 py-0.5 font-mono text-[13px] text-fg-strong">{item}</li>
+              ))}
+            </ul>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+
+  <section aria-labelledby="lang-title" class="flex flex-col gap-4">
+    <h2 id="lang-title" class="inline-flex items-center gap-2.5 font-mono text-xl font-bold text-fg-strong">
+      <Icon name="globe" size={20} class="text-whoami" />
+      Idiomas
+    </h2>
+    <ul class="flex flex-wrap gap-3">
+      {
+        languages.map((l) => (
+          <li class="flex items-center gap-3 rounded-xl border border-line-strong bg-panel/90 px-4 py-2.5">
+            <span class="text-fg-strong">{l.name}</span>
+            <span class="rounded-md bg-whoami/15 px-2 py-0.5 font-mono text-xs text-whoami">{l.level}</span>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+</BaseLayout>

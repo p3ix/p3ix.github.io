@@ -1,0 +1,49 @@
+---
+import Icon from './Icon.astro';
+import { tone } from '@/lib/tone';
+import { VARIABLE_NAMES, variables, type VariableName } from '@/lib/variables';
+
+interface Props {
+  /** Variables a mostrar. Por defecto, todas. */
+  names?: readonly VariableName[];
+}
+
+const { names: wanted = VARIABLE_NAMES } = Astro.props;
+// Siempre en el mismo orden (el de VARIABLE_NAMES), aparezcan como aparezcan en la página.
+const names = VARIABLE_NAMES.filter((n) => wanted.includes(n));
+---
+
+{
+  names.length > 0 && (
+    <section aria-labelledby="varbar-title" data-pagefind-ignore class="not-prose flex flex-col gap-3.5 rounded-2xl border border-biblia/35 bg-panel/95 p-4 shadow-[0_0_50px_color-mix(in_oklab,var(--color-biblia)_7%,transparent)] sm:p-5">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="varbar-title" class="inline-flex items-center gap-2.5 font-mono text-[13px] font-bold tracking-[0.16em] text-fg-strong uppercase">
+          <Icon name="target" size={17} class="text-biblia" />
+          Objetivo
+        </h2>
+        <div class="flex items-center gap-3">
+          <span class="font-mono text-xs text-subtle">Se guarda solo en este navegador</span>
+          <button type="button" data-vars-reset class="min-h-9 rounded-lg border border-line-strong px-3 font-mono text-xs text-muted hover:border-biblia/50 hover:text-fg-strong">
+            Limpiar
+          </button>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {names.map((name) => (
+          <label class="flex min-w-0 flex-col gap-1.5" style={tone(variables[name].color)} title={variables[name].description}>
+            <span class="tone-text font-mono text-[11px] font-bold tracking-[0.14em]">{name}</span>
+            <input
+              type="text"
+              data-var-input={name}
+              placeholder={variables[name].example}
+              spellcheck="false"
+              autocomplete="off"
+              autocapitalize="off"
+              class="tone-border h-11 w-full min-w-0 rounded-lg border bg-code px-3 font-mono text-sm text-fg-strong placeholder:text-subtle/60"
+            />
+          </label>
+        ))}
+      </div>
+    </section>
+  )
+}

@@ -1,0 +1,16 @@
+---
+import { tone } from '@/lib/tone';
+
+interface Props {
+  /** Color del `[*]` (token de global.css). */
+  color?: string;
+}
+
+const { color = 'ctf' } = Astro.props;
+---
+
+<div class="rounded-2xl border border-dashed border-line-strong bg-panel/60 px-6 py-10 text-center">
+  <p class="font-mono text-sm text-subtle">
+    <span style={tone(color)} class="tone-text">[*]</span> <slot />
+  </p>
+</div>

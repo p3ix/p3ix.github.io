@@ -1,0 +1,70 @@
+---
+title: IDOR en la API de facturas (plantilla)
+summary: Cambiar un identificador numérico permitía descargar las facturas de otros clientes. Ejemplo del formato de un reporte de bug bounty.
+date: 2026-10-25
+program: Programa privado
+platform: yeswehack
+severity: high
+cvss: 7.1
+cvssVector: CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:L/A:N
+cwe: CWE-639
+bounty: "[importe]"
+status: resolved
+# Solo true si el programa ha autorizado la divulgación por escrito.
+disclosurePermission: true
+timeline:
+  - { date: 2026-01-10, event: Reporte enviado }
+  - { date: 2026-01-12, event: Triado y validado como High }
+  - { date: 2026-02-03, event: Corregido en producción }
+  - { date: 2026-03-01, event: Divulgación autorizada por el programa }
+tags: [idor, api, broken-access-control]
+# PLANTILLA: hallazgo ficticio para mostrar el formato. Nunca publiques esta entrada tal cual.
+draft: true
+---
+
+## Resumen
+
+La API que sirve las facturas comprobaba que la sesión fuera válida, pero no que la factura
+pedida perteneciera al usuario. Cambiando el identificador se descargaban facturas de otros
+clientes con nombre, dirección fiscal e importes.
+
+## Alcance
+
+`app.example.com` y su API (`api.example.com`), dentro del alcance del programa. Dominios e
+identificadores redactados.
+
+## Cómo lo encontré
+
+Al descargar mi propia factura, la petición usaba un id numérico y secuencial:
+
+```http
+GET /v1/invoices/104233/pdf HTTP/2
+Host: api.example.com
+Authorization: Bearer [redactado]
+```
+
+Con una segunda cuenta de prueba confirmé que la respuesta no dependía del propietario: el mismo
+token servía para pedir facturas de la otra cuenta.
+
+## Prueba de concepto
+
+1. Inicia sesión con la cuenta A y apunta el id de una de sus facturas.
+2. Inicia sesión con la cuenta B y repite la petición con el id de la cuenta A.
+3. La API devuelve el PDF de la cuenta A con un `200 OK`.
+
+Solo accedí a facturas de mis propias cuentas de prueba.
+
+## Impacto
+
+Cualquier usuario registrado podía enumerar y descargar las facturas de todos los clientes:
+exposición masiva de datos personales y fiscales.
+
+## Corrección
+
+Comprobar en el servidor que el recurso pertenece al usuario de la sesión antes de devolverlo, y
+usar identificadores no secuenciales (UUID) como defensa adicional, no como única medida.
+
+## Lo que me llevo
+
+Cada vez que un identificador viaja en la petición, la pregunta es la misma: ¿quién comprueba que
+es mío?

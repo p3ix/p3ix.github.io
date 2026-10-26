@@ -1,0 +1,27 @@
+---
+import Icon from './Icon.astro';
+import type { Section } from '@/lib/sections';
+import { tone } from '@/lib/tone';
+
+interface Props {
+  section: Section;
+  title: string;
+  description?: string;
+  /** Texto pequeño sobre el título. Por defecto, el nombre de la sección. */
+  kicker?: string;
+}
+
+const { section, title, description, kicker = section.label } = Astro.props;
+---
+
+<header class="flex flex-col gap-4" style={tone(section.id)}>
+  <div class="flex items-center gap-3">
+    <span class="tone-soft tone-border tone-text grid size-11 place-items-center rounded-xl border">
+      <Icon name={section.icon} size={22} strokeWidth={2.1} />
+    </span>
+    <span class="tone-text font-mono text-[13px] tracking-[0.2em] uppercase">{kicker}</span>
+  </div>
+  <h1 class="text-[34px] leading-tight font-bold text-fg-strong sm:text-[40px]">{title}</h1>
+  {description && <p class="max-w-[46em] text-[17px] leading-relaxed text-muted">{description}</p>}
+  <slot />
+</header>

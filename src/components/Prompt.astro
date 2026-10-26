@@ -1,0 +1,20 @@
+---
+interface Props {
+  /** Muestra el cursor parpadeante al final. */
+  cursor?: boolean;
+}
+
+const { cursor = false } = Astro.props;
+const hasCommand = Astro.slots.has('default');
+---
+
+<p class="font-mono text-[15px] break-all">
+  <span class="font-bold text-ctf">p3i@kali</span><span class="text-muted">:~$</span>{
+    hasCommand && (
+      <span class="text-fg-strong">
+        {' '}
+        <slot />
+      </span>
+    )
+  }{cursor && <span aria-hidden="true" class="ml-2 inline-block h-[18px] w-[9px] translate-y-[3px] animate-blink bg-brand" />}
+</p>

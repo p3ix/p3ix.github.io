@@ -1,0 +1,38 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Prompt from '@/components/Prompt.astro';
+import TerminalWindow from '@/components/TerminalWindow.astro';
+---
+
+<BaseLayout title="404" path={['404']} noindex>
+  <TerminalWindow label="Página no encontrada">
+    <Prompt>cd <span data-path>/ruta</span></Prompt>
+    <p class="font-mono text-[15px] break-all text-area-shell">
+      bash: cd: <span data-path>/ruta</span>: No such file or directory
+    </p>
+    <p class="text-[17px] leading-relaxed text-fg">
+      Esta página no existe, o todavía no la he escrito. Prueba desde el inicio o busca en la biblia.
+    </p>
+    <div class="flex flex-wrap gap-3">
+      <a
+        href="/"
+        class="inline-flex min-h-12 items-center rounded-xl bg-brand px-5 font-mono text-sm font-bold tracking-widest text-on-accent uppercase"
+      >
+        Volver al inicio
+      </a>
+      <a
+        href="/biblia/"
+        class="inline-flex min-h-12 items-center rounded-xl border border-biblia/45 px-5 font-mono text-sm font-bold tracking-widest text-biblia uppercase"
+      >
+        Abrir la biblia
+      </a>
+    </div>
+    <Prompt cursor />
+  </TerminalWindow>
+</BaseLayout>
+
+<script>
+  document.querySelectorAll('[data-path]').forEach((el) => {
+    el.textContent = window.location.pathname;
+  });
+</script>

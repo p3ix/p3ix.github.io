@@ -1,0 +1,67 @@
+---
+import Icon from './Icon.astro';
+import { splitCommand, type Command } from '@/lib/content';
+import { areas, phases } from '@/lib/taxonomy';
+import { tone } from '@/lib/tone';
+import { variables } from '@/lib/variables';
+
+interface Props {
+  command: Command;
+  /** Encabezado del título: h3 dentro de una nota, h2 en la página de comandos. */
+  level?: 2 | 3;
+}
+
+const { command: c, level = 3 } = Astro.props;
+const area = areas[c.area];
+const lines = c.cmd.split('\n').map(splitCommand);
+const Title = level === 2 ? 'h2' : 'h3';
+---
+
+<article
+  id={c.id}
+  data-command={c.id}
+  data-title={c.title}
+  data-tool={c.tool}
+  data-area={c.area}
+  data-phase={c.phase}
+  data-os={c.os.join(' ')}
+  style={tone(area.color)}
+  class="not-prose tone-border flex scroll-mt-24 flex-col gap-3 rounded-xl border bg-panel/95 p-4 target:ring-2 target:ring-brand/60 sm:p-5"
+>
+  <header class="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+    <span class="tone-soft tone-text rounded-md px-2 py-0.5 font-mono text-[11px] font-bold tracking-widest uppercase">{area.label}</span>
+    <span class="font-mono text-[13px] text-subtle">{c.tool}</span>
+    <Title class="text-[17px] leading-snug font-semibold text-fg-strong">{c.title}</Title>
+    <a href={`/biblia/comandos/#${c.id}`} class="ml-auto font-mono text-xs text-subtle hover:text-brand" aria-label={`Enlace al comando ${c.title}`}>#</a>
+  </header>
+
+  <div class="flex items-start gap-3 rounded-lg border border-line bg-code px-3.5 py-3">
+    <code class="min-w-0 flex-1 font-mono text-sm leading-[1.85] wrap-anywhere whitespace-pre-wrap text-fg">{lines.map((parts, i) => (<span class="block"><span aria-hidden="true" class="tone-text select-none">{i === 0 ? '$ ' : '  '}</span>{parts.map((p) => ('variable' in p ? <span data-var={p.variable} class="var-chip" style={tone(variables[p.variable].color)}>{p.variable}</span> : p.text))}</span>))}</code>
+    <button
+      type="button"
+      data-copy-template={c.cmd}
+      aria-label="Copiar comando"
+      class="group tone-border tone-text grid size-11 shrink-0 place-items-center rounded-lg border bg-panel transition-colors hover:tone-soft data-[copied=error]:text-area-shell"
+    >
+      <Icon name="copy" size={17} class="group-data-copied:hidden" />
+      <Icon name="check" size={17} class="hidden group-data-[copied=ok]:block" />
+      <Icon name="close" size={17} class="hidden group-data-[copied=error]:block" />
+    </button>
+  </div>
+
+  {c.notes && <p class="text-[15px] leading-relaxed text-muted">{c.notes}</p>}
+
+  <footer class="flex flex-wrap items-center gap-x-3 gap-y-1.5 font-mono text-xs text-subtle">
+    <span class="rounded-full border border-line-strong px-2 py-0.5 text-muted">{phases[c.phase]}</span>
+    <span>desde {c.os.join(' / ')}</span>
+    {c.tags.map((t) => <span class="text-tags/80">#{t}</span>)}
+    {
+      c.refs.map((ref) => (
+        <a href={ref} target="_blank" rel="noopener" class="inline-flex items-center gap-1 hover:text-brand">
+          docs
+          <Icon name="external" size={11} />
+        </a>
+      ))
+    }
+  </footer>
+</article>

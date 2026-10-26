@@ -1,0 +1,167 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import EmptyState from '@/components/EmptyState.astro';
+import EntryCard from '@/components/EntryCard.astro';
+import Icon from '@/components/Icon.astro';
+import Prompt from '@/components/Prompt.astro';
+import TerminalWindow from '@/components/TerminalWindow.astro';
+import { platforms, profile, tools } from '@/data/profile';
+import { bugbountyCard, ctfCard, noteCard } from '@/lib/cards';
+import { getNotes, getPublished } from '@/lib/content';
+import type { IconName } from '@/lib/icons';
+import { sectionById, sections, type Section } from '@/lib/sections';
+
+// "P3I" en figlet (fuente ANSI Shadow).
+const figlet = [
+  '██████╗ ██████╗ ██╗',
+  '██╔══██╗╚════██╗██║',
+  '██████╔╝ █████╔╝██║',
+  '██╔═══╝  ╚═══██╗██║',
+  '██║     ██████╔╝██║',
+  '╚═╝     ╚═════╝ ╚═╝',
+];
+
+const ctfEntries = await getPublished('ctf');
+const bbEntries = await getPublished('bugbounty');
+const noteEntries = await getNotes();
+const writeupCount = ctfEntries.length + bbEntries.length;
+
+const latest = [
+  ...ctfEntries.map((e) => ({ date: e.data.updated ?? e.data.date, card: ctfCard(e) })),
+  ...bbEntries.map((e) => ({ date: e.data.updated ?? e.data.date, card: bugbountyCard(e) })),
+  ...noteEntries.map((e) => ({ date: e.data.updated ?? e.data.date, card: noteCard(e) })),
+]
+  .sort((a, b) => b.date.valueOf() - a.date.valueOf())
+  .slice(0, 5)
+  .map((x) => x.card);
+
+const stats: { label: string; value: string; icon: IconName; section: Section }[] = [
+  { label: 'Objetivo', value: profile.objective, icon: 'flag', section: sectionById.home },
+  { label: 'Writeups', value: String(writeupCount), icon: 'terminal', section: sectionById.ctf },
+  { label: 'Plataformas', value: String(platforms.length), icon: 'bug', section: sectionById.bb },
+  { label: 'Herramientas', value: String(tools.length), icon: 'wrench', section: sectionById.tools },
+  { label: 'Hall of fame', value: profile.hallOfFame, icon: 'trophy', section: sectionById.whoami },
+];
+
+const tiles = sections.filter((s) => s.id !== 'home');
+const c = (id: keyof typeof sectionById) => sectionById[id].cls.text;
+---
+
+<BaseLayout section="home" path={['inicio']}>
+  <TerminalWindow label="Presentación">
+    <div role="note" class="flex items-center gap-3.5 rounded-xl border border-warn/55 bg-warn/6 px-4 py-3.5">
+      <span class="grid size-[34px] shrink-0 place-items-center rounded-lg bg-warn/16 text-warn">
+        <Icon name="shield" size={18} strokeWidth={2.2} />
+      </span>
+      <!-- El compilador de Astro 7 recorta los saltos de línea junto a etiquetas: el texto con <strong> va en una sola línea. -->
+      <p class="font-mono text-[13.5px] leading-relaxed text-warn-fg">
+        Todo el contenido tiene <strong class="text-warn">fines educativos</strong>. Las técnicas se aplican solo en <strong class="text-warn">entornos autorizados</strong> o dentro del <strong class="text-warn">alcance</strong> de cada programa.
+      </p>
+    </div>
+
+    <Prompt>whoami</Prompt>
+
+    <div class="flex flex-wrap items-stretch gap-7">
+      <div
+        class="flex min-w-0 flex-[0_1_320px] flex-col items-center justify-center gap-4 rounded-xl border border-brand/20 bg-code bg-scanlines px-4 py-8 max-sm:flex-auto"
+      >
+        <div role="img" aria-label="p3i en arte ASCII" class="font-mono text-[15px] leading-[1.08] text-brand text-glow">
+          {figlet.map((line) => <div class="whitespace-pre">{line}</div>)}
+        </div>
+        <p class="font-mono text-xs tracking-[0.38em] text-muted">BUG BOUNTY HUNTER</p>
+      </div>
+
+      <div class="flex min-w-0 flex-[1_1_380px] flex-col justify-center gap-4">
+        <h1 class="font-mono text-[34px] leading-tight font-extrabold tracking-tight text-brand text-glow-soft">
+          {profile.name}
+        </h1>
+        <div aria-hidden="true" class="h-0.5 bg-spectrum"></div>
+        <p class="font-mono text-[15px] leading-[1.8] text-fg">
+          Soy <strong class={c('home')}>{profile.firstName}</strong>, ingeniero informático y <strong class={c('bb')}>bug bounty hunter</strong> en Burgos. Aquí documento los <strong class={c('bb')}>reportes</strong> que me aceptan, las <strong class={c('ctf')}>máquinas</strong> que voy rooteando, la <strong class={c('biblia')}>biblia de comandos</strong> que uso en cada auditoría y mis <strong class={c('tools')}>herramientas</strong>.
+        </p>
+        <p class="font-mono text-sm text-subtle italic">
+          Ponte cómodo: la biblia está a un <kbd class="rounded border border-biblia/50 px-1.5 text-biblia not-italic">Ctrl K</kbd> de distancia.
+        </p>
+      </div>
+    </div>
+
+    <ul class="flex flex-wrap gap-3" aria-label="Datos rápidos">
+      <li class="flex">
+        <a
+          href="https://github.com/p3ix"
+          aria-label="GitHub de p3i"
+          class="grid min-h-16 w-16 place-items-center rounded-xl border border-line-strong bg-panel text-fg-strong transition-colors hover:border-brand/40 hover:text-brand"
+        >
+          <Icon name="github" size={24} />
+        </a>
+      </li>
+      {
+        stats.map((s) => (
+          <li
+            class:list={[
+              'flex min-w-0 flex-[1_1_140px] flex-col gap-1.5 rounded-xl border px-3.5 py-3',
+              s.section.cls.border,
+              s.section.cls.faint,
+            ]}
+          >
+            <span class="inline-flex items-center gap-2 font-mono text-[11px] tracking-[0.14em] text-muted uppercase">
+              <Icon name={s.icon} size={13} strokeWidth={2.4} class={s.section.cls.text} />
+              {s.label}
+            </span>
+            <span class="font-mono text-xl font-extrabold text-fg-strong">{s.value}</span>
+          </li>
+        ))
+      }
+    </ul>
+
+    <Prompt cursor />
+  </TerminalWindow>
+
+  <section class="relative overflow-hidden rounded-2xl border border-line bg-panel/90 px-6.5 py-6">
+    <div aria-hidden="true" class="absolute inset-x-0 top-0 h-0.5 bg-spectrum"></div>
+    <p class="text-[17px] leading-[1.7] text-fg">
+      Este es mi cuaderno de campo: lo que encuentro cazando bugs, las máquinas que rompo y los comandos que no quiero volver a
+      buscar. Escribo los writeups como me habría gustado leerlos: al grano, explicando el porqué y cómo se detecta.
+    </p>
+    <p class="mt-3.5 text-[15px] leading-relaxed text-subtle">
+      ¿Algo no cuadra o te ha servido? Escríbeme desde los enlaces del lateral.
+    </p>
+  </section>
+
+  <nav aria-label="Accesos" class="grid grid-cols-2 gap-3.5 sm:grid-cols-3 xl:grid-cols-6">
+    {
+      tiles.map((s) => (
+        <a
+          href={s.href}
+          class:list={[
+            'flex min-h-28 flex-col items-center justify-center gap-3 rounded-2xl border px-2.5 py-4 text-fg-strong transition-transform hover:-translate-y-0.5',
+            s.cls.border,
+            s.cls.faint,
+          ]}
+        >
+          <span class:list={['grid size-11 place-items-center rounded-[10px]', s.cls.soft, s.cls.text]}>
+            <Icon name={s.icon} size={22} strokeWidth={2.1} />
+          </span>
+          <span class="text-center text-[15px] font-semibold">{s.tileLabel}</span>
+        </a>
+      ))
+    }
+  </nav>
+
+  <section aria-labelledby="updates-title" class="flex flex-col gap-4.5">
+    <h2 id="updates-title" class="text-[26px] font-bold text-fg-strong">Últimas actualizaciones</h2>
+    {
+      latest.length > 0 ? (
+        <ul class="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          {latest.map((card) => (
+            <li class="grid">
+              <EntryCard {...card} />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <EmptyState>Aún no hay entradas publicadas. El primer writeup está en camino.</EmptyState>
+      )
+    }
+  </section>
+</BaseLayout>

@@ -1,0 +1,52 @@
+---
+import type { MarkdownHeading } from 'astro';
+import BaseLayout from './BaseLayout.astro';
+import Icon from '@/components/Icon.astro';
+import Toc from '@/components/Toc.astro';
+import { sectionById, type SectionId } from '@/lib/sections';
+
+interface Props {
+  title: string;
+  description: string;
+  section: SectionId;
+  path: string[];
+  headings: MarkdownHeading[];
+  /** Ruta de la imagen OG (src/pages/og/[...route].png.ts). */
+  ogImage: string;
+  publishedTime: Date;
+  draft?: boolean;
+}
+
+const { title, description, section, path, headings, ogImage, publishedTime, draft = false } = Astro.props;
+const back = sectionById[section];
+---
+
+<BaseLayout title={title} description={description} section={section} path={path} ogImage={ogImage} type="article" publishedTime={publishedTime}>
+  {
+    draft && (
+      <p role="note" class="flex items-center gap-3 rounded-xl border border-warn/55 bg-warn/6 px-4 py-3 font-mono text-[13px] text-warn-fg">
+        <Icon name="warning" size={18} class="shrink-0 text-warn" />
+        BORRADOR: se ve con npm run dev, pero no se publica en producción.
+      </p>
+    )
+  }
+
+  <!-- Pagefind solo indexa lo que está dentro de data-pagefind-body (cabecera + texto). -->
+  <div data-pagefind-body class="flex flex-col gap-7">
+    <slot name="header" />
+
+    <div class="grid gap-10 xl:grid-cols-[minmax(0,1fr)_220px]">
+      <article class="prose-p3i min-w-0">
+        <slot />
+      </article>
+      <Toc headings={headings} />
+    </div>
+
+    <slot name="footer" />
+  </div>
+
+  <a href={back.href} class="inline-flex min-h-11 items-center gap-2 self-start font-mono text-sm text-muted hover:text-brand">
+    <Icon name="arrow-left" size={16} />
+    Volver a {back.label}
+  </a>
+</BaseLayout>

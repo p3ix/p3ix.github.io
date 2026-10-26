@@ -1,0 +1,21 @@
+# build
+dist/
+.astro/
+
+# dependencias
+node_modules/
+
+# entorno
+.env
+.env.*
+!.env.example
+
+# contenido que aún no se puede publicar (máquinas activas, reports sin permiso)
+private/
+
+# sistema / editor
+.DS_Store
+Thumbs.db
+*.log
+.vscode/*
+!.vscode/extensions.json

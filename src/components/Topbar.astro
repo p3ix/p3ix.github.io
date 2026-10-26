@@ -1,0 +1,53 @@
+---
+import Icon from './Icon.astro';
+
+interface Props {
+  /** Segmentos de la ruta que se muestra como `~/a/b`. */
+  path?: string[];
+  /** Clase de color del último segmento (el de la sección actual). */
+  accent?: string;
+}
+
+const { path = [], accent = 'text-fg-strong' } = Astro.props;
+const head = path.slice(0, -1);
+const last = path.at(-1);
+---
+
+<header
+  class="sticky top-0 z-40 flex items-center gap-3 border-b border-line bg-sidebar/85 px-4 py-3 backdrop-blur-md sm:px-10 sm:py-4"
+>
+  <button
+    type="button"
+    data-sidebar-open
+    aria-controls="sidebar"
+    aria-expanded="false"
+    aria-label="Abrir menú"
+    class="grid size-11 shrink-0 place-items-center rounded-xl border border-line-strong text-muted hover:text-fg-strong lg:hidden"
+  >
+    <Icon name="menu" />
+  </button>
+
+  <p class="min-w-0 flex-1 truncate font-mono text-[17px] text-muted">
+    <span class="text-brand">~</span>{head.map((seg) => `/${seg}`).join('')}{
+      last && (
+        <>
+          /<span class={accent}>{last}</span>
+        </>
+      )
+    }
+  </p>
+
+  <button
+    type="button"
+    data-search-trigger
+    aria-label="Buscar (Ctrl K)"
+    aria-keyshortcuts="Control+K /"
+    class="inline-flex min-h-11 shrink-0 items-center gap-3 rounded-xl border border-line-strong bg-panel px-3.5 font-mono text-sm text-subtle transition-colors hover:border-brand/40 sm:min-w-[280px] sm:justify-between"
+  >
+    <span class="inline-flex items-center gap-2.5">
+      <Icon name="search" size={16} />
+      <span class="max-sm:hidden">Buscar comandos, writeups…</span>
+    </span>
+    <kbd class="rounded-[5px] border border-brand/40 px-1.5 py-0.5 text-xs text-brand max-sm:hidden">Ctrl K</kbd>
+  </button>
+</header>

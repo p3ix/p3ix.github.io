@@ -1,0 +1,62 @@
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import ColorSwatches from '@/components/ColorSwatches.astro';
+
+<BaseLayout title="Kit de diseño" path={['kit']} noindex description="Tokens y componentes base de la web de p3i.">
+
+<div class="prose-p3i">
+
+# Kit de diseño
+
+Página de trabajo para revisar los tokens y cómo se ve el contenido MDX. No aparece en el menú.
+
+## Colores
+
+<ColorSwatches />
+
+## Texto
+
+Un párrafo normal con **negrita**, un [enlace](https://github.com/p3ix) y código en línea como `nxc smb`.
+Así se leerán los writeups: líneas cortas, buen contraste y nada que distraiga.
+
+- Enumerar SPN con una cuenta de dominio.
+- Pedir el TGS de cada servicio.
+- Crackear offline con hashcat.
+
+> Una cita o aviso dentro del texto, con borde completo en vez de una barra lateral.
+
+### Tabla
+
+| Puerto | Servicio | Notas |
+| --- | --- | --- |
+| 88 | Kerberos | Controlador de dominio |
+| 445 | SMB | Firma no requerida |
+
+## Bloques de código
+
+Terminal, detectado automáticamente por el lenguaje:
+
+```bash
+nmap -p- -sS --min-rate 5000 -n -Pn 10.10.11.42 -oG allPorts
+```
+
+Terminal con título y líneas marcadas:
+
+```bash title="Kerberoasting" {2}
+# los comentarios no se copian
+impacket-GetUserSPNs corp.local/svc_sql -dc-ip 10.10.11.42 -request
+hashcat -m 13100 kerberoast.hash /usr/share/wordlists/rockyou.txt
+```
+
+Editor con nombre de archivo y diff:
+
+```python title="exploit.py" ins={4} del={3}
+import requests
+
+url = "http://10.10.11.42/api/v1/users/1"
+url = "http://10.10.11.42/api/v1/users/2"
+print(requests.get(url, timeout=5).json())
+```
+
+</div>
+
+</BaseLayout>

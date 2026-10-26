@@ -1,0 +1,14 @@
+---
+// Incrusta un comando de la biblia en un MDX: <Cmd id="impacket-getuserspns" />.
+// Las páginas de notas lo pasan a <Content components={{ Cmd }} />, así que no hace falta importarlo.
+import CommandCard from './CommandCard.astro';
+import { getCommand } from '@/lib/content';
+
+interface Props {
+  id: string;
+}
+
+const command = await getCommand(Astro.props.id);
+---
+
+<CommandCard command={command} />

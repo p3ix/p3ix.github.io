@@ -1,0 +1,36 @@
+---
+import type { MarkdownHeading } from 'astro';
+
+interface Props {
+  headings: MarkdownHeading[];
+}
+
+const items = Astro.props.headings.filter((h) => h.depth === 2 || h.depth === 3);
+---
+
+{
+  items.length > 1 && (
+    <nav aria-labelledby="toc-title" data-pagefind-ignore class="hidden xl:block">
+      <div class="sticky top-24 flex flex-col gap-3">
+        <p id="toc-title" class="font-mono text-xs tracking-[0.2em] text-subtle uppercase">
+          En esta página
+        </p>
+        <ul class="flex flex-col gap-1.5 border-l border-line">
+          {items.map((h) => (
+            <li>
+              <a
+                href={`#${h.slug}`}
+                class:list={[
+                  '-ml-px block border-l border-transparent py-0.5 text-sm leading-snug text-muted transition-colors hover:border-brand hover:text-fg-strong',
+                  h.depth === 2 ? 'pl-3' : 'pl-6 text-[13px] text-subtle',
+                ]}
+              >
+                {h.text}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </nav>
+  )
+}

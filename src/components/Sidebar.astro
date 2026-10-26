@@ -1,0 +1,91 @@
+---
+import Avatar from './Avatar.astro';
+import Icon from './Icon.astro';
+import { profile, socials } from '@/data/profile';
+import { sections, type SectionId } from '@/lib/sections';
+
+interface Props {
+  current?: SectionId;
+}
+
+const { current } = Astro.props;
+---
+
+<aside
+  id="sidebar"
+  data-sidebar
+  aria-label="Navegación lateral"
+  class="hidden flex-col gap-8 bg-sidebar px-5 lg:bg-sidebar/95 pt-8 pb-6 max-lg:fixed max-lg:inset-0 max-lg:z-50 max-lg:overflow-y-auto lg:sticky lg:top-0 lg:flex lg:h-dvh lg:w-[272px] lg:shrink-0 lg:overflow-y-auto lg:border-r lg:border-line"
+>
+  <button
+    type="button"
+    data-sidebar-close
+    aria-label="Cerrar menú"
+    class="absolute top-4 right-4 grid size-11 place-items-center rounded-xl border border-line-strong text-muted hover:text-fg-strong lg:hidden"
+  >
+    <Icon name="close" />
+  </button>
+
+  <div class="flex flex-col items-start gap-4 px-1.5">
+    <Avatar />
+    <div>
+      <p class="text-[30px] leading-tight font-bold text-fg-strong">{profile.shortName}</p>
+      <p class="mt-2 font-mono text-[13px] text-brand">@{profile.handle} · bug bounty hunter</p>
+      <p class="mt-0.5 font-mono text-[13px] text-subtle">
+        {profile.tagline}<span class="animate-blink" aria-hidden="true">_</span>
+      </p>
+    </div>
+  </div>
+
+  <nav aria-label="Principal">
+    <ul class="flex flex-col gap-1.5">
+      {
+        sections.map((s) => {
+          const active = s.id === current;
+          return (
+            <li>
+              <a
+                href={s.href}
+                aria-current={active ? 'page' : undefined}
+                class:list={[
+                  'flex min-h-[52px] items-center gap-3.5 rounded-xl border py-1.5 pr-3 pl-[7px] transition-colors',
+                  s.cls.text,
+                  active ? [s.cls.borderStrong, s.cls.faint, 'glow'] : 'border-transparent hover:bg-white/3',
+                ]}
+              >
+                <span
+                  class:list={[
+                    'grid size-[38px] shrink-0 place-items-center rounded-[9px] border',
+                    active ? [s.cls.solid, 'border-transparent text-on-accent'] : [s.cls.soft, s.cls.border],
+                  ]}
+                >
+                  <Icon name={s.icon} size={19} strokeWidth={2.1} />
+                </span>
+                <span class="font-mono text-sm font-bold tracking-[0.12em] uppercase">{s.label}</span>
+              </a>
+            </li>
+          );
+        })
+      }
+    </ul>
+  </nav>
+
+  <ul class="mt-auto flex flex-wrap gap-2 px-1" aria-label="Perfiles">
+    {
+      socials.map((s) => (
+        <li>
+          <a
+            href={s.href}
+            aria-label={s.label}
+            title={s.label}
+            rel="me noopener"
+            target="_blank"
+            class="grid size-11 place-items-center rounded-[10px] border border-line-strong text-muted transition-colors hover:border-brand/40 hover:text-brand"
+          >
+            <Icon name={s.icon} size={18} />
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+</aside>

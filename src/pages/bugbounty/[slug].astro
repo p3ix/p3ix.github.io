@@ -1,0 +1,101 @@
+---
+import { render, type CollectionEntry } from 'astro:content';
+import ArticleLayout from '@/layouts/ArticleLayout.astro';
+import Icon from '@/components/Icon.astro';
+import Timeline from '@/components/Timeline.astro';
+import { getPublished } from '@/lib/content';
+import { formatDate, isoDate, readingTime } from '@/lib/format';
+import { bbPlatforms, bbStatuses, severities } from '@/lib/taxonomy';
+import { tone } from '@/lib/tone';
+
+export async function getStaticPaths() {
+  const entries = await getPublished('bugbounty');
+  return entries.map((entry) => ({ params: { slug: entry.id }, props: { entry } }));
+}
+
+interface Props {
+  entry: CollectionEntry<'bugbounty'>;
+}
+
+const { entry } = Astro.props;
+const { Content, headings } = await render(entry);
+const d = entry.data;
+const severity = severities[d.severity];
+const cweUrl = d.cwe && `https://cwe.mitre.org/data/definitions/${d.cwe.replace('CWE-', '')}.html`;
+const cvssUrl = d.cvssVector?.startsWith('CVSS:3.1/') && `https://www.first.org/cvss/calculator/3.1#${d.cvssVector}`;
+
+const facts = [
+  { label: 'Programa', value: d.program },
+  { label: 'Plataforma', value: d.platform ? bbPlatforms[d.platform] : undefined },
+  { label: 'Estado', value: bbStatuses[d.status] },
+  { label: 'Recompensa', value: d.bounty },
+].filter((f): f is { label: string; value: string } => Boolean(f.value));
+---
+
+<ArticleLayout title={d.title} description={d.summary} section="bb" path={['bugbounty', entry.id]} headings={headings} draft={d.draft} ogImage={`/og/bugbounty/${entry.id}.png`} publishedTime={d.date}>
+  <header slot="header" style={tone(severity.color)} class="tone-border flex flex-col gap-5 rounded-2xl border bg-panel/90 p-5 sm:p-6">
+    <div class="flex flex-wrap items-center gap-3">
+      <span class="tone-pill rounded-md px-3 py-1 font-mono text-sm font-bold tracking-widest uppercase">{severity.label}</span>
+      {d.cvss !== undefined && <span class="tone-text font-mono text-2xl font-extrabold">{d.cvss.toFixed(1)}</span>}
+      {
+        d.cvssVector &&
+          (cvssUrl ? (
+            <a href={cvssUrl} target="_blank" rel="noopener" class="font-mono text-xs break-all text-subtle hover:text-brand">
+              {d.cvssVector}
+            </a>
+          ) : (
+            <span class="font-mono text-xs break-all text-subtle">{d.cvssVector}</span>
+          ))
+      }
+    </div>
+
+    <div class="flex flex-col gap-3">
+      <p class="font-mono text-[13px] tracking-[0.2em] text-bb uppercase">Reporte de bug bounty</p>
+      <h1 class="text-[30px] leading-tight font-bold text-fg-strong sm:text-[36px]">{d.title}</h1>
+      <p class="text-[17px] leading-relaxed text-muted">{d.summary}</p>
+    </div>
+
+    <dl class="grid grid-cols-2 gap-4 border-t border-line pt-4 font-mono text-[13px] sm:grid-cols-3 lg:grid-cols-6">
+      {
+        facts.map((f) => (
+          <div>
+            <dt class="text-[11px] tracking-[0.14em] text-subtle uppercase">{f.label}</dt>
+            <dd class="mt-1 text-fg-strong">{f.value}</dd>
+          </div>
+        ))
+      }
+      {
+        d.cwe && (
+          <div>
+            <dt class="text-[11px] tracking-[0.14em] text-subtle uppercase">CWE</dt>
+            <dd class="mt-1">
+              <a href={cweUrl} target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-brand hover:underline">
+                {d.cwe}
+                <Icon name="external" size={12} />
+              </a>
+            </dd>
+          </div>
+        )
+      }
+      <div>
+        <dt class="text-[11px] tracking-[0.14em] text-subtle uppercase">Publicado</dt>
+        <dd class="mt-1 text-fg-strong">
+          <time datetime={isoDate(d.date)}>{formatDate(d.date)}</time> · {readingTime(entry.body)} min
+        </dd>
+      </div>
+    </dl>
+  </header>
+
+  <Content />
+
+  {
+    d.timeline.length > 0 && (
+      <section slot="footer" aria-labelledby="timeline-title" class="flex flex-col gap-4 rounded-2xl border border-line bg-panel/80 p-5 sm:p-6">
+        <h2 id="timeline-title" class="font-mono text-lg font-bold text-fg-strong">
+          <span class="text-bb">##</span> Cronología
+        </h2>
+        <Timeline items={d.timeline} color={severity.color} />
+      </section>
+    )
+  }
+</ArticleLayout>

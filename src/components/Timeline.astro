@@ -1,0 +1,32 @@
+---
+import { formatDate, isoDate } from '@/lib/format';
+import { tone } from '@/lib/tone';
+
+interface Props {
+  items: { date: Date; event: string }[];
+  /** Token de color de los puntos. */
+  color?: string;
+}
+
+const { items, color = 'bb' } = Astro.props;
+---
+
+<ol class="relative flex flex-col gap-4 border-l border-line pl-6" style={tone(color)}>
+  {
+    items.map((item, i) => (
+      <li class="relative">
+        <span
+          aria-hidden="true"
+          class:list={[
+            'absolute top-1.5 -left-[29px] size-2.5 rounded-full ring-4 ring-base',
+            i === items.length - 1 ? 'tone-pill' : 'bg-line-strong',
+          ]}
+        />
+        <time datetime={isoDate(item.date)} class="block font-mono text-xs text-subtle">
+          {formatDate(item.date)}
+        </time>
+        <p class="text-[15px] text-fg">{item.event}</p>
+      </li>
+    ))
+  }
+</ol>

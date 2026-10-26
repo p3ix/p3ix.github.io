@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /kit/
+
+Sitemap: https://p3ix.github.io/sitemap-index.xml

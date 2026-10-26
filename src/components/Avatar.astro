@@ -1,0 +1,37 @@
+---
+import { Image } from 'astro:assets';
+
+interface Props {
+  size?: 'md' | 'lg';
+}
+
+const { size = 'md' } = Astro.props;
+const large = size === 'lg';
+
+// Si existe src/assets/avatar.(png|jpg|jpeg|webp) se usa la foto; si no, la firma "p3i".
+const found = import.meta.glob<{ default: ImageMetadata }>('/src/assets/avatar.{png,jpg,jpeg,webp}', {
+  eager: true,
+});
+const avatar = Object.values(found)[0]?.default;
+---
+
+<div
+  class:list={[
+    'shrink-0 rounded-full bg-[conic-gradient(from_210deg,var(--color-home),var(--color-ctf),var(--color-bb),var(--color-tools),var(--color-biblia),var(--color-home))] p-[3px] shadow-[0_0_34px_color-mix(in_oklab,var(--color-brand)_35%,transparent),0_0_60px_color-mix(in_oklab,var(--color-biblia)_20%,transparent)]',
+    large ? 'size-[168px]' : 'size-[124px]',
+  ]}
+>
+  <div
+    class="grid size-full place-items-center overflow-hidden rounded-full bg-[radial-gradient(circle_at_50%_40%,var(--color-panel),var(--color-base)_70%)]"
+  >
+    {
+      avatar ? (
+        <Image src={avatar} alt="Avatar de p3i" width={large ? 336 : 248} height={large ? 336 : 248} class="size-full object-cover" />
+      ) : (
+        <span aria-label="p3i" role="img" class:list={['-rotate-8 font-tag leading-none text-brand text-glow', large ? 'text-[70px]' : 'text-[52px]']}>
+          p3i
+        </span>
+      )
+    }
+  </div>
+</div>

@@ -1,0 +1,60 @@
+---
+title: Kerberoasting
+summary: Pedir tickets de servicio con cualquier cuenta del dominio y crackear offline la contraseña de las cuentas de servicio.
+date: 2026-10-25
+area: ad
+order: 20
+related: [impacket-getuserspns, impacket-getnpusers]
+tags: [kerberos, spn, cracking]
+---
+
+## Qué es
+
+En Kerberos, cualquier usuario autenticado puede pedir un ticket de servicio (TGS) para cualquier
+cuenta que tenga un **SPN** (Service Principal Name). Parte de ese ticket va cifrada con la
+contraseña de la cuenta de servicio, así que se puede crackear **offline**, sin tocar más el
+dominio y sin bloqueos de cuenta.
+
+Las cuentas de servicio suelen tener contraseñas antiguas, que no caducan y con privilegios altos:
+por eso es uno de los primeros ataques en cuanto se consigue una cuenta de dominio.
+
+## Requisitos
+
+- Una cuenta de dominio cualquiera (usuario y contraseña, o su hash).
+- Alcance a un controlador de dominio por el puerto 88.
+
+## Pedir los tickets
+
+<Cmd id="impacket-getuserspns" />
+
+Con NetExec en una sola línea:
+
+```bash
+nxc ldap {{DC_IP}} -u {{USER}} -p '{{PASS}}' --kerberoasting kerberoast.hash
+```
+
+## Crackear
+
+El modo de hashcat depende del cifrado del ticket (el número tras `$krb5tgs$`):
+
+| Cifrado | etype | Modo de hashcat |
+| --- | --- | --- |
+| RC4 | 23 | `13100` |
+| AES128 | 17 | `19600` |
+| AES256 | 18 | `19700` |
+
+```bash
+hashcat -m 13100 kerberoast.hash /usr/share/wordlists/rockyou.txt
+```
+
+## Cómo se detecta
+
+- Muchos eventos **4769** de un mismo usuario en poco tiempo, sobre todo pidiendo cifrado RC4
+  (tipo `0x17`) en un dominio que usa AES.
+- Una cuenta cebo con SPN que nadie usa: cualquier ticket pedido para ella es sospechoso.
+
+## Cómo se mitiga
+
+- Cuentas de servicio administradas por el dominio (**gMSA**), con contraseñas largas que rotan solas.
+- Si no es posible, contraseñas de 25 caracteres o más y solo cifrado AES en esas cuentas.
+- Quitar los SPN que ya no se usan y revisar qué cuentas con SPN tienen privilegios altos.

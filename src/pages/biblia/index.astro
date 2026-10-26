@@ -1,0 +1,91 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import EmptyState from '@/components/EmptyState.astro';
+import Icon from '@/components/Icon.astro';
+import PageHeader from '@/components/PageHeader.astro';
+import { getCommands, getNotes } from '@/lib/content';
+import { sectionById } from '@/lib/sections';
+import { AREA_IDS, areas } from '@/lib/taxonomy';
+import { tone } from '@/lib/tone';
+
+const notes = await getNotes();
+const commands = await getCommands();
+const tools = new Set(commands.map((c) => c.tool));
+
+// Solo las áreas que ya tienen algo, en el orden de taxonomy.ts.
+const byArea = AREA_IDS.map((id) => ({
+  id,
+  ...areas[id],
+  notes: notes
+    .filter((n) => n.data.area === id)
+    .sort((a, b) => (a.data.order ?? Infinity) - (b.data.order ?? Infinity) || a.data.title.localeCompare(b.data.title)),
+  commandCount: commands.filter((c) => c.area === id).length,
+})).filter((a) => a.notes.length > 0 || a.commandCount > 0);
+
+const description =
+  'Metodología y comandos que uso en auditorías y máquinas, ordenados por área. Cada nota explica el porqué, cómo se detecta y cómo se mitiga.';
+---
+
+<BaseLayout title="Biblia" description={description} section="biblia" path={['biblia']} ogImage="/og/biblia.png">
+  <PageHeader section={sectionById.biblia} title="Biblia de hacking" description={description} />
+
+  <a
+    href="/biblia/comandos/"
+    class="group flex flex-wrap items-center gap-5 rounded-2xl border border-biblia/40 bg-biblia/6 p-5 shadow-[0_0_50px_color-mix(in_oklab,var(--color-biblia)_8%,transparent)] transition-transform hover:-translate-y-0.5 sm:p-6"
+  >
+    <span class="grid size-14 shrink-0 place-items-center rounded-xl bg-biblia text-on-accent">
+      <Icon name="terminal" size={26} strokeWidth={2.2} />
+    </span>
+    <span class="flex min-w-[220px] flex-1 flex-col gap-1">
+      <span class="text-xl font-bold text-fg-strong">Buscador de comandos</span>
+      <span class="text-[15px] text-muted">
+        {commands.length} comandos de {tools.size} {tools.size === 1 ? 'herramienta' : 'herramientas'}. Rellena el objetivo una vez y copia cada comando listo para pegar.
+      </span>
+    </span>
+    <span class="inline-flex items-center gap-2 font-mono text-sm text-biblia">
+      Abrir
+      <Icon name="arrow-right" size={16} class="transition-transform group-hover:translate-x-0.5" />
+    </span>
+  </a>
+
+  {
+    byArea.length > 0 ? (
+      <section aria-labelledby="areas-title" class="flex flex-col gap-4">
+        <h2 id="areas-title" class="font-mono text-xl font-bold text-fg-strong">
+          <span class="text-biblia">##</span> Áreas
+        </h2>
+        <div class="grid gap-4 md:grid-cols-2">
+          {byArea.map((a) => (
+            <section style={tone(a.color)} aria-labelledby={`area-${a.id}`} class="tone-border flex flex-col gap-3.5 rounded-2xl border bg-panel/90 p-5">
+              <div class="flex items-center justify-between gap-3">
+                <h3 id={`area-${a.id}`} class="tone-text inline-flex items-center gap-2.5 font-mono text-sm font-bold tracking-[0.14em] uppercase">
+                  <span class="tone-pill size-2.5 rounded-full" />
+                  {a.label}
+                </h3>
+                <span class="font-mono text-xs text-subtle">
+                  {a.notes.length} {a.notes.length === 1 ? 'nota' : 'notas'} · {a.commandCount} {a.commandCount === 1 ? 'comando' : 'comandos'}
+                </span>
+              </div>
+              {a.notes.length > 0 ? (
+                <ul class="flex flex-col gap-1">
+                  {a.notes.map((n) => (
+                    <li>
+                      <a href={`/biblia/${n.id}/`} class="group flex flex-col rounded-lg px-3 py-2.5 transition-colors hover:bg-white/3">
+                        <span class="font-semibold text-fg-strong group-hover:tone-text">{n.data.title}</span>
+                        <span class="text-sm leading-relaxed text-muted">{n.data.summary}</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p class="text-sm text-subtle">Aún sin notas: de momento, solo comandos.</p>
+              )}
+            </section>
+          ))}
+        </div>
+      </section>
+    ) : (
+      <EmptyState color="biblia">Aún no hay notas en la biblia.</EmptyState>
+    )
+  }
+</BaseLayout>

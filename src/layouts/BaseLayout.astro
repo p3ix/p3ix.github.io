@@ -1,0 +1,137 @@
+---
+import '@fontsource-variable/jetbrains-mono';
+import '@fontsource/chakra-petch/400.css';
+import '@fontsource/chakra-petch/500.css';
+import '@fontsource/chakra-petch/600.css';
+import '@fontsource/chakra-petch/700.css';
+import '@fontsource/sedgwick-ave-display';
+import '@/styles/global.css';
+
+import CommandPalette from '@/components/CommandPalette.astro';
+import Icon from '@/components/Icon.astro';
+import Sidebar from '@/components/Sidebar.astro';
+import Topbar from '@/components/Topbar.astro';
+import { profile } from '@/data/profile';
+import { sectionById, type SectionId } from '@/lib/sections';
+
+interface Props {
+  title?: string;
+  description?: string;
+  /** Sección activa en el menú y color del final de la ruta. */
+  section?: SectionId;
+  /** Segmentos de la ruta de la barra superior, p. ej. ['biblia', 'comandos']. */
+  path?: string[];
+  noindex?: boolean;
+  /** Imagen para redes sociales (generada en src/pages/og/[...route].png.ts). */
+  ogImage?: string;
+  type?: 'website' | 'article';
+  publishedTime?: Date;
+}
+
+const {
+  title,
+  description = 'Writeups de bug bounty y CTF, biblia de comandos y whoami de p3i.',
+  section,
+  path = [],
+  noindex = false,
+  ogImage = '/og/default.png',
+  type = 'website',
+  publishedTime,
+} = Astro.props;
+
+const fullTitle = title ? `${title} · p3i` : 'p3i · bug bounty hunter';
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const ogImageUrl = new URL(ogImage, Astro.site);
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="theme-color" content="#05080c" />
+    <link rel="sitemap" href="/sitemap-index.xml" />
+    <link rel="alternate" type="application/rss+xml" title="p3i · RSS" href="/rss.xml" />
+
+    <meta property="og:site_name" content="p3i" />
+    <meta property="og:locale" content="es_ES" />
+    <meta property="og:type" content={type} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImageUrl} />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={fullTitle} />
+    {publishedTime && <meta property="article:published_time" content={publishedTime.toISOString()} />}
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImageUrl} />
+    {noindex && <meta name="robots" content="noindex" />}
+    <meta name="generator" content={Astro.generator} />
+  </head>
+  <body class="min-h-dvh bg-grid">
+    <a
+      href="#contenido"
+      class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-60 focus:rounded-lg focus:bg-brand focus:px-4 focus:py-2 focus:font-mono focus:text-on-accent"
+    >
+      Saltar al contenido
+    </a>
+
+    <div class="lg:flex">
+      <Sidebar current={section} />
+      <div class="flex min-h-dvh min-w-0 flex-1 flex-col">
+        <Topbar path={path} accent={section ? sectionById[section].cls.text : undefined} />
+        <main id="contenido" class="mx-auto flex w-full max-w-[1080px] flex-1 flex-col gap-7 px-4 py-8 sm:px-10 sm:py-9">
+          <slot />
+        </main>
+        <footer
+          class="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-5 font-mono text-[13px] text-subtle sm:px-10"
+        >
+          <span>{profile.handle} · hecho en Burgos</span>
+          <span class="flex items-center gap-4">
+            <a href="/rss.xml" class="inline-flex min-h-11 items-center gap-1.5 hover:text-brand"><Icon name="rss" size={14} />RSS</a>
+            <span class="text-brand">{profile.site}</span>
+          </span>
+        </footer>
+      </div>
+    </div>
+
+    <CommandPalette />
+
+    <script>
+      import { initPalette } from '@/scripts/palette';
+      import { initVars } from '@/scripts/vars';
+
+      initVars();
+      initPalette();
+
+      // Menú lateral en móvil. En escritorio la sidebar está siempre visible (lg:flex).
+      const sidebar = document.querySelector<HTMLElement>('[data-sidebar]');
+      const openBtn = document.querySelector<HTMLButtonElement>('[data-sidebar-open]');
+      const closeBtn = document.querySelector<HTMLButtonElement>('[data-sidebar-close]');
+      const isMobile = () => window.matchMedia('(max-width: 63.99rem)').matches;
+
+      const setOpen = (open: boolean) => {
+        if (!sidebar || !openBtn) return;
+        sidebar.classList.toggle('hidden', !open);
+        sidebar.classList.toggle('flex', open);
+        openBtn.setAttribute('aria-expanded', String(open));
+        document.body.classList.toggle('overflow-hidden', open);
+        (open ? closeBtn : openBtn)?.focus();
+      };
+
+      openBtn?.addEventListener('click', () => setOpen(true));
+      closeBtn?.addEventListener('click', () => setOpen(false));
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && isMobile() && openBtn?.getAttribute('aria-expanded') === 'true') setOpen(false);
+      });
+    </script>
+  </body>
+</html>

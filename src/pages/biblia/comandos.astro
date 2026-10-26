@@ -1,0 +1,126 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import CommandCard from '@/components/CommandCard.astro';
+import EmptyState from '@/components/EmptyState.astro';
+import Icon from '@/components/Icon.astro';
+import PageHeader from '@/components/PageHeader.astro';
+import VarBar from '@/components/VarBar.astro';
+import { getCommands } from '@/lib/content';
+import { sectionById } from '@/lib/sections';
+import { AREA_IDS, LAUNCH_OS_IDS, PHASE_IDS, areas, phases } from '@/lib/taxonomy';
+import { tone } from '@/lib/tone';
+
+const commands = await getCommands();
+const tools = new Set(commands.map((c) => c.tool));
+
+// Solo se ofrecen filtros que devuelven algo.
+const areaFilters = AREA_IDS.map((id) => ({ id, ...areas[id], count: commands.filter((c) => c.area === id).length })).filter(
+  (a) => a.count > 0,
+);
+const phaseFilters = PHASE_IDS.filter((id) => commands.some((c) => c.phase === id));
+const osFilters = LAUNCH_OS_IDS.filter((id) => commands.some((c) => c.os.includes(id)));
+
+const description = 'Todos los comandos de la biblia en un sitio. Busca por herramienta, técnica o flag y filtra por área, fase o sistema.';
+const chip =
+  'min-h-9 rounded-full border border-line-strong px-3 font-mono text-xs text-muted transition-colors hover:text-fg-strong aria-pressed:border-biblia/55 aria-pressed:bg-biblia/12 aria-pressed:text-fg-strong';
+---
+
+<BaseLayout title="Comandos" description={description} section="biblia" path={['biblia', 'comandos']} ogImage="/og/biblia/comandos.png">
+  <PageHeader section={sectionById.biblia} kicker="Biblia" title="Buscador de comandos" description={description}>
+    <p class="font-mono text-sm text-subtle">
+      {commands.length} comandos · {tools.size} {tools.size === 1 ? 'herramienta' : 'herramientas'} · también con <kbd class="rounded border border-biblia/50 px-1.5 text-biblia">Ctrl K</kbd> desde cualquier página
+    </p>
+  </PageHeader>
+
+  <VarBar />
+
+  {
+    commands.length === 0 ? (
+      <EmptyState color="biblia">Aún no hay comandos en la biblia.</EmptyState>
+    ) : (
+      <div data-commands-app class="flex flex-wrap items-start gap-6">
+        <div class="flex min-w-0 flex-[1_1_240px] flex-col gap-5 rounded-2xl border border-line bg-panel/90 p-4 lg:sticky lg:top-24">
+          <div class="flex items-center gap-2.5 rounded-xl border border-line-strong bg-code px-3 focus-within:border-biblia/60">
+            <Icon name="search" size={17} class="shrink-0 text-subtle" />
+            <label for="cmd-q" class="sr-only">Buscar comandos</label>
+            <input
+              id="cmd-q"
+              data-commands-query
+              type="search"
+              placeholder="kerberos, smb, -hashes…"
+              spellcheck="false"
+              autocomplete="off"
+              class="h-11 w-full min-w-0 bg-transparent font-mono text-sm text-fg-strong outline-none placeholder:text-subtle/70"
+            />
+          </div>
+
+          <fieldset class="flex flex-col gap-1">
+            <legend class="mb-2 font-mono text-[11px] tracking-[0.18em] text-subtle uppercase">Área</legend>
+            <button type="button" data-filter="area" data-value="all" aria-pressed="true" class="flex min-h-10 items-center gap-2.5 rounded-lg px-3 text-left font-mono text-[13px] text-muted transition-colors hover:text-fg-strong aria-pressed:bg-white/5 aria-pressed:font-bold aria-pressed:text-fg-strong">
+              <span class="size-2.5 rounded-full bg-fg"></span>
+              Todas
+              <span class="ml-auto text-xs text-subtle">{commands.length}</span>
+            </button>
+            {
+              areaFilters.map((a) => (
+                <button
+                  type="button"
+                  data-filter="area"
+                  data-value={a.id}
+                  aria-pressed="false"
+                  style={tone(a.color)}
+                  class="flex min-h-10 items-center gap-2.5 rounded-lg border border-transparent px-3 text-left font-mono text-[13px] text-muted transition-colors hover:text-fg-strong aria-pressed:tone-border aria-pressed:tone-faint aria-pressed:font-bold aria-pressed:text-fg-strong"
+                >
+                  <span class="tone-pill size-2.5 rounded-full" />
+                  {a.label}
+                  <span class="ml-auto text-xs text-subtle">{a.count}</span>
+                </button>
+              ))
+            }
+          </fieldset>
+
+          <fieldset class="flex flex-col gap-2">
+            <legend class="mb-2 font-mono text-[11px] tracking-[0.18em] text-subtle uppercase">Fase</legend>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" data-filter="phase" data-value="all" aria-pressed="true" class={chip}>todas</button>
+              {phaseFilters.map((id) => (
+                <button type="button" data-filter="phase" data-value={id} aria-pressed="false" class={chip}>
+                  {phases[id].toLowerCase()}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+
+          <fieldset class="flex flex-col gap-2">
+            <legend class="mb-2 font-mono text-[11px] tracking-[0.18em] text-subtle uppercase">Se lanza desde</legend>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" data-filter="os" data-value="all" aria-pressed="true" class={chip}>cualquiera</button>
+              {osFilters.map((id) => (
+                <button type="button" data-filter="os" data-value={id} aria-pressed="false" class={chip}>
+                  {id}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+        </div>
+
+        <div class="flex min-w-0 flex-[999_1_520px] flex-col gap-3.5">
+          <p data-commands-count aria-live="polite" class="font-mono text-xs text-subtle">
+            {commands.length} comandos
+          </p>
+          {commands.map((c) => (
+            <CommandCard command={c} level={2} />
+          ))}
+          <p data-commands-empty hidden class="rounded-2xl border border-dashed border-line-strong px-6 py-10 text-center font-mono text-sm text-subtle">
+            <span class="text-biblia">[*]</span> Ningún comando coincide. Prueba con otra palabra o quita algún filtro.
+          </p>
+        </div>
+      </div>
+    )
+  }
+</BaseLayout>
+
+<script>
+  import { initCommandsPage } from '@/scripts/commands-page';
+  initCommandsPage();
+</script>

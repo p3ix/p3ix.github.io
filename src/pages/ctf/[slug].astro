@@ -1,0 +1,89 @@
+---
+import { Image } from 'astro:assets';
+import { render, type CollectionEntry } from 'astro:content';
+import ArticleLayout from '@/layouts/ArticleLayout.astro';
+import DifficultyMeter from '@/components/DifficultyMeter.astro';
+import { getPublished } from '@/lib/content';
+import { formatDate, isoDate, monogram, readingTime } from '@/lib/format';
+import { ctfPlatforms, targetOs } from '@/lib/taxonomy';
+import { tone } from '@/lib/tone';
+
+export async function getStaticPaths() {
+  const entries = await getPublished('ctf');
+  return entries.map((entry) => ({ params: { slug: entry.id }, props: { entry } }));
+}
+
+interface Props {
+  entry: CollectionEntry<'ctf'>;
+}
+
+const { entry } = Astro.props;
+const { Content, headings } = await render(entry);
+const d = entry.data;
+---
+
+<ArticleLayout title={d.title} description={d.summary} section="ctf" path={['ctf', entry.id]} headings={headings} draft={d.draft} ogImage={`/og/ctf/${entry.id}.png`} publishedTime={d.date}>
+  <header slot="header" style={tone('ctf')} class="tone-border flex flex-wrap gap-6 rounded-2xl border bg-panel/90 p-5 sm:p-6">
+    <div class="tone-cover relative grid size-[136px] shrink-0 place-items-center overflow-hidden rounded-xl">
+      {
+        d.cover ? (
+          <Image src={d.cover} alt={d.coverAlt ?? ''} width={272} height={272} class="absolute inset-0 size-full object-cover" />
+        ) : (
+          <span aria-hidden="true" class="tone-glow font-mono text-[56px] font-extrabold tracking-[-0.06em] text-fg-strong">
+            {monogram(d.title)}
+          </span>
+        )
+      }
+    </div>
+
+    <div class="flex min-w-[260px] flex-1 flex-col gap-3">
+      <p class="tone-text font-mono text-[13px] tracking-[0.2em] uppercase">Writeup · {ctfPlatforms[d.platform].label}</p>
+      <h1 class="font-mono text-[34px] leading-tight font-extrabold tracking-tight text-fg-strong sm:text-[40px]">{d.title}</h1>
+      <p class="text-[17px] leading-relaxed text-muted">{d.summary}</p>
+
+      <dl class="mt-1 grid grid-cols-2 gap-4 font-mono text-[13px] sm:grid-cols-4">
+        <div>
+          <dt class="text-[11px] tracking-[0.14em] text-subtle uppercase">Sistema</dt>
+          <dd class="mt-1 text-fg-strong">{targetOs[d.os]}</dd>
+        </div>
+        <div>
+          <dt class="text-[11px] tracking-[0.14em] text-subtle uppercase">Dificultad</dt>
+          <dd class="mt-1"><DifficultyMeter difficulty={d.difficulty} /></dd>
+        </div>
+        <div>
+          <dt class="text-[11px] tracking-[0.14em] text-subtle uppercase">Publicado</dt>
+          <dd class="mt-1 text-fg-strong"><time datetime={isoDate(d.date)}>{formatDate(d.date)}</time></dd>
+        </div>
+        <div>
+          <dt class="text-[11px] tracking-[0.14em] text-subtle uppercase">Lectura</dt>
+          <dd class="mt-1 text-fg-strong">{readingTime(entry.body)} min</dd>
+        </div>
+      </dl>
+
+      <div class="flex flex-col gap-2.5 border-t border-line pt-4">
+        <ul class="flex flex-wrap gap-2" aria-label="Técnicas">
+          {d.techniques.map((t) => <li class="tone-soft tone-text rounded-md px-2 py-0.5 font-mono text-xs">{t}</li>)}
+        </ul>
+        {
+          d.tools.length > 0 && (
+            <ul class="flex flex-wrap gap-2" aria-label="Herramientas">
+              {d.tools.map((t) => (
+                <li class="rounded-md border border-line-strong px-2 py-0.5 font-mono text-xs text-muted">{t}</li>
+              ))}
+            </ul>
+          )
+        }
+      </div>
+    </div>
+  </header>
+
+  <Content />
+
+  {
+    d.tags.length > 0 && (
+      <ul slot="footer" class="flex flex-wrap gap-2 border-t border-line pt-5" aria-label="Etiquetas">
+        {d.tags.map((t) => <li class="font-mono text-sm text-tags">#{t}</li>)}
+      </ul>
+    )
+  }
+</ArticleLayout>

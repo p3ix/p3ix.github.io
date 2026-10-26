@@ -1,0 +1,98 @@
+---
+import { render, type CollectionEntry } from 'astro:content';
+import ArticleLayout from '@/layouts/ArticleLayout.astro';
+import Cmd from '@/components/Cmd.astro';
+import CommandCard from '@/components/CommandCard.astro';
+import VarBar from '@/components/VarBar.astro';
+import { getCommands, getNotes, variablesIn, type Command } from '@/lib/content';
+import { formatDate, isoDate, readingTime } from '@/lib/format';
+import { areas } from '@/lib/taxonomy';
+import { tone } from '@/lib/tone';
+
+export async function getStaticPaths() {
+  const notes = await getNotes();
+  return notes.map((entry) => ({ params: { slug: entry.id }, props: { entry } }));
+}
+
+interface Props {
+  entry: CollectionEntry<'notes'>;
+}
+
+const { entry } = Astro.props;
+const { Content, headings } = await render(entry);
+const d = entry.data;
+const area = areas[d.area];
+const [commands, notes] = await Promise.all([getCommands(), getNotes()]);
+
+// Comandos incrustados con <Cmd id="..." /> en el cuerpo de la nota.
+const embeddedIds = [...(entry.body ?? '').matchAll(/<Cmd\s+id=["']([^"']+)["']/g)].map((m) => m[1]);
+const embedded = commands.filter((c) => embeddedIds.includes(c.id));
+
+// `related` acepta ids de comandos o de notas; cualquier otra cosa rompe el build.
+const relatedCommands: Command[] = [];
+const relatedNotes: CollectionEntry<'notes'>[] = [];
+for (const id of d.related) {
+  const command = commands.find((c) => c.id === id);
+  const note = notes.find((n) => n.id === id);
+  if (command) {
+    // Si ya está incrustado en el cuerpo no se repite abajo (y no se duplica su id en el HTML).
+    if (!embeddedIds.includes(id)) relatedCommands.push(command);
+  } else if (note) {
+    relatedNotes.push(note);
+  } else {
+    throw new Error(`Nota ${entry.id}: "${id}" en related no es ningún comando ni ninguna nota.`);
+  }
+}
+
+const varNames = variablesIn(entry.body, ...embedded.map((c) => c.cmd), ...relatedCommands.map((c) => c.cmd));
+const meta = [
+  `${formatDate(d.date)}`,
+  d.updated && `actualizada ${formatDate(d.updated)}`,
+  `${readingTime(entry.body)} min`,
+].filter(Boolean);
+---
+
+<ArticleLayout title={d.title} description={d.summary} section="biblia" path={['biblia', ...entry.id.split('/')]} headings={headings} draft={d.draft} ogImage={`/og/biblia/${entry.id}.png`} publishedTime={d.date}>
+  <div slot="header" class="flex flex-col gap-5">
+    <header style={tone(area.color)} class="tone-border flex flex-col gap-3 rounded-2xl border bg-panel/90 p-5 sm:p-6">
+      <a href="/biblia/" class="tone-text inline-flex items-center gap-2.5 self-start font-mono text-[13px] tracking-[0.2em] uppercase hover:underline">
+        <span class="tone-pill size-2.5 rounded-full"></span>
+        Biblia · {area.label}
+      </a>
+      <h1 class="font-mono text-[32px] leading-tight font-extrabold tracking-tight text-fg-strong sm:text-[38px]">{d.title}</h1>
+      <p class="text-[17px] leading-relaxed text-muted">{d.summary}</p>
+      <p class="flex flex-wrap gap-x-3 gap-y-1 font-mono text-xs text-subtle">
+        <time datetime={isoDate(d.updated ?? d.date)}>{meta.join(' · ')}</time>
+        {d.tags.map((t) => <span class="text-tags/80">#{t}</span>)}
+      </p>
+    </header>
+    <VarBar names={varNames} />
+  </div>
+
+  <Content components={{ Cmd }} />
+
+  {
+    (relatedCommands.length > 0 || relatedNotes.length > 0) && (
+      <section slot="footer" aria-labelledby="related-title" class="flex flex-col gap-4 border-t border-line pt-6">
+        <h2 id="related-title" class="font-mono text-xl font-bold text-fg-strong">
+          <span class="text-biblia">##</span> Relacionado
+        </h2>
+        {relatedCommands.map((c) => (
+          <CommandCard command={c} />
+        ))}
+        {relatedNotes.length > 0 && (
+          <ul class="flex flex-col gap-2">
+            {relatedNotes.map((n) => (
+              <li>
+                <a href={`/biblia/${n.id}/`} class="font-semibold text-biblia hover:underline">
+                  {n.data.title}
+                </a>
+                <span class="text-muted"> · {n.data.summary}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    )
+  }
+</ArticleLayout>

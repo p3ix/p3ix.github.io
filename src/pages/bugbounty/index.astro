@@ -1,0 +1,68 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import EmptyState from '@/components/EmptyState.astro';
+import PageHeader from '@/components/PageHeader.astro';
+import { getPublished } from '@/lib/content';
+import { entryBadge, formatDate, isoDate } from '@/lib/format';
+import { sectionById } from '@/lib/sections';
+import { bbPlatforms, bbStatuses, severities } from '@/lib/taxonomy';
+import { tone } from '@/lib/tone';
+
+const entries = await getPublished('bugbounty');
+
+const description =
+  'Reportes reales, publicados solo con permiso del programa y redactados: cómo encontré cada fallo, su impacto y cómo se corrige.';
+---
+
+<BaseLayout title="Bug bounty" description={description} section="bb" path={['bugbounty']} ogImage="/og/bugbounty.png">
+  <PageHeader section={sectionById.bb} title="Bug bounty" description={description}>
+    {
+      entries.length > 0 && (
+        <p class="font-mono text-sm text-subtle">
+          {entries.length} {entries.length === 1 ? 'reporte' : 'reportes'}
+        </p>
+      )
+    }
+  </PageHeader>
+
+  {
+    entries.length > 0 ? (
+      <ul class="flex flex-col gap-3">
+        {entries.map((entry) => {
+          const d = entry.data;
+          const severity = severities[d.severity];
+          const badge = entryBadge(d);
+          const where = [d.program, d.platform && bbPlatforms[d.platform], d.cwe].filter(Boolean).join(' · ');
+          return (
+            <li>
+              <a
+                href={`/bugbounty/${entry.id}/`}
+                style={tone(severity.color)}
+                class="tone-border group flex flex-wrap items-center gap-x-5 gap-y-3 rounded-2xl border bg-panel/90 px-5 py-4 transition-transform hover:-translate-y-0.5"
+              >
+                <span class="tone-pill w-[92px] rounded-md py-1 text-center font-mono text-xs font-bold tracking-widest uppercase">
+                  {severity.label}
+                </span>
+                <div class="flex min-w-[220px] flex-1 flex-col gap-1">
+                  <h2 class="text-lg leading-snug font-semibold text-fg-strong">
+                    {d.title}
+                    {badge && <span class="ml-2 align-middle font-mono text-[10px] tracking-widest text-warn">{badge}</span>}
+                  </h2>
+                  <p class="font-mono text-xs text-subtle">{where}</p>
+                </div>
+                <div class="flex flex-col items-end gap-1 font-mono text-xs text-muted max-sm:items-start">
+                  <span>{bbStatuses[d.status]}</span>
+                  <time datetime={isoDate(d.date)} class="text-subtle">
+                    {formatDate(d.date)}
+                  </time>
+                </div>
+              </a>
+            </li>
+          );
+        })}
+      </ul>
+    ) : (
+      <EmptyState color="bb">Aún no hay reportes publicados.</EmptyState>
+    )
+  }
+</BaseLayout>

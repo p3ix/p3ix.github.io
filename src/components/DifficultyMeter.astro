@@ -1,0 +1,22 @@
+---
+import { difficulties, type DifficultyId } from '@/lib/taxonomy';
+import { tone } from '@/lib/tone';
+
+interface Props {
+  difficulty: DifficultyId;
+}
+
+const d = difficulties[Astro.props.difficulty];
+const total = Object.keys(difficulties).length;
+---
+
+<span class="inline-flex items-center gap-2.5" style={tone(d.color)}>
+  <span role="img" aria-label={`Dificultad ${d.label}, ${d.level} de ${total}`} class="flex gap-[3px]">
+    {
+      Array.from({ length: total }, (_, i) => (
+        <span class:list={['h-2 w-[18px] rounded-sm', i < d.level ? 'tone-pill' : 'bg-line-strong']} />
+      ))
+    }
+  </span>
+  <span class="tone-text">{d.label}</span>
+</span>
