@@ -1,0 +1,108 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import CommandCard from '@/components/CommandCard.astro';
+import EntryCard from '@/components/EntryCard.astro';
+import Icon from '@/components/Icon.astro';
+import PageHeader from '@/components/PageHeader.astro';
+import VarBar from '@/components/VarBar.astro';
+import { bugbountyCard, ctfCard, noteCard, type EntryCardProps } from '@/lib/cards';
+import { variablesIn } from '@/lib/content';
+import { sectionById } from '@/lib/sections';
+import { getTags, relatedTags, tagBreakdown, tagHref, type Tag } from '@/lib/tags';
+import { tone } from '@/lib/tone';
+
+export async function getStaticPaths() {
+  const tags = await getTags();
+  return tags.map((tag) => ({ params: { tag: tag.name }, props: { tag, related: relatedTags(tag, tags) } }));
+}
+
+interface Props {
+  tag: Tag;
+  related: Tag[];
+}
+
+const { tag, related } = Astro.props;
+const breakdown = tagBreakdown(tag);
+
+const groups: { id: string; title: string; color: string; cards: EntryCardProps[] }[] = [
+  { id: 'ctf', title: 'Writeups CTF', color: 'ctf', cards: tag.ctf.map(ctfCard) },
+  { id: 'bugbounty', title: 'Bug bounty', color: 'bb', cards: tag.bugbounty.map(bugbountyCard) },
+  { id: 'biblia', title: 'Biblia', color: 'biblia', cards: tag.notes.map(noteCard) },
+].filter((g) => g.cards.length > 0);
+
+const varNames = variablesIn(...tag.commands.map((c) => c.cmd));
+const description = `Todo lo etiquetado con #${tag.name} en p3i: ${breakdown.map((b) => b.label).join(', ')}.`;
+---
+
+<BaseLayout title={`#${tag.name}`} description={description} section="tags" path={['etiquetas', tag.name]} ogImage={`/og/etiquetas/${tag.name}.png`}>
+  <PageHeader section={sectionById.tags} kicker="Etiqueta" title={`#${tag.name}`}>
+    <ul class="flex flex-wrap gap-2" aria-label="Contenido con esta etiqueta">
+      {
+        breakdown.map((b) => (
+          <li style={tone(b.color)} class="tone-border tone-faint inline-flex items-center gap-2 rounded-full border px-3 py-1 font-mono text-xs text-fg">
+            <span class="tone-pill size-2 rounded-full" />
+            {b.label}
+          </li>
+        ))
+      }
+    </ul>
+  </PageHeader>
+
+  {
+    groups.map((g) => (
+      <section aria-labelledby={`tag-${g.id}`} class="flex flex-col gap-4">
+        <h2 id={`tag-${g.id}`} class="font-mono text-xl font-bold text-fg-strong">
+          <span style={tone(g.color)} class="tone-text">##</span> {g.title}
+        </h2>
+        <ul class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {g.cards.map((card) => (
+            <li class="grid">
+              <EntryCard {...card} />
+            </li>
+          ))}
+        </ul>
+      </section>
+    ))
+  }
+
+  {
+    tag.commands.length > 0 && (
+      <>
+        <VarBar names={varNames} />
+        <section aria-labelledby="tag-commands" class="flex flex-col gap-3.5">
+          <h2 id="tag-commands" class="font-mono text-xl font-bold text-fg-strong">
+            <span class="text-biblia">##</span> Comandos
+          </h2>
+          {tag.commands.map((c) => (
+            <CommandCard command={c} />
+          ))}
+        </section>
+      </>
+    )
+  }
+
+  {
+    related.length > 0 && (
+      <section aria-labelledby="tag-related" class="flex flex-col gap-3 border-t border-line pt-6">
+        <h2 id="tag-related" class="font-mono text-lg font-bold text-fg-strong">
+          <span class="text-tags">##</span> Etiquetas relacionadas
+        </h2>
+        <ul class="flex flex-wrap gap-2">
+          {related.map((r) => (
+            <li>
+              <a href={tagHref(r.name)} class="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-tags/35 px-3 font-mono text-sm text-fg transition-colors hover:bg-tags/12 hover:text-tags">
+                <span class="text-tags">#</span>{r.name}
+                <span class="text-xs text-subtle">{r.total}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )
+  }
+
+  <a href="/etiquetas/" class="inline-flex min-h-11 items-center gap-2 self-start font-mono text-sm text-muted hover:text-tags">
+    <Icon name="arrow-left" size={16} />
+    Todas las etiquetas
+  </a>
+</BaseLayout>

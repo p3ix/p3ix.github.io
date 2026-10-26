@@ -1,0 +1,85 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import EmptyState from '@/components/EmptyState.astro';
+import PageHeader from '@/components/PageHeader.astro';
+import { sectionById } from '@/lib/sections';
+import { TAG_KINDS, getTags, tagBreakdown, tagHref } from '@/lib/tags';
+import { tone } from '@/lib/tone';
+
+const tags = await getTags();
+const entries = new Set(tags.flatMap((t) => [...t.ctf, ...t.bugbounty, ...t.notes]));
+const commands = new Set(tags.flatMap((t) => t.commands));
+
+// Notas y comandos comparten el violeta de la biblia: en la leyenda van juntos.
+const legend = [
+  { label: 'writeups CTF', color: 'ctf' },
+  { label: 'bug bounty', color: 'bb' },
+  { label: 'biblia', color: 'biblia' },
+];
+
+const description = 'Todo el contenido por tema: writeups, reportes, notas y comandos de la biblia. Las técnicas de los writeups también cuentan como etiquetas.';
+---
+
+<BaseLayout title="Etiquetas" description={description} section="tags" path={['etiquetas']} ogImage="/og/etiquetas.png">
+  <PageHeader section={sectionById.tags} title="Etiquetas" description={description}>
+    {
+      tags.length > 0 && (
+        <div class="flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-sm text-subtle">
+          <p>
+            {tags.length} {tags.length === 1 ? 'etiqueta' : 'etiquetas'} · {entries.size} {entries.size === 1 ? 'entrada' : 'entradas'} · {commands.size} {commands.size === 1 ? 'comando' : 'comandos'}
+          </p>
+          <ul class="flex flex-wrap gap-x-4 gap-y-1 text-xs" aria-label="Leyenda">
+            {legend.map((l) => (
+              <li class="inline-flex items-center gap-1.5">
+                <span style={tone(l.color)} class="tone-pill size-2 rounded-full" />
+                {l.label}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )
+    }
+  </PageHeader>
+
+  {
+    tags.length > 0 ? (
+      <ul class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {tags.map((tag) => {
+          const breakdown = tagBreakdown(tag);
+          return (
+            <li class="grid">
+              <a
+                href={tagHref(tag.name)}
+                style={tone('tags')}
+                class="tone-border group flex min-w-0 flex-col gap-3 rounded-xl border bg-panel/90 px-4 py-3.5 transition-[translate,background-color] hover:-translate-y-0.5 hover:tone-faint"
+              >
+                <span class="flex items-baseline gap-3">
+                  <span class="min-w-0 font-mono text-[15px] font-bold break-words text-fg-strong group-hover:tone-text">
+                    <span class="tone-text">#</span>
+                    {tag.name}
+                  </span>
+                  <span class="tone-text ml-auto font-mono text-sm font-bold">{tag.total}</span>
+                </span>
+                <span aria-hidden="true" class="flex h-1 gap-px overflow-hidden rounded-full bg-line">
+                  {TAG_KINDS.filter((k) => tag[k.key].length > 0).map((k) => (
+                    <span style={`${tone(k.color)}; flex-grow: ${tag[k.key].length}`} class="tone-pill" />
+                  ))}
+                </span>
+                <span class="flex flex-wrap gap-x-3 gap-y-1 font-mono text-xs text-subtle">
+                  {breakdown.map((b) => (
+                    <span class="inline-flex items-center gap-1.5">
+                      <span style={tone(b.color)} class="tone-pill size-1.5 rounded-full" />
+                      {b.label}
+                    </span>
+                  ))}
+                </span>
+              </a>
+            </li>
+          );
+        })}
+      </ul>
+    ) : (
+      <EmptyState color="tags">Aún no hay contenido etiquetado.</EmptyState>
+    )
+  }
+</BaseLayout>

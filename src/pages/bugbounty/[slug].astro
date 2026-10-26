@@ -5,6 +5,7 @@ import Icon from '@/components/Icon.astro';
 import Timeline from '@/components/Timeline.astro';
 import { getPublished } from '@/lib/content';
 import { formatDate, isoDate, readingTime } from '@/lib/format';
+import { tagHref } from '@/lib/tags';
 import { bbPlatforms, bbStatuses, severities } from '@/lib/taxonomy';
 import { tone } from '@/lib/tone';
 
@@ -96,6 +97,20 @@ const facts = [
         </h2>
         <Timeline items={d.timeline} color={severity.color} />
       </section>
+    )
+  }
+
+  {
+    d.tags.length > 0 && (
+      <ul slot="footer" class="flex flex-wrap gap-2 border-t border-line pt-5" aria-label="Etiquetas">
+        {d.tags.map((t) => (
+          <li>
+            <a href={tagHref(t)} class="font-mono text-sm text-tags hover:underline">
+              #{t}
+            </a>
+          </li>
+        ))}
+      </ul>
     )
   }
 </ArticleLayout>

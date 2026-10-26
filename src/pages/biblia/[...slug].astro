@@ -6,6 +6,7 @@ import CommandCard from '@/components/CommandCard.astro';
 import VarBar from '@/components/VarBar.astro';
 import { getCommands, getNotes, variablesIn, type Command } from '@/lib/content';
 import { formatDate, isoDate, readingTime } from '@/lib/format';
+import { tagHref } from '@/lib/tags';
 import { areas } from '@/lib/taxonomy';
 import { tone } from '@/lib/tone';
 
@@ -63,7 +64,7 @@ const meta = [
       <p class="text-[17px] leading-relaxed text-muted">{d.summary}</p>
       <p class="flex flex-wrap gap-x-3 gap-y-1 font-mono text-xs text-subtle">
         <time datetime={isoDate(d.updated ?? d.date)}>{meta.join(' · ')}</time>
-        {d.tags.map((t) => <span class="text-tags/80">#{t}</span>)}
+        {d.tags.map((t) => <a href={tagHref(t)} class="text-tags/80 hover:text-tags hover:underline">#{t}</a>)}
       </p>
     </header>
     <VarBar names={varNames} />

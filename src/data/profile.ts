@@ -1,4 +1,5 @@
 import type { IconName } from '@/lib/icons';
+import type { AreaId } from '@/lib/taxonomy';
 import type { ColorToken } from '@/lib/tone';
 
 /**
@@ -47,9 +48,18 @@ export const platforms: Platform[] = [
   },
 ];
 
+/** Herramientas propias: /herramientas/, whoami y el contador de la home. Datos sacados de cada README. */
 export interface Tool {
   name: string;
   description: string;
+  /** Área de la biblia en la que encaja: da el color de su etiqueta. */
+  area: AreaId;
+  repo: string;
+  language: string;
+  license?: string;
+  /** Un ejemplo de uso tal cual se escribe en la terminal. */
+  usage: string;
+  highlights: string[];
 }
 
 export const tools: Tool[] = [
@@ -57,14 +67,45 @@ export const tools: Tool[] = [
     name: 'subenum',
     description:
       'Reconocimiento para bug bounty: subdominios pasivos, fuerza bruta DNS, permutaciones, HTTP vivos, WAF, CNAME takeovers y secretos en JS.',
+    area: 'recon',
+    repo: 'https://github.com/p3ix/BBTools',
+    language: 'Python',
+    usage: 'python -m subenum.main run -i domains.txt --permutate --recursive',
+    highlights: [
+      '14 fuentes pasivas en paralelo (8 sin API key), fuerza bruta DNS y permutaciones',
+      'Sondeo HTTP, huella de tecnologías, detección de WAF y auditoría de cabeceras',
+      'Takeovers por CNAME, endpoints y secretos en JavaScript, puntuación de objetivos',
+      'Pensada para dejarla corriendo en un VPS y reanudar si se corta la conexión',
+    ],
   },
   {
     name: 'bypass-403',
     description: 'Combina variaciones de rutas, cabeceras y métodos para probar bypasses de respuestas 403.',
+    area: 'web',
+    repo: 'https://github.com/p3ix/Bypass-403',
+    language: 'Python',
+    usage: 'bypass https://app.example.com/admin',
+    highlights: [
+      'Rutas, cabeceras, métodos, parámetros y variantes de protocolo contra 403 y 401',
+      'Pruebas de Host/SNI con sockets en crudo y sondas ligeras de request smuggling',
+      'Verifica cada hallazgo contra una línea base nueva y lo exporta como curl, JSON o CSV',
+      'Concurrencia controlada, límite por host y espera automática ante 429/503',
+    ],
   },
   {
     name: 'scan-nuclei',
     description: 'Plantillas de Nuclei propias para stacks Java/Spring/Jakarta y Apache/Tomcat/WildFly.',
+    area: 'web',
+    repo: 'https://github.com/p3ix/scan-nuclei',
+    language: 'Nuclei YAML',
+    license: 'MIT',
+    usage: 'nuclei -t ./templates -u https://app.example.com -severity critical,high,medium',
+    highlights: [
+      '416 plantillas: consolas expuestas, ficheros sensibles, configuraciones peligrosas y CVE',
+      'Spring Boot, Tomcat, WildFly/JBoss, Jetty, Struts, Quarkus y su ecosistema',
+      'DevOps y APIs: Jenkins, GitLab, Nexus, Keycloak, Swagger/OpenAPI, GraphQL',
+      'Informe HTML a partir de los resultados JSONL',
+    ],
   },
 ];
 

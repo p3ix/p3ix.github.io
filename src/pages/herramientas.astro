@@ -1,0 +1,149 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import EmptyState from '@/components/EmptyState.astro';
+import Icon from '@/components/Icon.astro';
+import PageHeader from '@/components/PageHeader.astro';
+import { socials, tools } from '@/data/profile';
+import { getCommands } from '@/lib/content';
+import { sectionById } from '@/lib/sections';
+import { PHASE_IDS, areas, phases, type AreaId } from '@/lib/taxonomy';
+import { tone } from '@/lib/tone';
+
+const github = socials.find((s) => s.icon === 'github');
+const commands = await getCommands();
+
+// Arsenal: una tarjeta por archivo de src/content/commands/, con el área que más usan sus comandos.
+const arsenal = [...Map.groupBy(commands, (c) => c.file).values()]
+  .map((list) => {
+    const areaCount = Map.groupBy(list, (c) => c.area);
+    const area = [...areaCount].sort((a, b) => b[1].length - a[1].length)[0][0] as AreaId;
+    return {
+      tool: list[0].tool,
+      url: list[0].toolUrl,
+      area: areas[area],
+      count: list.length,
+      phases: PHASE_IDS.filter((p) => list.some((c) => c.phase === p)).map((p) => phases[p]),
+    };
+  })
+  .sort((a, b) => b.count - a.count || a.tool.localeCompare(b.tool));
+
+const description = 'Lo que programo para automatizar el reconocimiento y las pruebas que repito en cada programa, y el arsenal de terceros que documento en la biblia.';
+---
+
+<BaseLayout title="Herramientas" description={description} section="tools" path={['herramientas']} ogImage="/og/herramientas.png">
+  <PageHeader section={sectionById.tools} title="Herramientas" description={description}>
+    <p class="font-mono text-sm text-subtle">
+      {tools.length} propias · {arsenal.length} en la biblia{github && <> · código en <a href={github.href} target="_blank" rel="noopener" class="text-tools hover:underline">github.com/p3ix</a></>}
+    </p>
+  </PageHeader>
+
+  <section aria-labelledby="own-title" class="flex flex-col gap-4">
+    <h2 id="own-title" class="font-mono text-xl font-bold text-fg-strong"><span class="text-tools">##</span> Herramientas propias</h2>
+    <p class="text-[15px] text-muted">Úsalas solo contra sistemas en los que tengas autorización: dentro del alcance de un programa, en una auditoría o en tu laboratorio.</p>
+
+    {
+      tools.map((t) => (
+        <article id={t.name} aria-labelledby={`tool-${t.name}`} style={tone('tools')} class="tone-border grid scroll-mt-24 gap-6 rounded-2xl border bg-panel/90 p-5 target:ring-2 target:ring-tools/60 sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+          <div class="flex min-w-0 flex-col gap-4">
+            <div class="flex items-center gap-3">
+              <span class="tone-soft tone-text grid size-11 shrink-0 place-items-center rounded-xl">
+                <Icon name="wrench" size={21} strokeWidth={2.1} />
+              </span>
+              <h3 id={`tool-${t.name}`} class="font-mono text-2xl font-extrabold tracking-tight break-all text-fg-strong">{t.name}</h3>
+            </div>
+
+            <ul class="flex flex-wrap gap-2 font-mono text-xs" aria-label="Datos">
+              <li style={tone(areas[t.area].color)} class="tone-soft tone-text rounded-md px-2 py-0.5 font-bold tracking-widest uppercase">{areas[t.area].label}</li>
+              <li class="rounded-md border border-line-strong px-2 py-0.5 text-muted">{t.language}</li>
+              {t.license && <li class="rounded-md border border-line-strong px-2 py-0.5 text-muted">{t.license}</li>}
+            </ul>
+
+            <p class="text-base leading-relaxed text-muted">{t.description}</p>
+
+            <a href={t.repo} target="_blank" rel="noopener" class="tone-border tone-text mt-auto inline-flex min-h-11 items-center gap-2 self-start rounded-lg border px-4 font-mono text-sm transition-colors hover:tone-soft">
+              <Icon name="github" size={17} />
+              Código en GitHub
+              <Icon name="external" size={13} />
+            </a>
+          </div>
+
+          <div class="flex min-w-0 flex-col gap-4">
+            <div class="overflow-hidden rounded-xl border border-line bg-code">
+              <div class="relative flex items-center justify-center border-b border-line px-4 py-2.5 font-mono text-xs text-subtle">
+                <span aria-hidden="true" class="absolute top-1/2 left-3.5 flex -translate-y-1/2 gap-1.5">
+                  <span class="size-2.5 rounded-full bg-dot-close" />
+                  <span class="size-2.5 rounded-full bg-dot-min" />
+                  <span class="size-2.5 rounded-full bg-dot-max" />
+                </span>
+                <span>~/tools/{t.name}</span>
+              </div>
+              {/* Cada palabra va entera: el comando solo se parte entre palabras, nunca dentro de un flag (--permutate). */}
+              <p class="overflow-x-auto px-4 py-3.5 font-mono text-sm leading-[1.85] text-fg">
+                <span aria-hidden="true" class="font-bold text-ctf select-none">$ </span>
+                {t.usage.split(' ').map((word, i) => (
+                  <>
+                    {i > 0 && ' '}
+                    <span class="whitespace-nowrap">{word}</span>
+                  </>
+                ))}
+              </p>
+            </div>
+
+            <ul class="flex flex-col gap-2.5" aria-label="Qué hace">
+              {t.highlights.map((h) => (
+                <li class="flex gap-2.5 text-[15px] leading-relaxed text-muted">
+                  <span aria-hidden="true" class="tone-text font-mono">▸</span>
+                  {h}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </article>
+      ))
+    }
+  </section>
+
+  <section aria-labelledby="arsenal-title" class="flex flex-col gap-4">
+    <h2 id="arsenal-title" class="font-mono text-xl font-bold text-fg-strong"><span class="text-biblia">##</span> Arsenal de la biblia</h2>
+    <p class="text-[15px] text-muted">Las herramientas de terceros que más uso, con sus comandos listos para copiar en el <a href="/biblia/comandos/" class="text-biblia hover:underline">buscador de comandos</a>.</p>
+
+    {
+      arsenal.length > 0 ? (
+        <ul class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {arsenal.map((a) => (
+            <li class="grid">
+              <article style={tone(a.area.color)} class="tone-border flex min-w-0 flex-col gap-3.5 rounded-2xl border bg-panel/90 p-5">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <h3 class="font-mono text-lg font-bold text-fg-strong">{a.tool}</h3>
+                  <span class="tone-soft tone-text rounded-md px-2 py-0.5 font-mono text-[11px] font-bold tracking-widest uppercase">{a.area.label}</span>
+                </div>
+                <p class="font-mono text-sm text-fg">
+                  <span class="tone-text font-bold">{a.count}</span> {a.count === 1 ? 'comando' : 'comandos'}
+                </p>
+                <ul class="flex flex-wrap gap-1.5" aria-label="Fases">
+                  {a.phases.map((p) => (
+                    <li class="rounded-full border border-line-strong px-2 py-0.5 font-mono text-[11px] text-muted">{p.toLowerCase()}</li>
+                  ))}
+                </ul>
+                <div class="mt-auto flex flex-wrap items-center gap-x-5 gap-y-2 pt-1 font-mono text-sm">
+                  <a href={`/biblia/comandos/?q=${encodeURIComponent(a.tool)}`} class="tone-text inline-flex min-h-11 items-center gap-1.5 hover:underline">
+                    Ver comandos
+                    <Icon name="arrow-right" size={15} />
+                  </a>
+                  {a.url && (
+                    <a href={a.url} target="_blank" rel="noopener" class="inline-flex min-h-11 items-center gap-1.5 text-subtle hover:text-fg-strong">
+                      docs
+                      <Icon name="external" size={13} />
+                    </a>
+                  )}
+                </div>
+              </article>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <EmptyState color="biblia">Aún no hay comandos en la biblia.</EmptyState>
+      )
+    }
+  </section>
+</BaseLayout>

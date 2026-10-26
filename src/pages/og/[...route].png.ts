@@ -1,13 +1,15 @@
 import type { APIRoute, GetStaticPaths } from 'astro';
+import { tools } from '@/data/profile';
 import { getNotes, getPublished } from '@/lib/content';
 import { monogram } from '@/lib/format';
 import { renderOg, type OgCard } from '@/lib/og';
+import { getTags, tagBreakdown } from '@/lib/tags';
 import { areas, bbPlatforms, ctfPlatforms, difficulties, severities, targetOs } from '@/lib/taxonomy';
 
 // Una imagen por página: /og/default.png, /og/ctf/forest.png, /og/biblia/ad/kerberoasting.png...
 // Cada página pasa la suya a BaseLayout con `ogImage`; sin ella, /og/default.png.
 export const getStaticPaths = (async () => {
-  const [ctf, bugbounty, notes] = await Promise.all([getPublished('ctf'), getPublished('bugbounty'), getNotes()]);
+  const [ctf, bugbounty, notes, tags] = await Promise.all([getPublished('ctf'), getPublished('bugbounty'), getNotes(), getTags()]);
 
   const pages: { route: string; card: OgCard }[] = [
     {
@@ -40,6 +42,32 @@ export const getStaticPaths = (async () => {
       route: 'whoami',
       card: { kicker: 'whoami', title: 'Asier Lara Arroyo', summary: 'Ingeniero informático y bug bounty hunter. Hall of fame, herramientas y experiencia.', color: 'whoami', path: 'whoami' },
     },
+    {
+      route: 'herramientas',
+      card: {
+        kicker: 'Herramientas',
+        title: 'Herramientas propias',
+        summary: `${tools.map((t) => t.name).join(', ')} y el arsenal de la biblia.`,
+        color: 'tools',
+        path: 'herramientas',
+        chips: tools.map((t) => ({ text: t.name })),
+      },
+    },
+    {
+      route: 'etiquetas',
+      card: { kicker: 'Etiquetas', title: 'Etiquetas', summary: 'Writeups, reportes, notas y comandos de la biblia agrupados por tema.', color: 'tags', path: 'etiquetas' },
+    },
+    ...tags.map((tag) => ({
+      route: `etiquetas/${tag.name}`,
+      card: {
+        kicker: 'Etiqueta',
+        title: `#${tag.name}`,
+        summary: `Todo lo que hay en p3i sobre #${tag.name}, en un solo sitio.`,
+        color: 'tags',
+        path: `etiquetas/${tag.name}`,
+        chips: tagBreakdown(tag).map((b) => ({ text: b.label, color: b.color })),
+      },
+    })),
     ...ctf.map((e) => {
       const difficulty = difficulties[e.data.difficulty];
       return {

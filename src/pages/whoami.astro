@@ -95,17 +95,22 @@ const description = `${profile.name} (${profile.handle}): ${profile.role}. Hall 
     <ul class="grid gap-3.5 md:grid-cols-3">
       {
         tools.map((t) => (
-          <li class="tone-border flex flex-col gap-2 rounded-2xl border bg-panel/90 p-5">
-            <span class="tone-text inline-flex items-center gap-2 font-mono text-base font-bold">
-              <Icon name="wrench" size={16} />
-              {t.name}
-            </span>
-            <span class="text-[15px] leading-relaxed text-muted">{t.description}</span>
+          <li class="grid">
+            <a href={`/herramientas/#${t.name}`} class="tone-border group flex flex-col gap-2 rounded-2xl border bg-panel/90 p-5 transition-transform hover:-translate-y-0.5">
+              <span class="tone-text inline-flex items-center gap-2 font-mono text-base font-bold">
+                <Icon name="wrench" size={16} />
+                {t.name}
+              </span>
+              <span class="text-[15px] leading-relaxed text-muted">{t.description}</span>
+            </a>
           </li>
         ))
       }
     </ul>
-    {github && <a href={github.href} target="_blank" rel="noopener" class="self-start font-mono text-sm text-tools hover:underline">Código en github.com/p3ix →</a>}
+    <p class="flex flex-wrap gap-x-6 gap-y-1 font-mono text-sm">
+      <a href="/herramientas/" class="inline-flex min-h-11 items-center text-tools hover:underline">Todas las herramientas →</a>
+      {github && <a href={github.href} target="_blank" rel="noopener" class="inline-flex min-h-11 items-center text-subtle hover:text-tools">Código en github.com/p3ix</a>}
+    </p>
   </section>
 
   <div class="grid gap-7 lg:grid-cols-2">

@@ -1,5 +1,7 @@
 import type { APIRoute } from 'astro';
+import { tools } from '@/data/profile';
 import { getCommands, getNotes, getPublished } from '@/lib/content';
+import { getTags, tagBreakdown } from '@/lib/tags';
 import { areas, ctfPlatforms, severities } from '@/lib/taxonomy';
 
 /**
@@ -12,11 +14,12 @@ export interface SearchIndex {
 }
 
 export const GET: APIRoute = async () => {
-  const [commands, ctf, bugbounty, notes] = await Promise.all([
+  const [commands, ctf, bugbounty, notes, tags] = await Promise.all([
     getCommands(),
     getPublished('ctf'),
     getPublished('bugbounty'),
     getNotes(),
+    getTags(),
   ]);
 
   const index: SearchIndex = {
@@ -35,7 +38,29 @@ export const GET: APIRoute = async () => {
       { id: 'bb', url: '/bugbounty/', title: 'Bug bounty', summary: 'Reportes divulgados', kind: 'Sección', color: 'bb', tags: 'reportes' },
       { id: 'biblia', url: '/biblia/', title: 'Biblia', summary: 'Notas y metodología', kind: 'Sección', color: 'biblia', tags: 'notas' },
       { id: 'comandos', url: '/biblia/comandos/', title: 'Buscador de comandos', summary: 'Todos los comandos con variables', kind: 'Sección', color: 'biblia', tags: 'cheatsheet' },
+      { id: 'herramientas', url: '/herramientas/', title: 'Herramientas', summary: 'Herramientas propias y arsenal de la biblia', kind: 'Sección', color: 'tools', tags: 'github tools' },
       { id: 'whoami', url: '/whoami/', title: 'whoami', summary: 'Perfil, experiencia y CV', kind: 'Sección', color: 'whoami', tags: 'cv perfil' },
+      { id: 'etiquetas', url: '/etiquetas/', title: 'Etiquetas', summary: 'Todo el contenido por tema', kind: 'Sección', color: 'tags', tags: 'tags temas' },
+      ...tools.map((t) => ({
+        id: `tool/${t.name}`,
+        url: `/herramientas/#${t.name}`,
+        title: t.name,
+        summary: t.description,
+        kind: 'Herramienta',
+        color: 'tools',
+        tags: t.language,
+      })),
+      ...tags.map((t) => ({
+        id: `tag/${t.name}`,
+        url: `/etiquetas/${t.name}/`,
+        title: `#${t.name}`,
+        summary: tagBreakdown(t)
+          .map((b) => b.label)
+          .join(' · '),
+        kind: 'Etiqueta',
+        color: 'tags',
+        tags: t.name.replaceAll('-', ' '),
+      })),
       ...ctf.map((e) => ({
         id: `ctf/${e.id}`,
         url: `/ctf/${e.id}/`,
