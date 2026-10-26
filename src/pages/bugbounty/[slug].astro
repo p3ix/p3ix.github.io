@@ -3,6 +3,7 @@ import { render, type CollectionEntry } from 'astro:content';
 import ArticleLayout from '@/layouts/ArticleLayout.astro';
 import Icon from '@/components/Icon.astro';
 import Timeline from '@/components/Timeline.astro';
+import Trophy from '@/components/Trophy.astro';
 import { getPublished } from '@/lib/content';
 import { formatDate, isoDate, readingTime } from '@/lib/format';
 import { tagHref } from '@/lib/tags';
@@ -31,29 +32,36 @@ const facts = [
   { label: 'Estado', value: bbStatuses[d.status] },
   { label: 'Recompensa', value: d.bounty },
 ].filter((f): f is { label: string; value: string } => Boolean(f.value));
+const trophyCaption = [d.bounty ? 'Recompensa' : 'Reconocimiento', d.platform && bbPlatforms[d.platform]].filter(Boolean).join(' · ');
 ---
 
 <ArticleLayout title={d.title} description={d.summary} section="bb" path={['bugbounty', entry.id]} headings={headings} draft={d.draft} ogImage={`/og/bugbounty/${entry.id}.png`} publishedTime={d.date}>
-  <header slot="header" style={tone(severity.color)} class="tone-border flex flex-col gap-5 rounded-2xl border bg-panel/90 p-5 sm:p-6">
-    <div class="flex flex-wrap items-center gap-3">
-      <span class="tone-pill rounded-md px-3 py-1 font-mono text-sm font-bold tracking-widest uppercase">{severity.label}</span>
-      {d.cvss !== undefined && <span class="tone-text font-mono text-2xl font-extrabold">{d.cvss.toFixed(1)}</span>}
-      {
-        d.cvssVector &&
-          (cvssUrl ? (
-            <a href={cvssUrl} target="_blank" rel="noopener" class="font-mono text-xs break-all text-subtle hover:text-brand">
-              {d.cvssVector}
-            </a>
-          ) : (
-            <span class="font-mono text-xs break-all text-subtle">{d.cvssVector}</span>
-          ))
-      }
-    </div>
+  <header slot="header" style={tone(severity.color)} class="tone-border @container flex flex-col gap-5 rounded-2xl border bg-panel/90 p-5 sm:p-6">
+    <div class:list={['grid gap-6', d.cover && '@3xl:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] @3xl:items-center']}>
+      <div class="flex min-w-0 flex-col gap-5">
+        <div class="flex flex-wrap items-center gap-3">
+          <span class="tone-pill rounded-md px-3 py-1 font-mono text-sm font-bold tracking-widest uppercase">{severity.label}</span>
+          {d.cvss !== undefined && <span class="tone-text font-mono text-2xl font-extrabold">{d.cvss.toFixed(1)}</span>}
+          {
+            d.cvssVector &&
+              (cvssUrl ? (
+                <a href={cvssUrl} target="_blank" rel="noopener" class="font-mono text-xs break-all text-subtle hover:text-brand">
+                  {d.cvssVector}
+                </a>
+              ) : (
+                <span class="font-mono text-xs break-all text-subtle">{d.cvssVector}</span>
+              ))
+          }
+        </div>
 
-    <div class="flex flex-col gap-3">
-      <p class="font-mono text-[13px] tracking-[0.2em] text-bb uppercase">Reporte de bug bounty</p>
-      <h1 class="text-[30px] leading-tight font-bold text-fg-strong sm:text-[36px]">{d.title}</h1>
-      <p class="text-[17px] leading-relaxed text-muted">{d.summary}</p>
+        <div class="flex flex-col gap-3">
+          <p class="font-mono text-[13px] tracking-[0.2em] text-bb uppercase">Reporte de bug bounty</p>
+          <h1 class="text-[30px] leading-tight font-bold text-fg-strong sm:text-[36px]">{d.title}</h1>
+          <p class="text-[17px] leading-relaxed text-muted">{d.summary}</p>
+        </div>
+      </div>
+
+      {d.cover && <Trophy src={d.cover} alt={d.coverAlt ?? ''} caption={trophyCaption} color={severity.color} />}
     </div>
 
     <dl class="grid grid-cols-2 gap-4 border-t border-line pt-4 font-mono text-[13px] sm:grid-cols-3 lg:grid-cols-6">

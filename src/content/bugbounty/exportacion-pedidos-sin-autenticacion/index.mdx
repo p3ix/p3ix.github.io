@@ -1,0 +1,234 @@
+---
+title: Exportación de pedidos sin autenticación en una API interna
+summary: Un endpoint de una herramienta interna devolvía en CSV los datos de cualquier pedido a quien subiera un archivo con sus números, sin login ni token. Los números eran correlativos y la ruta estaba a la vista en el JavaScript del frontend.
+date: 2026-10-26
+program: Programa privado
+platform: yeswehack
+severity: high
+cvss: 7.5
+cvssVector: CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N
+cwe: CWE-200
+bounty: "600 €"
+status: resolved
+# Solo true si el programa ha autorizado la divulgación por escrito.
+disclosurePermission: true
+cover: ./recompensa.png
+coverAlt: "Tarjeta de recompensa de YesWeHack: 600 €, +30 puntos, CVSS 7.5 High, Information Disclosure (CWE-200), 6 de febrero de 2026."
+timeline:
+  - { date: 2026-01-31, event: Reporte enviado }
+  - { date: 2026-01-31, event: "Recibido por el programa: en revisión" }
+  - { date: 2026-02-04, event: El programa pregunta cómo encontré el endpoint y le enseño el bundle JavaScript donde aparece }
+  - { date: 2026-02-06, event: "Aceptado como High (7.5): 600 € y 23 puntos" }
+  - { date: 2026-02-06, event: "Marcado como resuelto: 7 puntos más" }
+tags: [api, broken-access-control, information-disclosure, missing-authentication, js-analysis, osint]
+draft: false
+---
+
+## Resumen
+
+Una herramienta interna tenía expuesto a Internet un endpoint de exportación de pedidos. Le subías
+un CSV con números de pedido y te devolvía otro CSV con los datos asociados a cada uno: las URLs de
+las fotos adjuntas al pedido y los comentarios de los clientes, con su alias, fechas y referencias
+de producto. No pedía sesión, token ni ninguna otra credencial.
+
+La falta de autenticación es el fallo; el resto de la cadena decide cuánto se puede sacar:
+
+```text title="Cadena del ataque"
+1. Bundle JavaScript público
+   → aparece la ruta /v1/ops/export-orders
+2. POST sin cookies ni token
+   → el servidor no lo rechaza
+3. Un número de pedido ya público
+   → 200 OK y un CSV con los datos del pedido
+4. Números correlativos × 5000 por petición
+   → enumeración masiva y barata
+```
+
+## Alcance
+
+- **Activo**: `ops.example.com`, el subdominio de una herramienta interna, cubierto por el
+  comodín `*.example.com` del alcance del programa.
+- **Endpoint**: `POST /v1/ops/export-orders`.
+- El programa no se nombra: dominios, rutas, nombres de archivo e identificadores están
+  redactados.
+
+## Cómo lo encontré
+
+### El JavaScript del frontend es el mapa de la API
+
+Una SPA (React, Angular, Vue...) se ejecuta en el navegador, así que lleva dentro todo su cliente
+de la API: las URLs base, las rutas y los parámetros de cada llamada. Minificar el código cambia los
+nombres de las variables, pero no las cadenas de texto: las rutas siguen ahí, en claro.
+
+Analizando el JavaScript de producción de las aplicaciones del programa llegué a un subdominio que
+no era una web para clientes, sino una herramienta interna: `ops.example.com`. Ese host servía su
+propio frontend a cualquiera, y en su bundle minificado (`app.[hash].js`) estaba la función que
+lanza la exportación de pedidos hacia el ERP.
+
+Una forma rápida de sacar las rutas de un bundle:
+
+```bash title="Rutas de API dentro de un bundle"
+curl -s https://ops.example.com/app.[hash].js -o app.js
+grep -oE '"/v[0-9]+/[A-Za-z0-9/_-]+"' app.js | sort -u
+```
+
+En el navegador sirve lo mismo: DevTools → Sources, el botón `{}` para formatear el código y
+Ctrl+Shift+F para buscar en todos los scripts a la vez. Para hacerlo a escala hay herramientas
+que lo automatizan (LinkFinder, xnLinkFinder, jsluice), pero la idea es la del `grep`: buscar
+cadenas que empiecen por `/api`, `/v1` o `https://`, y palabras como `export`, `admin` o
+`internal`.
+
+### Primera prueba: quitar las credenciales
+
+Con una ruta nueva delante, la primera prueba no es un payload sofisticado: es mandar la petición
+sin cookies ni cabecera `Authorization`. El frontend de una herramienta interna suele estar detrás
+de un login, y es fácil dar por hecho que la API también. Aquí no: el endpoint procesaba la
+petición igual.
+
+### Un ID válido sin fuerza bruta
+
+Para demostrar que devolvía datos reales hacía falta un número de pedido que existiera. En vez de
+probar números al azar, lo saqué por OSINT: hay clientes que mencionan su número de pedido en
+reseñas públicas en plataformas de opiniones. Ese dato público bastaba para la prueba, sin
+enumerar nada.
+
+Los números de pedido eran numéricos, de 10 dígitos y correlativos: si el `1234567890` existe, es
+muy probable que el `1234567891` también.
+
+> **Que los IDs sean predecibles no es la vulnerabilidad.** Un número de pedido aparece en emails,
+> facturas y reseñas: es público por naturaleza. El fallo es que el servidor entregue datos a quien
+> solo conoce el número. Lo que sí hace la secuencialidad es multiplicar el impacto: convierte "un
+> pedido" en "todos los pedidos".
+
+## Prueba de concepto
+
+**1.** Crea un archivo `leak_test.csv` con un número de pedido válido (uno por línea):
+
+```text title="leak_test.csv"
+1234567890
+```
+
+**2.** Súbelo como `multipart/form-data`, sin cookies ni cabeceras de autenticación:
+
+```bash
+curl -i -X POST "https://ops.example.com/v1/ops/export-orders" \
+  -H "User-Agent: Mozilla/5.0 BugBounty-[programa]-[alias]" \
+  -F "file=@leak_test.csv"
+```
+
+El `User-Agent` solo identifica el tráfico como pruebas de bug bounty (muchos programas lo exigen);
+no influye en el fallo.
+
+**3.** El servidor responde `200 OK` con un CSV para descargar:
+
+```http
+HTTP/1.1 200 OK
+Content-Type: text/csv; charset=utf-8
+content-disposition: attachment; filename=results.csv
+```
+
+```csv title="results.csv"
+orderId,pictures,feedback
+1234567890,"[...URLs de las fotos...]","[...comentarios del cliente...]"
+```
+
+Solo accedí a los datos de ese pedido, cuyo número ya era público.
+
+### Hasta dónde llegaba
+
+Para medir el impacto sin volcar pedidos ajenos probé los límites del endpoint:
+
+- **Volumen**: archivos de 10, 100, 1000 y 5000 filas devolvían `200 OK`; con 10 000 filas la
+  respuesta era un `502`. El techo práctico rondaba las 5000 filas por petición.
+- **Validación**: aceptaba espacios y valores separados por comas, y la línea de cabecera del CSV
+  no se validaba: se procesaba como una fila más.
+
+Estas pruebas sirvieron para medir la capacidad del endpoint, no para extraer datos de otros
+pedidos.
+
+## Impacto
+
+- **Sin autenticación**: cualquiera en Internet, sin cuenta y sin que nadie haga nada.
+- **A escala**: con números correlativos y hasta 5000 por petición, recorrer un millón de pedidos
+  son unas 200 peticiones.
+- **Datos expuestos**: URLs de las fotos adjuntas a cada pedido y los comentarios de los clientes
+  (texto, origen, alias, fechas y SKU). Ligados a un número de pedido, permiten relacionar a cada
+  cliente con lo que ha comprado y preparar fraudes muy creíbles: un phishing que cita tu número
+  de pedido real y lo que comentaste sobre él.
+- **Negocio**: exposición de datos de clientes, con sus consecuencias de privacidad (RGPD) y de
+  reputación.
+
+El programa matizó el impacto al aceptarlo: el endpoint estaba expuesto, pero los datos más
+sensibles, los de las propias imágenes, tenían su propia protección. Aun así lo valoró como High.
+
+> Cuando un programa rebaja el impacto con un dato que desde fuera no podías ver, no es una
+> derrota: es información sobre su arquitectura. Separar en el reporte lo comprobado ("devuelve
+> estos campos") de lo posible ("puede contener datos personales") hace esa conversación mucho
+> más fácil.
+
+### Por qué es High: el CVSS métrica a métrica
+
+| Métrica | Valor | Por qué |
+|---|---|---|
+| Attack Vector | Network | Basta con acceso a Internet |
+| Attack Complexity | Low | Una petición, sin condiciones especiales |
+| Privileges Required | None | Sin cuenta ni token |
+| User Interaction | None | Ninguna víctima tiene que hacer nada |
+| Scope | Unchanged | El impacto se queda en el propio servicio |
+| Confidentiality | High | Datos de pedidos de forma masiva |
+| Integrity | None | Solo lectura |
+| Availability | None | El servicio sigue funcionando |
+
+`CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N` da un **7.5**: el vector de manual de una exposición
+de datos sin autenticación.
+
+### CWE-200 es la consecuencia; CWE-306, la causa
+
+El programa lo clasificó como CWE-200 (exposición de información a un actor no autorizado), que
+describe lo que pasa. La causa raíz es CWE-306: falta de autenticación en una función crítica.
+Nombrar la causa en el reporte ayuda al equipo a arreglar lo correcto: no basta con quitar campos
+del CSV, hay que poner autenticación delante.
+
+## Corrección
+
+La causa es de diseño: un servicio pensado para uso interno que confiaba en que nadie conocería su
+ruta. Pero la ruta no era secreta: viajaba en un JavaScript público. Esconder no es proteger.
+
+1. **Autenticación obligatoria**: sin credenciales válidas, `401`. Mejor con un middleware que
+   proteja todo por defecto que ruta a ruta.
+2. **Autorización**: además de saber quién llama, comprobar que tiene permiso para exportar (su
+   rol) y para esos pedidos en concreto.
+3. **Fuera de Internet**: si es una herramienta interna, detrás de una VPN o de un proxy de
+   identidad (Zero Trust), no solo de la pantalla de login de su frontend.
+4. **Límites y auditoría**: máximo de filas por archivo, rate limiting por usuario y alertas cuando
+   alguien exporta en bloque.
+5. **Validación estricta**: solo números de pedido, una columna, cabecera rechazada.
+
+El backend era Express (lo anunciaba la cabecera `X-Powered-By`). Proteger todo por defecto se ve
+así:
+
+```js title="server.js" del={1} ins={3-5}
+app.post('/v1/ops/export-orders', upload.single('file'), exportOrders);
+
+app.disable('x-powered-by'); // de paso, no anunciar el framework
+app.use('/v1', requireAuth); // todo /v1 exige sesión; lo público se declara aparte, a propósito
+app.post('/v1/ops/export-orders', requireRole('orders:export'), upload.single('file'), exportOrders);
+```
+
+¿Y los IDs? Pasar a identificadores aleatorios sería defensa en profundidad, pero un número de
+pedido es público por naturaleza: el control que importa es la autenticación.
+
+**Cómo detectarlo antes de producción**: un test que recorra todas las rutas de la API sin
+credenciales y espere un `401` en cada una, salvo una lista explícita de rutas públicas. Si alguien
+añade una ruta y se olvida de protegerla, el test falla en CI.
+
+## Lo que me llevo
+
+- El JavaScript del frontend es el mapa de la API. Leerlo da rutas que no salen en ningún otro
+  sitio, sobre todo en herramientas internas.
+- La primera prueba con cualquier endpoint es la más simple: quitar las credenciales.
+- Para demostrar impacto no hace falta enumerar: un dato que ya es público y medir los límites del
+  endpoint bastan para que el programa vea el alcance real.
+- Apunta el camino mientras investigas. El programa me preguntó cómo había llegado al endpoint y
+  en la primera respuesta cité un bundle que no era; con la URL exacta del archivo y la captura de
+  la función guardadas desde el principio, eso se resuelve en un mensaje.

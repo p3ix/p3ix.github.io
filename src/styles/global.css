@@ -222,6 +222,111 @@
     color: var(--color-on-accent);
   }
 
+  /* Vitrina del trofeo de un reporte (Trophy.astro). Su script mueve --rx/--ry (giro de la tarjeta)
+     y --mx/--my (posición de la luz) con el puntero; sin ratón se queda en la inclinación de reposo. */
+  .trophy-stage {
+    perspective: 1000px;
+  }
+
+  .trophy-ambient {
+    position: absolute;
+    inset: 12% 8%;
+    width: 84%;
+    height: 76%;
+    object-fit: cover;
+    filter: blur(34px) saturate(1.3);
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  .trophy-card {
+    position: relative;
+    display: block;
+    overflow: hidden;
+    border: 1px solid color-mix(in oklab, var(--tone) 45%, transparent);
+    border-radius: 0.8rem;
+    box-shadow:
+      0 28px 48px -24px rgb(0 0 0 / 0.9),
+      0 0 32px color-mix(in oklab, var(--tone) 18%, transparent);
+    transform: rotateX(var(--rx, 4deg)) rotateY(var(--ry, -8deg));
+    transition:
+      transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1),
+      box-shadow 0.3s;
+
+    &.is-tracking {
+      transition-duration: 0.12s, 0.3s;
+    }
+
+    /* Al cargar la página, un barrido de luz cruza la tarjeta una vez. */
+    &::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(105deg, transparent 35%, rgb(255 255 255 / 0.2) 50%, transparent 65%);
+      transform: translateX(-120%);
+      animation: trophy-sweep 1.4s 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+      pointer-events: none;
+    }
+  }
+
+  .trophy-stage:hover .trophy-card,
+  .trophy-stage:focus-visible .trophy-card {
+    box-shadow:
+      0 34px 56px -24px rgb(0 0 0 / 0.9),
+      0 0 52px color-mix(in oklab, var(--tone) 34%, transparent);
+  }
+
+  /* Lámina holográfica: franja con los colores de sección que se desplaza con la luz. */
+  .trophy-foil {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      115deg,
+      transparent 25%,
+      color-mix(in oklab, var(--color-home) 60%, transparent) 40%,
+      color-mix(in oklab, var(--color-biblia) 60%, transparent) 50%,
+      color-mix(in oklab, var(--color-tools) 55%, transparent) 60%,
+      transparent 75%
+    );
+    background-size: 300% 300%;
+    background-position: var(--mx, 15%) var(--my, 15%);
+    mix-blend-mode: color-dodge;
+    opacity: 0.16;
+    transition: opacity 0.3s;
+  }
+
+  /* Reflejo: un punto de luz bajo el puntero. */
+  .trophy-shine {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at var(--mx, 30%) var(--my, 20%), rgb(255 255 255 / 0.3), transparent 55%);
+    mix-blend-mode: overlay;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .trophy-stage:hover {
+    & .trophy-foil {
+      opacity: 0.5;
+    }
+
+    & .trophy-shine {
+      opacity: 1;
+    }
+  }
+
+  @keyframes trophy-sweep {
+    to {
+      transform: translateX(120%);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .trophy-card::after {
+      display: none;
+    }
+  }
+
   /* En pantallas táctiles el botón de copiar de Expressive Code siempre se ve: deja hueco a su derecha. */
   @media (hover: none) {
     .expressive-code .ec-line .code {
@@ -300,6 +405,8 @@
       font-family: var(--font-mono);
       font-size: 0.875em;
       color: var(--color-brand);
+      /* Vectores CVSS, URLs, rutas largas: que partan antes de desbordar en móvil. */
+      overflow-wrap: anywhere;
     }
 
     & ul:not(.not-prose *) {

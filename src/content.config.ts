@@ -70,28 +70,38 @@ const ctf = defineCollection({
 
 const bugbounty = defineCollection({
   loader: glob({ pattern: ['*.mdx', '*/index.mdx'], base: './src/content/bugbounty', generateId: idFromPath }),
-  schema: z.object({
-    ...common,
-    /** Nombre del programa, o "Programa privado" si no se puede nombrar. */
-    program: z.string().min(1),
-    platform: z.enum(BB_PLATFORM_IDS).optional(),
-    severity: z.enum(SEVERITY_IDS),
-    cvss: z.number().min(0).max(10).optional(),
-    cvssVector: z.string().startsWith('CVSS:').optional(),
-    cwe: z
-      .string()
-      .regex(/^CWE-\d+$/, { error: 'cwe: formato CWE-639' })
-      .optional(),
-    /** Texto libre: "500 €", "swag", "Hall of Fame"... */
-    bounty: z.string().optional(),
-    status: z.enum(BB_STATUS_IDS),
-    // Sin permiso del programa no se publica, ni siquiera como borrador (el repo es público).
-    disclosurePermission: z.boolean().refine((granted) => granted, {
-      error:
-        'disclosurePermission tiene que ser true: sin permiso de divulgación del programa el reporte va en private/.',
-    }),
-    timeline: z.array(z.object({ date: z.coerce.date(), event: z.string().min(1) })).default([]),
-  }),
+  schema: ({ image }) =>
+    z
+      .object({
+        ...common,
+        /** Nombre del programa, o "Programa privado" si no se puede nombrar. */
+        program: z.string().min(1),
+        platform: z.enum(BB_PLATFORM_IDS).optional(),
+        severity: z.enum(SEVERITY_IDS),
+        cvss: z.number().min(0).max(10).optional(),
+        cvssVector: z.string().startsWith('CVSS:').optional(),
+        cwe: z
+          .string()
+          .regex(/^CWE-\d+$/, { error: 'cwe: formato CWE-639' })
+          .optional(),
+        /** Texto libre: "500 €", "swag", "Hall of Fame"... */
+        bounty: z.string().optional(),
+        status: z.enum(BB_STATUS_IDS),
+        // Sin permiso del programa no se publica, ni siquiera como borrador (el repo es público).
+        disclosurePermission: z.boolean().refine((granted) => granted, {
+          error:
+            'disclosurePermission tiene que ser true: sin permiso de divulgación del programa el reporte va en private/.',
+        }),
+        timeline: z.array(z.object({ date: z.coerce.date(), event: z.string().min(1) })).default([]),
+        /** Trofeo del reporte: tarjeta de recompensa, carta de agradecimiento, certificado... */
+        cover: image().optional(),
+        coverAlt: z.string().optional(),
+      })
+      .superRefine((data, ctx) => {
+        if (data.cover && !data.coverAlt) {
+          ctx.addIssue({ code: 'custom', path: ['coverAlt'], message: 'Si hay portada, describe la imagen en coverAlt.' });
+        }
+      }),
 });
 
 const notes = defineCollection({

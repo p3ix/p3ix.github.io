@@ -54,7 +54,7 @@ export function bugbountyCard(entry: CollectionEntry<'bugbounty'>): EntryCardPro
     meta: d.platform ? bbPlatforms[d.platform] : d.program,
     color: 'bb',
     accent: { text: severity.label.toLowerCase(), color: severity.color },
-    cover: { kind: 'icon', icon: 'bug' },
+    cover: d.cover ? { kind: 'image', src: d.cover, alt: d.coverAlt ?? '' } : { kind: 'icon', icon: 'bug' },
     badge: entryBadge(d),
   };
 }
