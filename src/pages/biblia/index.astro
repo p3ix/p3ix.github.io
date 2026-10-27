@@ -3,6 +3,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 import EmptyState from '@/components/EmptyState.astro';
 import Icon from '@/components/Icon.astro';
 import PageHeader from '@/components/PageHeader.astro';
+import { utilities, utilityHref } from '@/data/utilities';
 import { getCommands, getNotes } from '@/lib/content';
 import { sectionById } from '@/lib/sections';
 import { AREA_IDS, areas } from '@/lib/taxonomy';
@@ -47,6 +48,28 @@ const description =
       <Icon name="arrow-right" size={16} class="transition-transform group-hover:translate-x-0.5" />
     </span>
   </a>
+
+  <section aria-labelledby="utilities-title" class="flex flex-col gap-4">
+    <h2 id="utilities-title" class="font-mono text-xl font-bold text-fg-strong">
+      <span class="text-biblia">##</span> Utilidades
+    </h2>
+    <div class="grid gap-4 md:grid-cols-2">
+      {
+        utilities.map((u) => (
+          <a href={utilityHref(u)} style={tone(u.color)} class="group tone-border flex items-center gap-4 rounded-2xl border bg-panel/90 p-4 transition-transform hover:-translate-y-0.5 sm:p-5">
+            <span class="tone-pill grid size-12 shrink-0 place-items-center rounded-xl">
+              <Icon name={u.icon} size={22} strokeWidth={2.1} />
+            </span>
+            <span class="flex min-w-0 flex-1 flex-col gap-1">
+              <span class="font-semibold text-fg-strong group-hover:tone-text">{u.title}</span>
+              <span class="text-sm leading-relaxed text-muted">{u.summary}</span>
+            </span>
+            <Icon name="arrow-right" size={16} class="tone-text shrink-0 transition-transform group-hover:translate-x-0.5" />
+          </a>
+        ))
+      }
+    </div>
+  </section>
 
   {
     byArea.length > 0 ? (

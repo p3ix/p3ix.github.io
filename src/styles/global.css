@@ -63,6 +63,9 @@
   --color-var-user: #4da3ff;
   --color-var-pass: #ff5fa2;
   --color-var-dcip: #00e5ff;
+  --color-var-subnet: #00e5ff;
+  --color-var-ports: #ffb020;
+  --color-var-iface: #3dff9a;
   --color-var-hash: #ffe45c;
   --color-var-url: #ff8a3d;
   --color-var-wordlist: #a9c1cc;

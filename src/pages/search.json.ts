@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { tools } from '@/data/profile';
+import { utilities, utilityHref } from '@/data/utilities';
 import { getCommands, getNotes, getPublished } from '@/lib/content';
 import { getTags, tagBreakdown } from '@/lib/tags';
 import { areas, ctfPlatforms, severities } from '@/lib/taxonomy';
@@ -38,6 +39,15 @@ export const GET: APIRoute = async () => {
       { id: 'bb', url: '/bugbounty/', title: 'Bug bounty', summary: 'Reportes divulgados', kind: 'Sección', color: 'bb', tags: 'reportes' },
       { id: 'biblia', url: '/biblia/', title: 'Biblia', summary: 'Notas y metodología', kind: 'Sección', color: 'biblia', tags: 'notas' },
       { id: 'comandos', url: '/biblia/comandos/', title: 'Buscador de comandos', summary: 'Todos los comandos con variables', kind: 'Sección', color: 'biblia', tags: 'cheatsheet' },
+      ...utilities.map((u) => ({
+        id: `utilidad/${u.id}`,
+        url: utilityHref(u),
+        title: u.title,
+        summary: u.summary,
+        kind: 'Utilidad',
+        color: u.color,
+        tags: u.keywords,
+      })),
       { id: 'herramientas', url: '/herramientas/', title: 'Herramientas', summary: 'Herramientas propias y arsenal de la biblia', kind: 'Sección', color: 'tools', tags: 'github tools' },
       { id: 'whoami', url: '/whoami/', title: 'whoami', summary: 'Perfil, experiencia y CV', kind: 'Sección', color: 'whoami', tags: 'cv perfil' },
       { id: 'etiquetas', url: '/etiquetas/', title: 'Etiquetas', summary: 'Todo el contenido por tema', kind: 'Sección', color: 'tags', tags: 'tags temas' },

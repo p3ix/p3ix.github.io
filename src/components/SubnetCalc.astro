@@ -1,0 +1,179 @@
+---
+// Calculadora de subredes IPv4. Página propia en /biblia/utilidades/subredes/ y, en las notas,
+// <SubnetCalc /> sin importar nada (se pasa a <Content components={{ ... }} />).
+// El build pinta el ejemplo inicial; el script recalcula al escribir y guarda la red en {{SUBNET}}.
+import Icon from './Icon.astro';
+import { binaryParts, parseSubnet, rangeKind, splitOptions, summary, type SummaryKey } from '@/lib/ipv4';
+import { tone } from '@/lib/tone';
+import { variables } from '@/lib/variables';
+
+interface Props {
+  /** Valor inicial: se ve sin JavaScript y mientras no haya un {{SUBNET}} guardado. */
+  value?: string;
+  /** Prefijo de los ids del formulario, por si hay dos en la misma página. */
+  id?: string;
+}
+
+const { value = '10.10.14.7/23', id = 'subnet' } = Astro.props;
+const initial = parseSubnet(value);
+if ('error' in initial) throw new Error(`SubnetCalc: el valor inicial «${value}» no vale. ${initial.error}`);
+
+const out = summary(initial);
+const kind = rangeKind(initial.ip);
+const stats: { key: SummaryKey; label: string; accent?: boolean }[] = [
+  { key: 'network', label: 'Red', accent: true },
+  { key: 'broadcast', label: 'Broadcast' },
+  { key: 'first', label: 'Primer host' },
+  { key: 'last', label: 'Último host' },
+  { key: 'usable', label: 'Hosts útiles', accent: true },
+  { key: 'mask', label: 'Máscara' },
+  { key: 'wildcard', label: 'Wildcard' },
+  { key: 'hex', label: 'Máscara en hex' },
+];
+const binaryRows = [
+  { key: 'ip', label: 'IP', n: initial.ip },
+  { key: 'mask', label: 'Máscara', n: initial.mask },
+  { key: 'network', label: 'Red', n: initial.network },
+  { key: 'broadcast', label: 'Broadcast', n: initial.broadcast },
+];
+const subnetTone = tone(variables.SUBNET.color);
+const field =
+  'h-11 w-full min-w-0 rounded-lg border border-line-strong bg-code px-3 font-mono text-sm text-fg-strong placeholder:text-subtle/60';
+const legend = 'font-mono text-[11px] tracking-[0.14em] text-subtle uppercase';
+---
+
+<!-- not-prose y sin ul/ol/li: dentro de una nota no hereda los estilos de .prose-p3i. Pagefind la ignora. -->
+<section
+  data-subnet-calc
+  data-pagefind-ignore
+  aria-label="Calculadora de subredes"
+  style={tone('area-recon')}
+  class="not-prose tone-border @container flex flex-col gap-5 rounded-2xl border bg-panel/95 p-4 leading-normal shadow-[0_0_50px_color-mix(in_oklab,var(--color-area-recon)_7%,transparent)] sm:p-6"
+>
+  <div class="flex flex-col gap-2">
+    <label for={`${id}-input`} class="tone-text inline-flex items-center gap-2 font-mono text-[11px] font-bold tracking-[0.16em] uppercase">
+      <Icon name="network" size={15} />
+      IP y máscara
+    </label>
+    <input
+      id={`${id}-input`}
+      data-subnet-input
+      type="text"
+      value={value}
+      placeholder="10.10.14.7/23"
+      spellcheck="false"
+      autocomplete="off"
+      autocapitalize="off"
+      aria-describedby={`${id}-status ${id}-help`}
+      class="tone-border h-13 w-full min-w-0 rounded-xl border bg-code px-4 font-mono text-lg text-fg-strong placeholder:text-subtle/60 aria-invalid:border-area-shell/70"
+    />
+    <p class="flex flex-wrap justify-between gap-x-4 gap-y-1 font-mono text-xs">
+      <span id={`${id}-status`} data-subnet-status aria-live="polite" class="text-muted data-invalid:text-area-shell">{out.line}</span>
+      <span id={`${id}-help`} class="text-subtle">También 255.255.254.0 o wildcard 0.0.1.255</span>
+    </p>
+  </div>
+
+  <div data-subnet-result class="flex flex-col gap-5 transition-opacity data-stale:opacity-40">
+    <div data-subnet-kind style={tone(kind.color)} class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+      <span data-subnet-kind-label class="tone-soft tone-text rounded-md px-2 py-0.5 font-mono text-[11px] font-bold tracking-widest uppercase">{kind.label}</span>
+      <span data-out="class" class="font-mono text-xs text-subtle">{out.class}</span>
+      <span data-subnet-kind-hint class="basis-full text-sm text-muted">{kind.hint}</span>
+    </div>
+
+    <!-- Según el ancho de la calculadora (no de la pantalla): filas clave-valor y, con sitio, baldosas. -->
+    <dl class="grid gap-2 @lg:grid-cols-2 @3xl:grid-cols-4">
+      {
+        stats.map((s) => (
+          <div class="flex min-w-0 items-baseline justify-between gap-3 rounded-lg border border-line bg-code/70 px-3 py-2 @3xl:flex-col @3xl:justify-start @3xl:gap-1 @3xl:py-2.5">
+            <dt class={legend}>{s.label}</dt>
+            <dd data-out={s.key} class:list={['text-right font-mono text-[14px] font-semibold wrap-anywhere @3xl:text-left @3xl:text-[15px]', s.accent ? 'tone-text' : 'text-fg-strong']}>
+              {out[s.key]}
+            </dd>
+          </div>
+        ))
+      }
+    </dl>
+
+    <div class="flex flex-col gap-3 rounded-xl border border-line bg-code p-3.5 sm:p-4">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <span class={legend}>En binario</span>
+        <span class="flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-muted">
+          <span class="inline-flex items-center gap-1.5"><span class="size-2 rounded-full bg-area-recon"></span><span data-out="netBits">{out.netBits}</span> bits de red</span>
+          <span class="inline-flex items-center gap-1.5"><span class="size-2 rounded-full bg-bb"></span><span data-out="hostBits">{out.hostBits}</span> bits de host</span>
+        </span>
+      </div>
+      <div class="grid gap-x-5 @md:grid-cols-[auto_1fr]">
+        {
+          binaryRows.map((r) => {
+            const [net, host] = binaryParts(r.n, initial.prefix);
+            return (
+              <>
+                <span class="mt-2 font-mono text-[11px] text-subtle uppercase @md:mt-0 @md:text-xs @md:leading-7">{r.label}</span>
+                <code data-bin={r.key} class="font-mono text-[12.5px] leading-6 whitespace-nowrap @md:text-sm @md:leading-7 @md:tracking-wide"><span data-bin-net class="text-area-recon">{net}</span><span data-bin-host class="text-bb">{host}</span></code>
+              </>
+            );
+          })
+        }
+      </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-x-4 gap-y-3">
+      <button
+        type="button"
+        data-subnet-use
+        class="group tone-border tone-text inline-flex min-h-11 items-center gap-2 rounded-lg border bg-panel px-3.5 font-mono text-sm font-bold transition-colors hover:tone-soft"
+      >
+        <Icon name="target" size={16} class="group-data-saved:hidden" />
+        <Icon name="check" size={16} class="hidden group-data-saved:block" />
+        <span>Usar como</span>
+        <span class="var-chip" style={subnetTone}>SUBNET</span>
+      </button>
+      <span class="inline-flex items-center gap-2 font-mono text-xs text-subtle">
+        Valor actual
+        <span data-var="SUBNET" class="var-chip" style={subnetTone}>SUBNET</span>
+      </span>
+      <button
+        type="button"
+        data-subnet-copy
+        class="group inline-flex min-h-11 min-w-0 items-center gap-2.5 rounded-lg border border-line-strong bg-code px-3.5 font-mono text-sm text-fg transition-colors hover:border-area-recon/50 @3xl:ml-auto"
+      >
+        <span class="sr-only">Copiar</span>
+        <span aria-hidden="true" class="tone-text select-none">$</span>
+        <span data-out="nmap" class="truncate">{out.nmap}</span>
+        <Icon name="copy" size={15} class="shrink-0 text-subtle group-data-copied:hidden" />
+        <Icon name="check" size={15} class="hidden shrink-0 text-ctf group-data-[copied=ok]:block" />
+        <Icon name="close" size={15} class="hidden shrink-0 text-area-shell group-data-[copied=error]:block" />
+      </button>
+    </div>
+
+    <div class="grid gap-3 @xl:grid-cols-2">
+      <div class="flex flex-col gap-2 rounded-xl border border-line p-3.5">
+        <label for={`${id}-contains`} class={legend}>¿Está esta IP dentro?</label>
+        <input id={`${id}-contains`} data-subnet-contains type="text" placeholder="10.10.15.200" spellcheck="false" autocomplete="off" autocapitalize="off" class={field} />
+        <p
+          data-subnet-contains-result
+          aria-live="polite"
+          class="min-h-5 font-mono text-xs text-subtle data-[state=broadcast]:text-warn data-[state=host]:text-ctf data-[state=network]:text-warn data-[state=out]:text-area-shell"
+        >
+          Escribe una IP para comprobarlo.
+        </p>
+      </div>
+
+      <div class="flex flex-col gap-2 rounded-xl border border-line p-3.5">
+        <label for={`${id}-split`} class={legend}>Dividir en subredes</label>
+        <select id={`${id}-split`} data-subnet-split class={field}>
+          <option value="">Elige un prefijo</option>
+          {splitOptions(initial).map((o) => <option value={o.prefix}>{o.label}</option>)}
+        </select>
+        <div data-subnet-split-list role="list" aria-label="Subredes" class="hidden max-h-64 flex-col overflow-y-auto rounded-lg border border-line bg-code py-1"></div>
+        <p data-subnet-split-more class="hidden font-mono text-xs text-subtle"></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { initSubnetCalcs } from '@/scripts/subnet-calc';
+
+  initSubnetCalcs();
+</script>

@@ -1,0 +1,39 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Icon from '@/components/Icon.astro';
+import PageHeader from '@/components/PageHeader.astro';
+import SubnetCalc from '@/components/SubnetCalc.astro';
+import { utilities } from '@/data/utilities';
+import { getNotes } from '@/lib/content';
+import { sectionById } from '@/lib/sections';
+
+const utility = utilities.find((u) => u.id === 'subredes')!;
+// La teoría vive en la nota del área recon; si aún no está publicada, no se enlaza.
+const note = (await getNotes()).find((n) => n.id === 'recon/subredes-y-cidr');
+
+const description = `${utility.summary} Todo se calcula en tu navegador.`;
+---
+
+<BaseLayout title={utility.title} description={description} section="biblia" path={['biblia', 'utilidades', 'subredes']} ogImage="/og/biblia/utilidades/subredes.png">
+  <PageHeader section={sectionById.biblia} kicker="Biblia · Utilidades" title={utility.title} description={description}>
+    <p class="font-mono text-sm text-subtle">IPv4 · /23, 255.255.254.0 o wildcard · guarda la red en <span class="text-var-subnet">SUBNET</span> para los comandos</p>
+  </PageHeader>
+
+  <SubnetCalc />
+
+  {
+    note && (
+      <a href={`/biblia/${note.id}/`} class="group flex items-center gap-4 rounded-2xl border border-line bg-panel/90 p-4 transition-colors hover:border-area-recon/45 sm:p-5">
+        <span class="grid size-11 shrink-0 place-items-center rounded-xl border border-area-recon/35 bg-area-recon/12 text-area-recon">
+          <Icon name="book" size={20} />
+        </span>
+        <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span class="font-mono text-xs tracking-[0.16em] text-area-recon uppercase">La teoría</span>
+          <span class="font-semibold text-fg-strong">{note.data.title}</span>
+          <span class="text-sm text-muted">{note.data.summary}</span>
+        </span>
+        <Icon name="arrow-right" size={18} class="shrink-0 text-subtle transition-transform group-hover:translate-x-0.5" />
+      </a>
+    )
+  }
+</BaseLayout>

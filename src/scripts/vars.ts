@@ -8,7 +8,7 @@
  * - `[data-var-input="RHOST"]`: input de la barra de variables. `[data-vars-reset]` las borra.
  * - Bloques de Expressive Code con {{X}}: se convierten en chips y su botón de copiar se actualiza.
  */
-import { VARIABLE_NAMES, isVariableName, variables } from '@/lib/variables';
+import { VARIABLE_NAMES, isVariableName, variables, type VariableName } from '@/lib/variables';
 
 type Values = Partial<Record<string, string>>;
 
@@ -33,6 +33,11 @@ function saveValues(values: Values) {
     // Sin almacenamiento (modo privado estricto): los valores duran lo que la página.
   }
   window.dispatchEvent(new CustomEvent(CHANGE_EVENT));
+}
+
+/** Fija una variable desde otro componente (la calculadora de subredes guarda {{SUBNET}}). */
+export function setValue(name: VariableName, value: string) {
+  saveValues({ ...loadValues(), [name]: value });
 }
 
 /** Sustituye {{X}} por su valor; las variables vacías se quedan como {{X}}. */

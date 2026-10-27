@@ -8,8 +8,11 @@ import type { ColorToken } from './tone';
 export const VARIABLE_NAMES = [
   'RHOST',
   'DC_IP',
+  'SUBNET',
+  'PORTS',
   'LHOST',
   'LPORT',
+  'IFACE',
   'DOMAIN',
   'USER',
   'PASS',
@@ -22,8 +25,11 @@ export type VariableName = (typeof VARIABLE_NAMES)[number];
 export const variables: Record<VariableName, { description: string; example: string; color: ColorToken }> = {
   RHOST: { description: 'IP o host objetivo', example: '10.10.11.42', color: 'var-rhost' },
   DC_IP: { description: 'IP del controlador de dominio', example: '10.10.11.42', color: 'var-dcip' },
+  SUBNET: { description: 'Red objetivo en notación CIDR', example: '10.10.11.0/24', color: 'var-subnet' },
+  PORTS: { description: 'Puertos separados por comas', example: '22,80,445', color: 'var-ports' },
   LHOST: { description: 'Tu IP (VPN/tun0)', example: '10.10.14.7', color: 'var-lhost' },
   LPORT: { description: 'Tu puerto a la escucha', example: '4444', color: 'var-lport' },
+  IFACE: { description: 'Tu interfaz de red', example: 'tun0', color: 'var-iface' },
   DOMAIN: { description: 'Dominio de Active Directory', example: 'corp.local', color: 'var-domain' },
   USER: { description: 'Usuario', example: 'svc_sql', color: 'var-user' },
   PASS: { description: 'Contraseña', example: 'Octubre2026!', color: 'var-pass' },

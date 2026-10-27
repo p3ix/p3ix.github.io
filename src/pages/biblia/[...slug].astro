@@ -3,6 +3,7 @@ import { render, type CollectionEntry } from 'astro:content';
 import ArticleLayout from '@/layouts/ArticleLayout.astro';
 import Cmd from '@/components/Cmd.astro';
 import CommandCard from '@/components/CommandCard.astro';
+import SubnetCalc from '@/components/SubnetCalc.astro';
 import VarBar from '@/components/VarBar.astro';
 import { getCommands, getNotes, variablesIn, type Command } from '@/lib/content';
 import { formatDate, isoDate, readingTime } from '@/lib/format';
@@ -70,7 +71,7 @@ const meta = [
     <VarBar names={varNames} />
   </div>
 
-  <Content components={{ Cmd }} />
+  <Content components={{ Cmd, SubnetCalc }} />
 
   {
     (relatedCommands.length > 0 || relatedNotes.length > 0) && (

@@ -1,5 +1,6 @@
 import type { APIRoute, GetStaticPaths } from 'astro';
 import { tools } from '@/data/profile';
+import { utilities } from '@/data/utilities';
 import { getNotes, getPublished } from '@/lib/content';
 import { monogram } from '@/lib/format';
 import { renderOg, type OgCard } from '@/lib/og';
@@ -38,6 +39,10 @@ export const getStaticPaths = (async () => {
       route: 'biblia/comandos',
       card: { kicker: 'Biblia', title: 'Buscador de comandos', summary: 'Rellena el objetivo una vez y copia cada comando listo para pegar.', color: 'biblia', path: 'biblia/comandos' },
     },
+    ...utilities.map((u) => ({
+      route: `biblia/utilidades/${u.id}`,
+      card: { kicker: 'Biblia · Utilidades', title: u.title, summary: u.summary, color: u.color, path: `biblia/utilidades/${u.id}` },
+    })),
     {
       route: 'whoami',
       card: { kicker: 'whoami', title: 'Asier Lara Arroyo', summary: 'Ingeniero informático y bug bounty hunter. Hall of fame, herramientas y experiencia.', color: 'whoami', path: 'whoami' },

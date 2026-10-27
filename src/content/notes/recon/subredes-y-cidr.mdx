@@ -1,0 +1,151 @@
+---
+title: Subredes, máscaras y CIDR
+summary: Qué es una máscara, cómo se lee la notación CIDR y cómo sacar la red, el broadcast y el rango de hosts de cualquier IP. Lo primero antes de escanear una red o de pivotar a otra.
+date: 2026-10-27
+area: recon
+order: 20
+tags: [subnetting, cidr, ipv4, redes]
+---
+
+## Qué es una máscara
+
+Una dirección IPv4 son 32 bits, escritos como cuatro números de 0 a 255 (un octeto cada uno). Esos
+bits tienen dos partes: los primeros identifican la **red** y el resto, el **host** dentro de esa red.
+La **máscara** marca dónde está el corte: sus bits a 1 son la parte de red y sus bits a 0, la de host.
+
+Dos equipos con la misma parte de red están en la misma subred y se hablan directamente, sin pasar
+por un router. Si la parte de red cambia, el tráfico tiene que dar un salto. Por eso, antes de
+escanear, conviene saber qué tienes en tu misma red y qué queda detrás de un router.
+
+## La IP en binario
+
+Con `192.168.1.130` y la máscara `255.255.255.192`, los tres primeros octetos de la máscara son
+255: son red de principio a fin. Todo pasa en el último, donde la barra marca el corte entre los
+bits de red y los de host:
+
+```text
+           decimal  binario
+IP         130      10|000010
+Máscara    192      11|000000
+Red        128      10|000000
+Broadcast  191      10|111111
+```
+
+- La **red** sale de hacer un AND entre la IP y la máscara: los bits de host se quedan a 0.
+- El **broadcast** es la red con todos los bits de host a 1: lo que se envía ahí llega a todos los equipos de la subred.
+- Los **hosts útiles** son todo lo que queda entre las dos: de `192.168.1.129` a `192.168.1.190`.
+
+## Notación CIDR
+
+Escribir la máscara entera es largo, así que se cuenta cuántos bits a 1 tiene: `255.255.255.192`
+son 26 unos, `/26`. Con `h` bits de host hay `2^h` direcciones y `2^h − 2` hosts útiles, porque la
+primera (la red) y la última (el broadcast) no se asignan a ningún equipo.
+
+| Prefijo | Máscara | Hosts útiles |
+| --- | --- | --- |
+| /8 | 255.0.0.0 | 16 777 214 |
+| /16 | 255.255.0.0 | 65 534 |
+| /20 | 255.255.240.0 | 4 094 |
+| /22 | 255.255.252.0 | 1 022 |
+| /23 | 255.255.254.0 | 510 |
+| /24 | 255.255.255.0 | 254 |
+| /25 | 255.255.255.128 | 126 |
+| /26 | 255.255.255.192 | 62 |
+| /27 | 255.255.255.224 | 30 |
+| /28 | 255.255.255.240 | 14 |
+| /29 | 255.255.255.248 | 6 |
+| /30 | 255.255.255.252 | 2 |
+| /31 | 255.255.255.254 | 2: enlace punto a punto (RFC 3021) |
+| /32 | 255.255.255.255 | 1: un solo host |
+
+El prefijo decide cuánto vas a tardar: un `/24` se barre en segundos, pero un `/16` son 65 534 hosts
+y un escaneo de puertos completo sobre él puede llevar horas. Cada bit menos de prefijo duplica los
+hosts. Antes de lanzar nada, mira el prefijo.
+
+## Cálculo mental: el tamaño del bloque
+
+Para no pasar a binario cada vez:
+
+1. Busca el octeto de la máscara que no es ni 255 ni 0.
+2. El tamaño del bloque es `256 − ese octeto`.
+3. Las redes empiezan en múltiplos de ese tamaño, en ese octeto. La tuya es el múltiplo más alto que no pasa de tu IP.
+
+Con `10.10.14.7/23`: la máscara es `255.255.254.0`, el octeto que importa es el tercero (254) y el
+bloque mide `256 − 254 = 2`. Las redes van de 2 en 2 en el tercer octeto (12, 14, 16…), así que la
+tuya empieza en 14: red `10.10.14.0`, broadcast `10.10.15.255` y hosts de `10.10.14.1` a
+`10.10.15.254`, 510 en total.
+
+Con `/8`, `/16` o `/24` el corte cae justo entre octetos y la red se lee a simple vista.
+
+## La calculadora
+
+Escribe cualquier IP con su máscara: `/23`, `255.255.254.0` o la wildcard `0.0.1.255`.
+Con **Usar como SUBNET** la red se guarda en la barra de variables y aparece ya rellena en los
+comandos de la biblia que la usan. También tiene su propia página: [calculadora de subredes](/biblia/utilidades/subredes/).
+
+<SubnetCalc />
+
+Sin navegador, en Kali hace lo mismo `ipcalc`:
+
+```bash
+ipcalc 10.10.14.7/23
+```
+
+## Rangos que conviene reconocer
+
+- **Privadas (RFC 1918)**: `10.0.0.0/8`, `172.16.0.0/12` y `192.168.0.0/16`. Red interna. Ojo: `172.16.0.0/12` llega hasta `172.31.255.255`, no se queda en `172.16.x.x`.
+- **CGNAT (RFC 6598)**: `100.64.0.0/10`. NAT del operador; también lo usan algunas VPN de malla.
+- **Loopback**: `127.0.0.0/8`. Un servicio que solo escucha aquí no se ve desde fuera: candidato a port forwarding cuando estés dentro.
+- **Link-local (APIPA)**: `169.254.0.0/16`. El equipo no consiguió IP por DHCP y se asignó una a sí mismo.
+- **Multicast**: `224.0.0.0/4`. Grupos, no hosts: no tiene sentido escanearla.
+- **Documentación (RFC 5737)**: `192.0.2.0/24`, `198.51.100.0/24` y `203.0.113.0/24`. Reservadas para ejemplos: úsalas al redactar un writeup o un reporte.
+
+## Dónde estoy: la red de una máquina comprometida
+
+En cuanto consigues una shell, mira sus interfaces y sus rutas. Si tiene una segunda interfaz en otra
+subred, has encontrado una red que no se ve desde tu máquina: el punto de partida del pivoting.
+
+En Linux:
+
+```bash
+ip -4 addr
+ip route
+ip neigh
+```
+
+En Windows:
+
+```powershell
+ipconfig /all
+route print
+arp -a
+```
+
+Resumida, la salida de `ip -4 addr` en una máquina con dos patas:
+
+```text
+eth0   inet 10.10.11.42/24    # la red por la que has entrado
+eth1   inet 172.16.20.5/24    # otra red, solo alcanzable a través de esta máquina
+```
+
+- La tabla de rutas (`ip route`, `route print`) dice qué redes alcanza la máquina y a través de qué router.
+- La caché ARP (`ip neigh`, `arp -a`) lista los equipos con los que ya ha hablado: hosts vivos sin enviar un solo paquete.
+- Una IP `169.254.x.x` en una interfaz suele significar que esa pata no tiene DHCP: no cuentes con ella.
+
+## Del cálculo al escaneo
+
+Con la red delimitada, el siguiente paso es saber qué hosts están vivos dentro de ella. El barrido
+más básico:
+
+```bash
+nmap -sn {{SUBNET}}
+```
+
+`-sn` solo descubre hosts, sin escanear puertos. En redes grandes, empieza por las subredes que hayas
+visto en las rutas o en la caché ARP en vez de barrer el rango entero.
+
+## Desde el lado defensivo
+
+- **Segmentación**: en una red plana (todo en un `/16`), cualquier equipo comprometido llega a todos los demás. Separar usuarios, servidores y administración en subredes distintas, con reglas de firewall entre ellas, obliga al atacante a pivotar en cada salto.
+- **Reglas por prefijo**: las ACL y los firewalls se escriben con prefijos (las de Cisco, con wildcards como `0.0.0.255`); un prefijo demasiado ancho abre mucho más de lo que parece.
+- **Tráfico entre subredes**: un equipo de usuario que de repente habla con todo un rango de servidores, o un barrido ARP o ICMP sobre la subred, es una señal clara de reconocimiento.
