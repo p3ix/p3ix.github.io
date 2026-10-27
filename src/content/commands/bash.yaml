@@ -1,0 +1,23 @@
+# Bash sin herramientas: para una máquina comprometida que no tiene nmap.
+tool: bash
+area: recon
+commands:
+  - id: bash-ping-sweep
+    title: Barrido de ping sin herramientas en Linux
+    cmd: |
+      NET=$(echo {{SUBNET}} | cut -d. -f1-3); for i in $(seq 1 254); do (ping -c 1 -W 1 $NET.$i >/dev/null && echo $NET.$i) & done; wait
+    phase: recon
+    tags: [host-discovery, ping-sweep, living-off-the-land]
+    notes: >-
+      Para un /24: toma los tres primeros octetos de SUBNET. Cada ping va en segundo plano, así que
+      tarda un par de segundos en total. Solo ve los hosts que responden a ICMP.
+
+  - id: bash-tcp-sweep
+    title: Hosts con puertos típicos abiertos sin herramientas
+    cmd: |
+      NET=$(echo {{SUBNET}} | cut -d. -f1-3); for i in $(seq 1 254); do for p in 22 80 445; do (timeout 1 bash -c "echo >/dev/tcp/$NET.$i/$p" 2>/dev/null && echo $NET.$i:$p) & done; done; wait
+    phase: recon
+    tags: [host-discovery, living-off-the-land]
+    notes: >-
+      Para cuando el ICMP está filtrado. /dev/tcp es una función de bash (no existe en sh ni en
+      dash), así que lánzalo con bash. Para un /24, como el barrido de ping.

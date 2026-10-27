@@ -1,0 +1,50 @@
+# Comandos de nmap. De momento, descubrimiento de hosts; el escaneo de puertos va después.
+tool: nmap
+area: recon
+url: https://nmap.org/book/man.html
+commands:
+  - id: nmap-host-sweep
+    title: Barrido de hosts vivos en una red
+    cmd: |
+      sudo nmap -sn -n {{SUBNET}} -oG - | awk '/Up$/{print $2}' | tee hosts.txt
+    phase: recon
+    tags: [host-discovery, ping-sweep]
+    notes: >-
+      -sn descubre hosts sin escanear puertos. Como root manda ICMP echo, ICMP timestamp, SYN al 443
+      y ACK al 80 (en tu propia red, ARP); sin root solo intenta conectar al 80 y al 443. -n evita
+      resolver el DNS de cada IP.
+    refs: [https://nmap.org/book/man-host-discovery.html]
+
+  - id: nmap-host-sweep-no-icmp
+    title: Descubrir hosts que no responden al ping
+    cmd: |
+      sudo nmap -sn -n -PE -PS21,22,80,135,443,445,3389,5985 -PA80 -PU53,161 {{SUBNET}}
+    phase: recon
+    tags: [host-discovery, firewall]
+    notes: >-
+      Si un barrido normal no encuentra nada donde debería haber equipos, el ICMP está filtrado
+      (Windows lo bloquea por defecto). Un RST a la sonda SYN también delata un host vivo, aunque el
+      puerto esté cerrado.
+    refs: [https://nmap.org/book/man-host-discovery.html]
+
+  - id: nmap-host-sweep-arp
+    title: Barrido ARP en tu misma red con nmap
+    cmd: |
+      sudo nmap -sn -n -PR -e {{IFACE}} {{SUBNET}}
+    phase: recon
+    tags: [host-discovery, arp]
+    notes: >-
+      Un equipo no puede hablar en la red sin contestar a ARP, así que su firewall no lo oculta.
+      Muestra también la MAC y el fabricante. No cruza routers: solo vale para tu segmento.
+    refs: [https://nmap.org/book/man-host-discovery.html]
+
+  - id: nmap-list-scan-dns
+    title: Nombres DNS de una red sin tocar los hosts
+    cmd: |
+      nmap -sL {{SUBNET}} --dns-servers {{DC_IP}} | grep '('
+    phase: recon
+    tags: [host-discovery, dns]
+    notes: >-
+      -sL no envía nada a los hosts, solo pregunta al DNS el nombre de cada IP. En un dominio, el DNS
+      del controlador suele devolver nombres que ya dicen qué es cada máquina (SQL01, WEB-DEV...).
+    refs: [https://nmap.org/book/man-host-discovery.html]

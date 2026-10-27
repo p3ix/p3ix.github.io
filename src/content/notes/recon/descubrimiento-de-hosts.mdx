@@ -1,0 +1,130 @@
+---
+title: Descubrimiento de hosts
+summary: Saber qué equipos están vivos en una red antes de escanear puertos. ARP en tu segmento, ICMP y sondas TCP/UDP más allá, escucha pasiva y barridos sin herramientas desde una máquina comprometida.
+date: 2026-10-27
+area: recon
+order: 30
+related: [recon/subredes-y-cidr]
+tags: [host-discovery, ping-sweep, arp, icmp]
+---
+
+## Qué es
+
+Escanear todos los puertos de cada IP de un `/24` es lento y ruidoso, y casi todas esas IP están
+vacías. El descubrimiento de hosts responde antes a una pregunta más barata: ¿qué direcciones tienen
+un equipo encendido detrás? Después, el escaneo de puertos solo va contra esas.
+
+Para saberlo basta con provocar una respuesta cualquiera. Las técnicas se diferencian en qué
+preguntan y en hasta dónde llegan:
+
+| Técnica | Llega a | Lo frena |
+| --- | --- | --- |
+| ARP | Solo tu segmento | Nada: sin ARP el equipo no puede comunicarse |
+| ICMP echo (ping) | Cualquier red enrutable | Firewalls; el de Windows lo suele bloquear |
+| Sondas TCP | Cualquier red enrutable | Un firewall que descarte en silencio |
+| Sondas UDP | Cualquier red enrutable | Casi todo: lo normal es no recibir nada |
+| DNS inverso | Lo que conozca el DNS | No toca los hosts: solo da nombres |
+
+## Requisitos
+
+- Saber qué red barrer. Si no lo tienes claro, empieza por [subredes, máscaras y CIDR](/biblia/recon/subredes-y-cidr/).
+- Para ARP, estar en el mismo segmento que los objetivos. La VPN de un laboratorio no lo es: `tun0` es una interfaz punto a punto, sin ARP.
+- Para que nmap mande ARP, ICMP o SYN a medida, root. Sin root solo puede abrir conexiones normales.
+
+## En tu misma red: ARP
+
+Para enviar cualquier paquete IP a un vecino, un equipo tiene que preguntar por ARP quién tiene esa
+IP, y el vecino tiene que contestar. Por eso es la técnica más fiable: ni el firewall del equipo lo
+oculta. A cambio, no cruza routers.
+
+<Cmd id="arp-scan-localnet" />
+
+<Cmd id="arp-scan-subnet" />
+
+<Cmd id="netdiscover-active" />
+
+nmap hace lo mismo y, como root, usa ARP solo en cuanto ve que el objetivo está en tu red:
+
+<Cmd id="nmap-host-sweep-arp" />
+
+### Sin hacer ruido: escucha pasiva
+
+Antes de enviar nada puedes escuchar. Los equipos anuncian su IP y su MAC en cada petición ARP, así
+que con paciencia aparecen solos:
+
+<Cmd id="netdiscover-passive" />
+
+En una máquina comprometida, la caché ARP (`ip neigh` en Linux, `arp -a` en Windows) ya lista los
+equipos con los que ha hablado, sin enviar un paquete.
+
+## Más allá de tu red: ICMP y sondas TCP/UDP
+
+Detrás de un router o de la VPN no hay ARP: toca preguntar por IP. El barrido básico de nmap combina
+varias sondas y le basta con que una conteste:
+
+<Cmd id="nmap-host-sweep" />
+
+Para un ping puro a todo el rango, fping es más rápido:
+
+<Cmd id="fping-sweep" />
+
+Cuando un equipo sí responde al ping, fíjate en el TTL: Linux empieza en 64 y Windows en 128, y cada
+router resta uno. Un TTL de 127 suele ser un Windows a un salto.
+
+### Cuando el ping no contesta
+
+Un barrido vacío no significa una red vacía. Muchos firewalls descartan el ICMP, pero un equipo con
+la pila TCP activa contesta a un SYN: con SYN/ACK si el puerto está abierto y con RST si está
+cerrado. Cualquiera de las dos respuestas dice que está vivo. Por eso se añaden sondas a los puertos
+que casi todo equipo tiene (SSH, web, SMB, RDP, WinRM) y un par de UDP (DNS y SNMP):
+
+<Cmd id="nmap-host-sweep-no-icmp" />
+
+Si ni así aparece nada y sabes que hay equipos, queda saltarse el descubrimiento con `-Pn`: nmap da
+todas las IP por vivas y pasa directamente a los puertos. En un rango grande es muy lento, así que
+resérvalo para objetivos concretos.
+
+## Desde una máquina comprometida, sin herramientas
+
+Al pivotar es habitual no tener nmap ni permisos para instalarlo. Para un `/24`, bash y PowerShell
+bastan:
+
+<Cmd id="bash-ping-sweep" />
+
+<Cmd id="bash-tcp-sweep" />
+
+<Cmd id="powershell-ping-sweep" />
+
+<Cmd id="powershell-tcp-sweep" />
+
+Y en un `cmd.exe` sin PowerShell, el bucle clásico (cambia el prefijo por el de tu red). Se filtra
+por `TTL=` porque un "host inaccesible" del router también cuenta como respuesta:
+
+```bat
+for /L %i in (1,1,254) do @ping -n 1 -w 200 10.10.11.%i | find "TTL="
+```
+
+## Nombres sin tocar los hosts: DNS inverso
+
+Las IP no dicen qué es cada máquina; sus nombres, a menudo, sí. Con `-sL` nmap no envía nada a los
+objetivos: solo pide al DNS el nombre de cada IP del rango. En un dominio de Active Directory, el
+DNS es el controlador:
+
+<Cmd id="nmap-list-scan-dns" />
+
+Un `SQL01`, un `BACKUP` o un `WEB-DEV` te dicen por dónde empezar antes de escanear un solo puerto.
+
+## Cómo se detecta
+
+- **Barridos ARP**: muchas peticiones seguidas desde una misma MAC a IP consecutivas. Lo ven los switches gestionados y herramientas como arpwatch o Zeek.
+- **Barridos ICMP**: ráfagas de echo request a todo un rango y, con nmap, timestamp request, que casi nadie usa. Snort y Suricata tienen reglas para los barridos de ping y para las sondas de nmap.
+- **Sondas TCP**: un SYN o un ACK suelto a los mismos puertos de muchas IP, sin conexión después. Un ACK sin conexión previa es especialmente raro.
+- **DNS inverso**: cientos de consultas PTR seguidas desde un mismo equipo en los logs del servidor DNS.
+- La escucha pasiva no genera tráfico: por red no se detecta.
+
+## Cómo se mitiga
+
+- **Segmentación**: VLAN por función y aislamiento de clientes, para que un equipo comprometido no vea por ARP más que lo imprescindible.
+- **Filtrar en cada salto** el ICMP y las conexiones que no hacen falta. No impide descubrir los equipos con puertos abiertos, pero reduce lo que se ve y obliga a hacer más ruido.
+- **Dynamic ARP Inspection y port security** en los switches, que frenan el ARP spoofing que suele venir después del descubrimiento.
+- **Alertas** en el IDS por barridos y en el DNS por ráfagas de PTR: descubrir hosts es casi siempre el primer paso visible de un ataque desde dentro.

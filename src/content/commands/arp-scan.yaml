@@ -1,0 +1,24 @@
+# Comandos de arp-scan: descubrimiento de hosts por ARP en la red local.
+tool: arp-scan
+area: recon
+url: https://github.com/royhills/arp-scan
+commands:
+  - id: arp-scan-localnet
+    title: Barrido ARP de la red local
+    cmd: |
+      sudo arp-scan -I {{IFACE}} --localnet
+    phase: recon
+    tags: [host-discovery, arp]
+    notes: >-
+      Toma la red de la configuración de la interfaz. Si una IP aparece dos veces con MAC distintas
+      (DUP), hay un conflicto de direcciones o alguien está haciendo ARP spoofing.
+
+  - id: arp-scan-subnet
+    title: Barrido ARP de una red concreta
+    cmd: |
+      sudo arp-scan -I {{IFACE}} {{SUBNET}}
+    phase: recon
+    tags: [host-discovery, arp]
+    notes: >-
+      Solo funciona dentro de tu segmento, porque ARP no cruza routers. Para redes remotas, nmap con
+      sondas ICMP o TCP.

@@ -1,0 +1,14 @@
+# Comandos de fping: barridos de ping en paralelo.
+tool: fping
+area: recon
+url: https://fping.org/
+commands:
+  - id: fping-sweep
+    title: Ping a toda una red con fping
+    cmd: |
+      fping -a -q -g {{SUBNET}}
+    phase: recon
+    tags: [host-discovery, ping-sweep, icmp]
+    notes: >-
+      -g genera todas las IP de la red, -a muestra solo las que contestan y -q calla el resto. Manda
+      los pings en paralelo, mucho más rápido que un bucle, pero solo ve hosts que responden a ICMP.

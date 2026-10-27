@@ -1,0 +1,24 @@
+# Comandos de netdiscover: descubrimiento ARP activo y pasivo.
+tool: netdiscover
+area: recon
+url: https://github.com/netdiscover-scanner/netdiscover
+commands:
+  - id: netdiscover-active
+    title: Descubrimiento ARP activo con netdiscover
+    cmd: |
+      sudo netdiscover -i {{IFACE}} -r {{SUBNET}}
+    phase: recon
+    tags: [host-discovery, arp]
+    notes: >-
+      Pregunta por ARP a cada IP del rango y va pintando una tabla con IP, MAC y fabricante. Ctrl+C
+      para salir.
+
+  - id: netdiscover-passive
+    title: Escucha pasiva de ARP
+    cmd: |
+      sudo netdiscover -i {{IFACE}} -p
+    phase: recon
+    tags: [host-discovery, arp, passive]
+    notes: >-
+      No envía nada, solo apunta los equipos según ve sus peticiones ARP. Es lento, pero no genera
+      tráfico que un IDS pueda detectar. Úsalo nada más entrar en una red, antes de hacer ruido.

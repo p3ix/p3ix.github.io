@@ -4,6 +4,7 @@ summary: Qué es una máscara, cómo se lee la notación CIDR y cómo sacar la r
 date: 2026-10-27
 area: recon
 order: 20
+related: [recon/descubrimiento-de-hosts]
 tags: [subnetting, cidr, ipv4, redes]
 ---
 
@@ -137,12 +138,11 @@ eth1   inet 172.16.20.5/24    # otra red, solo alcanzable a través de esta máq
 Con la red delimitada, el siguiente paso es saber qué hosts están vivos dentro de ella. El barrido
 más básico:
 
-```bash
-nmap -sn {{SUBNET}}
-```
+<Cmd id="nmap-host-sweep" />
 
-`-sn` solo descubre hosts, sin escanear puertos. En redes grandes, empieza por las subredes que hayas
-visto en las rutas o en la caché ARP en vez de barrer el rango entero.
+En redes grandes, empieza por las subredes que hayas visto en las rutas o en la caché ARP en vez de
+barrer el rango entero. ARP, sondas TCP cuando el ping no contesta y barridos sin herramientas:
+en [descubrimiento de hosts](/biblia/recon/descubrimiento-de-hosts/).
 
 ## Desde el lado defensivo
 

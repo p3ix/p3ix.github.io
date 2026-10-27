@@ -1,0 +1,25 @@
+# PowerShell sin herramientas: para una máquina Windows comprometida.
+tool: powershell
+area: recon
+commands:
+  - id: powershell-ping-sweep
+    title: Barrido de ping desde Windows
+    cmd: |
+      $net = '{{SUBNET}}' -replace '\.\d+/\d+$'; $p = New-Object Net.NetworkInformation.Ping; 1..254 | % { if ($p.Send("$net.$_", 200).Status -eq 'Success') { "$net.$_" } }
+    phase: recon
+    os: [windows]
+    tags: [host-discovery, ping-sweep, living-off-the-land]
+    notes: >-
+      Para un /24: toma los tres primeros octetos de SUBNET. Usa la clase Ping de .NET con 200 ms de
+      espera, mucho más rápido que Test-Connection en PowerShell 5.
+
+  - id: powershell-tcp-sweep
+    title: Hosts con SMB abierto desde Windows
+    cmd: |
+      $net = '{{SUBNET}}' -replace '\.\d+/\d+$'; 1..254 | % { $c = New-Object Net.Sockets.TcpClient; try { if ($c.ConnectAsync("$net.$_", 445).Wait(200)) { "$net.$_" } } catch {}; $c.Close() }
+    phase: recon
+    os: [windows]
+    tags: [host-discovery, living-off-the-land, smb]
+    notes: >-
+      Para cuando el ICMP está filtrado. Solo lista los hosts que aceptan la conexión al 445; uno que
+      la rechaza también está vivo, pero cae en el catch. Cambia el 445 por el puerto que te interese.
