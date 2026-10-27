@@ -1,0 +1,94 @@
+---
+title: Metodología de reconocimiento de red
+summary: El orden que sigo para reconocer una red (dónde estoy, qué redes hay, qué hosts viven, qué puertos abren y qué hay detrás) y una tabla de puertos frecuentes con qué mirar en cada uno.
+date: 2026-10-27
+area: recon
+order: 10
+related: [recon/subredes-y-cidr, recon/descubrimiento-de-hosts, recon/escaneo-tcp, recon/escaneo-udp, recon/nmap-nse-y-salida]
+tags: [methodology, host-discovery, port-scan]
+---
+
+## Qué es
+
+El reconocimiento de red es un embudo: se va de lo general a lo concreto, y cada paso reduce lo que
+hay que mirar en el siguiente. Saltarse un paso cuesta tiempo (escanear todos los puertos de cientos
+de IP vacías) o, peor, hallazgos (el panel en un puerto alto, el SNMP que nadie miró).
+
+Esta nota es el índice del área: el orden, la receta rápida y qué hacer con cada puerto. El detalle
+de cada paso está en su propia nota.
+
+## Antes de empezar
+
+- **El alcance, por escrito**: qué rangos entran y cuáles no. Un prefijo de más puede ser la red de otra empresa. La [calculadora de subredes](/biblia/utilidades/subredes/) dice si una IP cae dentro de un rango.
+- **Dónde guardar todo**: una carpeta por objetivo y `-oA` en cada escaneo. La salida es tu evidencia y te ahorra repetir escaneos lentos.
+- **El ritmo**: en un laboratorio, deprisa; en una red real, en el horario pactado y a una velocidad que no tumbe nada ni pierda puertos.
+
+## El orden
+
+1. **Dónde estoy**: tu IP, tu interfaz y tus rutas; en una máquina comprometida, además, sus otras interfaces y su caché ARP. Ver [subredes, máscaras y CIDR](/biblia/recon/subredes-y-cidr/).
+2. **Qué redes hay**: el prefijo de cada red, los rangos privados que aparecen en las rutas y las segundas patas de las máquinas que controlas.
+3. **Qué hosts están vivos**: ARP si estás en el mismo segmento; ICMP y sondas TCP si no. Ver [descubrimiento de hosts](/biblia/recon/descubrimiento-de-hosts/).
+4. **Qué puertos TCP abren**: todos, deprisa y sin versiones. Ver [escaneo de puertos TCP](/biblia/recon/escaneo-tcp/).
+5. **Qué hay detrás**: versiones y scripts por defecto solo en los abiertos. Ver [scripts NSE y salida de nmap](/biblia/recon/nmap-nse-y-salida/).
+6. **UDP, en segundo plano**: los 100 más comunes mientras trabajas el TCP. Ver [escaneo de puertos UDP](/biblia/recon/escaneo-udp/).
+7. **Cada servicio, a fondo**: la tabla de puertos de abajo dice por dónde empezar.
+
+## La receta rápida
+
+Para una red, primero quién está vivo y después los puertos que más dan en todos:
+
+<Cmd id="nmap-host-sweep" />
+
+<Cmd id="nmap-subnet-common-ports" />
+
+Para cada host interesante, las dos pasadas de TCP y el UDP en paralelo:
+
+<Cmd id="nmap-tcp-all-ports" />
+
+<Cmd id="nmap-extract-ports" />
+
+<Cmd id="nmap-tcp-services" />
+
+<Cmd id="nmap-udp-top" />
+
+## Puertos frecuentes y qué mirar
+
+| Puerto · servicio | Qué mirar primero |
+| --- | --- |
+| 21 · FTP | Login anónimo, la versión exacta y si se puede subir a una carpeta que sirva la web. |
+| 22 · SSH | Versión y métodos de autenticación. Rara vez es la entrada: se usa con credenciales encontradas en otro sitio. |
+| 23 · Telnet | Credenciales por defecto. Todo viaja en claro. |
+| 25, 465, 587 · SMTP | Enumerar usuarios con VRFY, EXPN o RCPT TO y probar si hace relay abierto. |
+| 53 · DNS | Transferencia de zona (AXFR) y nombres internos. En una red Windows, apunta al controlador de dominio. |
+| 80, 443, 8080, 8443 · HTTP(S) | Tecnologías, directorios, virtual hosts y el certificado, cuyos nombres (CN y SAN) revelan dominios. |
+| 88 · Kerberos | Es un controlador de dominio. Usuarios válidos, [AS-REP roasting](/biblia/comandos/#impacket-getnpusers) y, con una cuenta, [kerberoasting](/biblia/ad/kerberoasting/). |
+| 110, 143, 993, 995 · POP3, IMAP | Correo de los usuarios en cuanto haya credenciales. |
+| 111 · rpcbind | Qué servicios RPC hay detrás; a menudo, NFS. |
+| 135 · MSRPC | Enumeración por RPC de usuarios, grupos y servicios de Windows. |
+| 139, 445 · SMB | Sesión nula o de invitado, recursos compartidos, versión y si exige firma. |
+| 161 (UDP) · SNMP | Comunidades `public` y `private`: interfaces, procesos, software y a veces usuarios. |
+| 389, 636, 3268 · LDAP | Bind anónimo y, con cualquier cuenta del dominio, el directorio entero. |
+| 1433 · MSSQL | Credenciales por defecto o débiles, autenticación de Windows y `xp_cmdshell`. |
+| 2049 · NFS | Qué exporta y a quién, y si `root_squash` está desactivado. |
+| 2375 · Docker | La API sin TLS da control total del host. |
+| 3306, 5432 · MySQL, PostgreSQL | Acceso remoto con credenciales por defecto o reutilizadas. |
+| 3389 · RDP | Si exige NLA, y un escritorio en cuanto haya credenciales. |
+| 5985, 5986 · WinRM | Una shell de PowerShell con un usuario del grupo Remote Management Users. |
+| 5900 · VNC | Sin contraseña o con una débil. |
+| 6379 · Redis | Sin autenticación en muchas instalaciones: datos en memoria y escritura de archivos. |
+| 9200 · Elasticsearch | Índices legibles sin autenticación. |
+| 27017 · MongoDB | Bases de datos abiertas sin autenticación. |
+
+Un puerto que no esté aquí no es menos interesante: `-sV` y una búsqueda de la versión exacta suelen
+decir más que el número.
+
+## Desde el lado defensivo
+
+El reconocimiento es la fase más ruidosa de un ataque, y la primera que se puede ver: un equipo de
+usuario que barre la red o escanea puertos de servidores es una alerta temprana de verdad. Cada nota
+del área tiene su apartado de detección y mitigación; en resumen:
+
+- **Inventario propio**: escanear tu red de forma periódica con estas mismas técnicas y comparar con lo que debería haber.
+- **Exponer lo mínimo**: cada fila de la tabla de arriba que no tenga que estar abierta es una puerta menos.
+- **Segmentar**: que desde la red de usuarios no se alcancen los puertos de gestión (SMB, WinRM, RDP, SNMP, IPMI) de los servidores.
+- **Vigilar**: alertas por barridos ARP e ICMP, por escaneos de puertos y por ráfagas de consultas DNS inversas.
