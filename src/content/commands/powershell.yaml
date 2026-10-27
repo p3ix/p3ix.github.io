@@ -2,6 +2,18 @@
 tool: powershell
 area: recon
 commands:
+  - id: powershell-find-route
+    title: Qué IP e interfaz usa Windows para llegar a un objetivo
+    cmd: |
+      Find-NetRoute -RemoteIPAddress {{RHOST}} | Select-Object IPAddress, InterfaceAlias, NextHop
+    phase: recon
+    os: [windows]
+    tags: [routing, interfaces, living-off-the-land]
+    notes: >-
+      El equivalente de ip route get. Saca dos filas: en la primera, IPAddress es tu LHOST para ese
+      objetivo; en la segunda, NextHop es el router (0.0.0.0 si el objetivo está en tu misma red).
+      Desde Windows 8 y Server 2012.
+
   - id: powershell-ping-sweep
     title: Barrido de ping desde Windows
     cmd: |

@@ -1,0 +1,49 @@
+# ip (iproute2): interfaces, rutas y vecinos de una máquina Linux.
+tool: ip
+area: recon
+url: https://man7.org/linux/man-pages/man8/ip.8.html
+commands:
+  - id: ip-addr
+    title: Interfaces de red y sus IP
+    cmd: |
+      ip -4 -br addr
+    phase: recon
+    tags: [interfaces, pivoting]
+    notes: >-
+      Una línea por interfaz con su IP y su prefijo, que dice en qué red está (pásalo por la
+      calculadora de subredes). Dos interfaces en redes distintas: la máquina hace de puente hacia
+      otra red. Sin -br sale además el broadcast de cada una.
+
+  - id: ip-route
+    title: Tabla de rutas
+    cmd: |
+      ip route
+    phase: recon
+    tags: [routing, pivoting]
+    notes: >-
+      Las rutas con scope link son redes en las que la máquina está directamente; las que llevan
+      via, redes que alcanza a través de ese router. La default es por donde sale todo lo demás. Una
+      ruta a una red que no es la tuya es una red más que escanear.
+
+  - id: ip-route-get
+    title: Qué IP e interfaz usar para llegar a un objetivo
+    cmd: |
+      ip route get {{RHOST}}
+    phase: recon
+    tags: [routing, interfaces]
+    notes: >-
+      src es la IP con la que te ve el objetivo: la que va en LHOST para una reverse shell, un
+      servidor HTTP o un enlace dentro de un correo. dev es la interfaz (IFACE) y via, el router. Solo
+      consulta la tabla de rutas, sin enviar nada. Necesita una IP: si tienes un nombre, sácala antes
+      con getent hosts.
+
+  - id: ip-neigh
+    title: Caché ARP de una máquina Linux
+    cmd: |
+      ip neigh
+    phase: recon
+    tags: [arp, host-discovery, passive]
+    notes: >-
+      Los equipos de las redes locales con los que la máquina ya ha hablado: hosts vivos sin enviar
+      un paquete. REACHABLE es una respuesta reciente, STALE que hace rato que no habla y FAILED que
+      no contestó.

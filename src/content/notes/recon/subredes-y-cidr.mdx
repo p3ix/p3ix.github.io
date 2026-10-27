@@ -101,18 +101,19 @@ ipcalc 10.10.14.7/23
 - **Multicast**: `224.0.0.0/4`. Grupos, no hosts: no tiene sentido escanearla.
 - **Documentación (RFC 5737)**: `192.0.2.0/24`, `198.51.100.0/24` y `203.0.113.0/24`. Reservadas para ejemplos: úsalas al redactar un writeup o un reporte.
 
-## Dónde estoy: la red de una máquina comprometida
+## Dónde estoy: interfaces, rutas y qué IP usar
 
 En cuanto consigues una shell, mira sus interfaces y sus rutas. Si tiene una segunda interfaz en otra
-subred, has encontrado una red que no se ve desde tu máquina: el punto de partida del pivoting.
+subred, has encontrado una red que no se ve desde tu máquina: el punto de partida del pivoting. Lo
+mismo vale para tu propia máquina en un laboratorio con varias redes.
 
 En Linux:
 
-```bash
-ip -4 addr
-ip route
-ip neigh
-```
+<Cmd id="ip-addr" />
+
+<Cmd id="ip-route" />
+
+<Cmd id="ip-neigh" />
 
 En Windows:
 
@@ -120,18 +121,72 @@ En Windows:
 ipconfig /all
 route print
 arp -a
+type C:\Windows\System32\drivers\etc\hosts
 ```
 
-Resumida, la salida de `ip -4 addr` en una máquina con dos patas:
+Resumida, la salida de `ip -4 -br addr` en una máquina con dos patas:
 
 ```text
-eth0   inet 10.10.11.42/24    # la red por la que has entrado
-eth1   inet 172.16.20.5/24    # otra red, solo alcanzable a través de esta máquina
+lo     UNKNOWN  127.0.0.1/8
+eth0   UP       10.10.11.42/24    # la red por la que has entrado
+eth1   UP       172.16.20.5/24    # otra red, solo alcanzable a través de esta máquina
 ```
 
 - La tabla de rutas (`ip route`, `route print`) dice qué redes alcanza la máquina y a través de qué router.
 - La caché ARP (`ip neigh`, `arp -a`) lista los equipos con los que ya ha hablado: hosts vivos sin enviar un solo paquete.
 - Una IP `169.254.x.x` en una interfaz suele significar que esa pata no tiene DHCP: no cuentes con ella.
+
+### Qué IP usar como LHOST
+
+Con una sola interfaz, tu IP es una. Con varias (la VPN y la red local, o las dos patas de un
+laboratorio), la pregunta es otra: ¿con qué IP te ve **este** objetivo? Es la que va en **LHOST**
+para una reverse shell, en el servidor HTTP del que descarga algo o en el enlace de un correo. Si
+pones la de otra interfaz, el objetivo intenta volver a una red para la que no tiene ruta y no llega
+nada.
+
+Lo decide la tabla de rutas, y `ip route get` se lo pregunta directamente al kernel:
+
+<Cmd id="ip-route-get" />
+
+Un ejemplo con dos interfaces y un servidor de correo que no está en ninguna de las dos redes:
+
+```text
+$ ip -4 -br addr
+lo     UNKNOWN  127.0.0.1/8
+eth0   UP       10.1.0.15/16
+eth1   UP       10.10.20.4/24
+
+$ ip route get 10.2.19.30
+10.2.19.30 via 10.10.20.1 dev eth1 src 10.10.20.4 uid 0
+    cache
+```
+
+- **via 10.10.20.1**: el router que da el salto hasta la red del correo.
+- **dev eth1**: la interfaz por la que sale, tu **IFACE** para ese objetivo.
+- **src 10.10.20.4**: tu IP vista desde el objetivo, tu **LHOST**. La de `eth0` no sirve: el servidor no tiene por qué saber volver a `10.1.0.0/16`.
+
+El resto de la línea (`uid`, `cache`) no importa aquí. En Hack The Box o TryHackMe la respuesta
+suele ser `dev tun0` con tu IP de la VPN. En Windows:
+
+<Cmd id="powershell-find-route" />
+
+### Nombres sin DNS: /etc/hosts
+
+`ip route get` necesita una IP, y en los laboratorios los objetivos vienen a menudo por su nombre
+(`mail.corp.local`). El archivo de hosts dice a qué IP apunta cada nombre sin preguntar al DNS:
+
+<Cmd id="bash-hosts-file" />
+
+Del nombre a la ruta en un solo paso:
+
+```bash
+ip route get $(getent hosts mail.corp.local | awk '{print $1}')
+```
+
+Y al revés: si una web solo responde por su nombre, o no llegas al DNS del dominio, añade tú la
+entrada:
+
+<Cmd id="bash-hosts-add" />
 
 ## Del cálculo al escaneo
 

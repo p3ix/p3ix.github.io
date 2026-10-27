@@ -1,7 +1,29 @@
-# Bash sin herramientas: para una máquina comprometida que no tiene nmap.
+# Bash sin herramientas: para una máquina comprometida que no tiene nmap, o lo que ya trae el sistema.
 tool: bash
 area: recon
 commands:
+  - id: bash-hosts-file
+    title: Nombres resueltos sin DNS en /etc/hosts
+    cmd: |
+      grep -v '^#' /etc/hosts
+    phase: recon
+    tags: [hosts-file, living-off-the-land]
+    notes: >-
+      En un laboratorio suele traer los nombres de los objetivos; en una máquina comprometida, los
+      servidores con los que habla (bases de datos, el correo, un controlador de dominio). getent
+      hosts nombre da la IP de un nombre, venga de aquí o del DNS.
+
+  - id: bash-hosts-add
+    title: Añadir un nombre a /etc/hosts
+    cmd: |
+      echo '{{RHOST}} {{DOMAIN}}' | sudo tee -a /etc/hosts
+    phase: recon
+    tags: [hosts-file, dns]
+    notes: >-
+      Para webs que solo responden por su nombre (virtual hosts) o un dominio sin acceso a su DNS.
+      Pon en la misma línea, separados por espacios, los demás nombres que use el objetivo, como
+      dc01.dominio o mail.dominio.
+
   - id: bash-ping-sweep
     title: Barrido de ping sin herramientas en Linux
     cmd: |

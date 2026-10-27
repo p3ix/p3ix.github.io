@@ -25,7 +25,7 @@ de cada paso está en su propia nota.
 
 ## El orden
 
-1. **Dónde estoy**: tu IP, tu interfaz y tus rutas; en una máquina comprometida, además, sus otras interfaces y su caché ARP. Ver [subredes, máscaras y CIDR](/biblia/recon/subredes-y-cidr/).
+1. **Dónde estoy**: tu IP, tu interfaz y tus rutas; en una máquina comprometida, además, sus otras interfaces y su caché ARP. Con varias interfaces, `ip route get` dice qué IP usar como LHOST con cada objetivo. Ver [subredes, máscaras y CIDR](/biblia/recon/subredes-y-cidr/#qué-ip-usar-como-lhost).
 2. **Qué redes hay**: el prefijo de cada red, los rangos privados que aparecen en las rutas y las segundas patas de las máquinas que controlas.
 3. **Qué hosts están vivos**: ARP si estás en el mismo segmento; ICMP y sondas TCP si no. Ver [descubrimiento de hosts](/biblia/recon/descubrimiento-de-hosts/).
 4. **Qué puertos TCP abren**: todos, deprisa y sin versiones. Ver [escaneo de puertos TCP](/biblia/recon/escaneo-tcp/).
