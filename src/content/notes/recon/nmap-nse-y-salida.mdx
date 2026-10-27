@@ -1,0 +1,98 @@
+---
+title: Scripts NSE y salida de nmap
+summary: Qué hace -sC, cómo buscar y lanzar scripts NSE por categoría o con argumentos, y cómo guardar los resultados para reutilizarlos. Formatos de salida, los puertos a PORTS, informe HTML y searchsploit.
+date: 2026-10-27
+area: recon
+order: 60
+related: [recon/escaneo-tcp, recon/escaneo-udp]
+tags: [nmap, nse, port-scan, reporting]
+---
+
+## Qué es
+
+NSE (Nmap Scripting Engine) son scripts en Lua que nmap lanza contra cada host o puerto después de
+identificar el servicio. Algunos solo leen un banner; otros enumeran recursos, prueban credenciales
+o comprueban un CVE concreto. `-sC` lanza los de la categoría `default`.
+
+Cada script pertenece a una o varias categorías, y conviene saber qué implica cada una antes de
+lanzarla:
+
+| Categoría | Qué hace | Riesgo |
+| --- | --- | --- |
+| default | Rápido y útil: lo que lanza -sC | Bajo |
+| safe | No debería tumbar ni alterar nada | Bajo |
+| discovery | Enumera: recursos, usuarios, rutas | Bajo o medio |
+| vuln | Comprueba vulnerabilidades concretas | Medio |
+| auth y brute | Credenciales por defecto y fuerza bruta | Bloqueo de cuentas |
+| intrusive, exploit y dos | Pueden alterar o tumbar el servicio | Alto |
+| external | Envía datos del objetivo a servicios de terceros | Confidencialidad |
+
+## Requisitos
+
+- Saber qué servicios hay: los scripts eligen a qué atacar según el puerto y, con `-sV`, según el servicio detectado.
+- Permiso para lo que lanzas: en un alcance real, `brute`, `intrusive` o `dos` hay que pactarlos antes.
+
+## Buscar scripts
+
+<Cmd id="nmap-nse-search" />
+
+O directamente en la carpeta, que es más rápido para ver nombres:
+
+```bash
+ls /usr/share/nmap/scripts/ | grep -i smb
+```
+
+## Lanzar scripts
+
+`--script` acepta nombres, comodines, categorías y expresiones con `and`, `or` y `not`:
+
+```bash
+nmap --script 'default and safe' -p{{PORTS}} {{RHOST}}
+nmap --script 'smb-* and not brute' -p445 {{RHOST}}
+```
+
+La categoría `vuln` es la que más se usa al principio de una auditoría:
+
+<Cmd id="nmap-nse-vuln" />
+
+Muchos scripts aceptan parámetros. Con credenciales válidas, los de SMB o HTTP ven bastante más:
+
+<Cmd id="nmap-nse-script-args" />
+
+Si un script no hace lo que esperas, `--script-trace` enseña cada paquete que envía y recibe.
+
+## Guardar la salida
+
+En un escaneo real, guarda siempre la salida: es tu evidencia y te ahorra repetir escaneos lentos.
+
+- `-oN`: la salida normal, para leer.
+- `-oG`: grepable, una línea por host. Obsoleta según nmap, pero cómoda para grep y awk.
+- `-oX`: XML, para otras herramientas.
+- `-oA nombre`: los tres a la vez (`nombre.nmap`, `nombre.gnmap` y `nombre.xml`).
+
+Un escaneo largo que se corta se puede retomar con `nmap --resume nombre.gnmap` (o con el `.nmap`).
+
+De la salida grepable salen los puertos abiertos, listos para **PORTS**:
+
+<Cmd id="nmap-extract-ports" />
+
+Del XML, un informe HTML para revisar o adjuntar:
+
+<Cmd id="nmap-output-html" />
+
+Y, con las versiones de `-sV`, una primera búsqueda de exploits conocidos:
+
+<Cmd id="searchsploit-nmap" />
+
+## Cómo se detecta
+
+- **Scripts HTTP**: el user-agent por defecto de NSE contiene `Nmap Scripting Engine` y aparece tal cual en los logs web, junto con peticiones a rutas típicas (`http-enum`).
+- **auth y brute**: ráfagas de inicios de sesión fallidos (el evento 4625 en Windows, `Failed password` en sshd).
+- **vuln**: los IDS tienen firmas para las comprobaciones más conocidas, como MS17-010.
+
+## Cómo se mitiga
+
+- **Parchear lo que encuentra `vuln`**: son CVE conocidos y públicos, lo primero que va a probar cualquiera.
+- **Bloqueo de cuentas** y límites de intentos frente a `brute`, sin olvidar las cuentas de servicio.
+- **Quitar banners y versiones** de las respuestas de los servicios: no detiene a nadie, pero hace que `-sV` y searchsploit acierten menos.
+- **Firmas de NSE en el WAF y el IDS**, sabiendo que el user-agent se puede cambiar.

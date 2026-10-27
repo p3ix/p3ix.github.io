@@ -1,0 +1,15 @@
+# Comandos de masscan: escaneo de puertos a muy alta velocidad para redes grandes.
+tool: masscan
+area: recon
+url: https://github.com/robertdavidgraham/masscan
+commands:
+  - id: masscan-full-range
+    title: Todos los puertos de una red grande con masscan
+    cmd: |
+      sudo masscan -p1-65535 {{SUBNET}} --rate 10000 -e {{IFACE}} -oL masscan.txt
+    phase: recon
+    tags: [port-scan, tcp]
+    notes: >-
+      Usa su propia pila TCP, así que escanea redes enteras a miles de paquetes por segundo. No da
+      versiones y, con un rate alto, satura enlaces y pierde puertos: confirma lo que encuentre con
+      nmap.

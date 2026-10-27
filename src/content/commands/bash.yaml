@@ -21,3 +21,13 @@ commands:
     notes: >-
       Para cuando el ICMP está filtrado. /dev/tcp es una función de bash (no existe en sh ni en
       dash), así que lánzalo con bash. Para un /24, como el barrido de ping.
+
+  - id: bash-port-scan
+    title: Escaneo de puertos sin herramientas en Linux
+    cmd: |
+      for p in $(seq 1 1024); do (timeout 1 bash -c "echo >/dev/tcp/{{RHOST}}/$p" 2>/dev/null && echo "$p abierto") & done; wait
+    phase: recon
+    tags: [port-scan, living-off-the-land]
+    notes: >-
+      Prueba los 1024 primeros puertos en paralelo. Para otros rangos cambia el seq, pero ve por
+      tramos: con los 65 535 a la vez la máquina se queda sin procesos.

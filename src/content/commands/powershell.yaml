@@ -23,3 +23,14 @@ commands:
     notes: >-
       Para cuando el ICMP está filtrado. Solo lista los hosts que aceptan la conexión al 445; uno que
       la rechaza también está vivo, pero cae en el catch. Cambia el 445 por el puerto que te interese.
+
+  - id: powershell-port-scan
+    title: Escaneo de puertos desde Windows
+    cmd: |
+      1..1024 | % { $c = New-Object Net.Sockets.TcpClient; try { if ($c.ConnectAsync('{{RHOST}}', $_).Wait(100)) { "$_ abierto" } } catch {}; $c.Close() }
+    phase: recon
+    os: [windows]
+    tags: [port-scan, living-off-the-land]
+    notes: >-
+      Va puerto a puerto con 100 ms de espera: los 1024 primeros tardan menos de dos minutos.
+      Test-NetConnection hace lo mismo, pero mucho más despacio.

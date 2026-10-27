@@ -1,0 +1,139 @@
+---
+title: Escaneo de puertos TCP
+summary: Cómo decide nmap si un puerto TCP está abierto, cerrado o filtrado, el escaneo en dos pasadas (todos los puertos deprisa y luego versiones solo en los abiertos) y lo que cuesta ir rápido.
+date: 2026-10-27
+area: recon
+order: 40
+related: [recon/descubrimiento-de-hosts, recon/escaneo-udp, recon/nmap-nse-y-salida]
+tags: [port-scan, tcp, nmap]
+---
+
+## Qué es
+
+Cada conexión TCP empieza con el saludo de tres pasos: el cliente manda un SYN, el servidor contesta
+SYN/ACK y el cliente cierra con un ACK. Para escanear basta con el primer paso, porque la respuesta
+al SYN ya lo dice todo:
+
+| Estado | Qué ha recibido nmap | Qué significa |
+| --- | --- | --- |
+| open | SYN/ACK | Hay un servicio escuchando |
+| closed | RST | El host está vivo, pero ahí no escucha nada |
+| filtered | Nada, o un ICMP de inaccesible | Un firewall descarta o rechaza los paquetes |
+| unfiltered | RST a un ACK (solo con -sA) | No hay filtro, pero no sabe si está abierto |
+
+Hay dos estados más para cuando nmap no puede decidir, `open|filtered` y `closed|filtered`. El
+primero es lo normal en [UDP](/biblia/recon/escaneo-udp/).
+
+Un `closed` también es información: confirma que el host existe y que el firewall deja pasar ese
+puerto. Muchos `filtered` seguidos y algún `closed` suelto dibujan las reglas del firewall.
+
+## Requisitos
+
+- El host vivo, o `-Pn` para que nmap no lo compruebe (ver [descubrimiento de hosts](/biblia/recon/descubrimiento-de-hosts/)).
+- Root para el SYN scan (`-sS`), que fabrica los paquetes a mano. Sin root, nmap usa `-sT`.
+- Alcance directo al objetivo. Detrás de un pivot con proxychains, solo vale `-sT`.
+
+## SYN scan o connect scan
+
+Con root, nmap hace por defecto un **SYN scan** (`-sS`): manda el SYN, lee la respuesta y, si es un
+SYN/ACK, corta con un RST sin terminar el saludo. Es rápido y la aplicación nunca llega a ver la
+conexión, aunque el firewall y el IDS sí.
+
+El **connect scan** (`-sT`) pide al sistema una conexión completa con `connect()`, como cualquier
+programa. Es más lento y queda registrado en cada servicio, pero no necesita root y pasa por un
+proxy SOCKS:
+
+<Cmd id="nmap-tcp-connect" />
+
+## El escaneo en dos pasadas
+
+Sin `-p`, nmap solo mira los 1000 puertos más comunes de su lista: el panel web en el 8443 o la API
+en el 5000 se quedan fuera. Y lanzar `-sCV` contra los 65 535 puertos tarda muchísimo. La solución
+es separar las dos cosas.
+
+Primero, todos los puertos, sin versiones:
+
+<Cmd id="nmap-tcp-all-ports" />
+
+Después, la lista de los abiertos. Pégala en **PORTS** en la barra de variables:
+
+<Cmd id="nmap-extract-ports" />
+
+Y la segunda pasada, solo contra esos, con versiones y scripts:
+
+<Cmd id="nmap-tcp-services" />
+
+RustScan hace las dos pasadas en una: encuentra los puertos en segundos y llama a nmap con ellos.
+
+<Cmd id="rustscan-to-nmap" />
+
+## Lo que cuesta ir rápido
+
+`--min-rate` obliga a nmap a mandar al menos ese número de paquetes por segundo. En un laboratorio
+ahorra minutos; en una red real tiene dos precios: se pierden puertos, porque las respuestas que
+llegan tarde ya no se esperan, y cualquier IDS lo ve al instante. Un escaneo rápido que se salta un
+puerto es peor que uno lento que lo encuentra.
+
+Para una auditoría, mejor una plantilla de tiempos y dejar que nmap ajuste solo:
+
+```bash
+sudo nmap -sS -p- -T4 -n -Pn {{RHOST}} -oA allports
+```
+
+- `-T4` es agresivo pero razonable en redes rápidas; `-T3` es el valor por defecto y `-T5` sacrifica precisión.
+- `-n` evita una consulta DNS por cada IP.
+- `--max-retries 1` reduce los reintentos a los puertos que no contestan, a cambio de algo de precisión.
+
+## Muchos hosts a la vez
+
+En una red grande no tiene sentido un `-p-` a cada equipo. Primero, los puertos que más dan en toda
+la red:
+
+<Cmd id="nmap-subnet-common-ports" />
+
+Para barrer todos los puertos de un rango grande, masscan va mucho más rápido que nmap, aunque
+luego hay que confirmar lo que encuentra:
+
+<Cmd id="masscan-full-range" />
+
+## El sistema operativo
+
+Cada sistema construye sus paquetes TCP/IP de una forma un poco distinta (TTL, tamaño de ventana,
+opciones). nmap lo compara con su base de huellas:
+
+<Cmd id="nmap-os-detection" />
+
+## Mapear el firewall
+
+Un ACK suelto, fuera de cualquier conexión, no abre nada: sirve para ver si hay un firewall con
+estado en medio. Si vuelve un RST, el paquete llegó al host; si no vuelve nada, alguien lo filtró.
+
+<Cmd id="nmap-ack-firewall" />
+
+Un fallo de configuración clásico es confiar en el puerto de origen: reglas que dejan pasar todo lo
+que viene del 53 para que funcione el DNS. Comprobarlo es rápido:
+
+<Cmd id="nmap-source-port-53" />
+
+## Sin nmap
+
+Desde una máquina comprometida, sin herramientas:
+
+<Cmd id="bash-port-scan" />
+
+<Cmd id="powershell-port-scan" />
+
+## Cómo se detecta
+
+- **SYN scan**: muchos SYN de un mismo origen a puertos distintos, sin completar el saludo. Es justo lo que buscan las reglas de escaneo de Snort y Suricata y los detectores de escaneo de Zeek.
+- **Connect scan**: lo anterior más una línea por conexión en los logs de cada servicio, como las conexiones de sshd cerradas antes de autenticar.
+- **Versiones y scripts**: las sondas de `-sV` y el user-agent de NSE (contiene `Nmap Scripting Engine`) aparecen en los logs web.
+- **Firewall**: con el log de paquetes denegados activo, una ráfaga de drops a puertos consecutivos desde la misma IP.
+
+## Cómo se mitiga
+
+- **Exponer solo lo necesario**, con una política de denegar por defecto: lo que no escucha o no es alcanzable no se encuentra.
+- **Descartar (DROP) en vez de rechazar (REJECT)** en el perímetro: no impide el escaneo, pero lo ralentiza, porque nmap tiene que esperar y reintentar.
+- **Bloqueo automático** en el IPS de los orígenes que escanean, con cuidado de no bloquear servicios legítimos.
+- **Reglas sin excepciones por puerto de origen**: el puerto de origen lo elige el cliente.
+- **Escanear tu propia red** de forma periódica, para ver lo mismo que vería un atacante antes que él.

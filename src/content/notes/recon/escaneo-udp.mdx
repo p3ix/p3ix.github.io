@@ -1,0 +1,76 @@
+---
+title: Escaneo de puertos UDP
+summary: Por qué el escaneo UDP es lento y ambiguo, cómo sacarle partido con pocos puertos y detección de versiones, y qué servicios UDP merecen siempre una pasada (DNS, SNMP, TFTP, IPMI...).
+date: 2026-10-27
+area: recon
+order: 50
+related: [recon/escaneo-tcp, recon/nmap-nse-y-salida]
+tags: [port-scan, udp, nmap]
+---
+
+## Qué es
+
+UDP no tiene saludo: se manda un datagrama y ya. Si en ese puerto no escucha nada, el sistema suele
+contestar con un ICMP port unreachable. Pero si hay un servicio y el datagrama no le dice nada (un
+payload vacío o de otro protocolo), lo normal es que no conteste. Y un firewall que descarta el
+paquete tampoco contesta. Desde fuera, las dos cosas son idénticas.
+
+Por eso nmap clasifica así lo que recibe:
+
+- **Una respuesta UDP**: `open`.
+- **ICMP port unreachable** (tipo 3, código 3): `closed`.
+- **Otro ICMP de inaccesible** (tipo 3, códigos 0, 1, 2, 9, 10 o 13): `filtered`.
+- **Nada, ni después de reintentar**: `open|filtered`. Puede ser un servicio callado o un firewall.
+
+Y luego está la lentitud. Linux, por defecto, solo manda un ICMP de inaccesible por segundo, así que
+nmap no puede saber antes si cada puerto está cerrado. Todos los puertos UDP de un único host pueden
+llevar unas 18 horas.
+
+## Requisitos
+
+- Root: el escaneo UDP (`-sU`) siempre fabrica los paquetes.
+- Elegir puertos. Ningún escaneo UDP razonable empieza por `-p-`.
+- Paciencia, y lanzarlo en segundo plano mientras trabajas los puertos TCP.
+
+## Los puertos que más dan
+
+Los 100 puertos UDP más comunes cubren casi todo lo interesante:
+
+<Cmd id="nmap-udp-top" />
+
+Para decidir los `open|filtered`, la detección de versiones manda a cada puerto un payload del
+protocolo que espera. Si el servicio lo entiende y contesta, el puerto pasa a `open`. Pon en
+**PORTS** los que hayan salido:
+
+<Cmd id="nmap-udp-services" />
+
+## Servicios UDP que nunca hay que saltarse
+
+- **53, DNS**: transferencias de zona y resolución de nombres internos.
+- **69, TFTP**: sin autenticación. Suele guardar configuraciones de routers, switches y teléfonos IP.
+- **123, NTP**: da la hora del dominio, y Kerberos solo tolera cinco minutos de desfase.
+- **137, NetBIOS**: nombre del equipo, dominio o grupo de trabajo y MAC, incluso de Windows antiguos que no responden a nada más.
+- **161, SNMP**: con la comunidad `public` o `private`, a menudo todo el inventario del equipo: interfaces, rutas, procesos y software instalado.
+- **500, IKE**: VPN IPsec. ike-scan identifica el fabricante y si acepta el modo agresivo.
+- **623, IPMI**: la gestión remota de servidores. IPMI 2.0 entrega el hash de la contraseña de cualquier usuario que exista, antes de autenticar.
+- **1900, SSDP** y **5353, mDNS**: dispositivos que se anuncian solos en la red local.
+
+## Ir más rápido sin perder puertos
+
+- **Menos puertos**: `--top-ports 100`, o una lista con los de arriba.
+- **Menos sondas**: `--version-intensity 0` en la detección de versiones.
+- **Más hosts a la vez**: el límite de ICMP es de cada host, así que escanear varios en paralelo no pierde nada. nmap ya los agrupa; `--min-hostgroup` sube el tamaño del grupo.
+- **Subir `--min-rate` no ayuda**: el límite está en el objetivo, que deja de contestar. nmap acabará marcando como `open|filtered` puertos que en realidad están cerrados.
+
+## Cómo se detecta
+
+- Datagramas a muchos puertos UDP desde un mismo origen y, sobre todo, la ráfaga de ICMP port unreachable que sale del objetivo: el propio host escaneado genera la señal.
+- Las sondas de versión llevan payloads de protocolo reconocibles (consultas DNS, SNMP con comunidades típicas), y los IDS tienen firmas para ellas.
+- En los servicios, intentos de SNMP con comunidades por defecto o peticiones TFTP de archivos de configuración.
+
+## Cómo se mitiga
+
+- **Gestión aparte**: SNMP, IPMI y TFTP solo en una VLAN de administración, nunca alcanzables desde la red de usuarios.
+- **SNMPv3** con autenticación y cifrado en vez de comunidades de v1 y v2c, y nunca `public` ni `private`.
+- **Descartar en el firewall** el UDP que no haga falta, incluido el que sale: muchos de estos servicios solo deben hablar con unos pocos equipos.
+- **Revisar los BMC (IPMI)**: deshabilitar IPMI sobre LAN si no se usa y cambiar las credenciales de fábrica.

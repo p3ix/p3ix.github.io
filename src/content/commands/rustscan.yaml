@@ -1,0 +1,14 @@
+# Comandos de RustScan: descubre los puertos abiertos muy rápido y se los pasa a nmap.
+tool: rustscan
+area: recon
+url: https://github.com/RustScan/RustScan
+commands:
+  - id: rustscan-to-nmap
+    title: Puertos abiertos en segundos y nmap sobre ellos
+    cmd: |
+      rustscan -a {{RHOST}} --ulimit 5000 -- -sCV -oA rustscan
+    phase: recon
+    tags: [port-scan, tcp]
+    notes: >-
+      Hace la primera pasada (todos los puertos) y le pasa a nmap los abiertos con lo que va detrás de
+      --. Es muy ruidoso: pensado para laboratorios, no para una red con IDS.

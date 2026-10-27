@@ -1,0 +1,14 @@
+# Comandos de searchsploit: búsqueda offline en Exploit-DB.
+tool: searchsploit
+area: recon
+url: https://www.exploit-db.com/searchsploit
+commands:
+  - id: searchsploit-nmap
+    title: Buscar exploits para las versiones de un escaneo
+    cmd: |
+      searchsploit --nmap targeted.xml
+    phase: enum
+    tags: [exploit-search, reporting]
+    notes: >-
+      Lee el XML de nmap y busca en Exploit-DB cada servicio con su versión, así que necesita un
+      escaneo con -sV. Un resultado no es una vulnerabilidad confirmada: compara la versión exacta.

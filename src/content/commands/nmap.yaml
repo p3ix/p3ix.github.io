@@ -1,4 +1,4 @@
-# Comandos de nmap. De momento, descubrimiento de hosts; el escaneo de puertos va después.
+# Comandos de nmap: descubrimiento de hosts, puertos TCP y UDP, scripts NSE y salida.
 tool: nmap
 area: recon
 url: https://nmap.org/book/man.html
@@ -48,3 +48,160 @@ commands:
       -sL no envía nada a los hosts, solo pregunta al DNS el nombre de cada IP. En un dominio, el DNS
       del controlador suele devolver nombres que ya dicen qué es cada máquina (SQL01, WEB-DEV...).
     refs: [https://nmap.org/book/man-host-discovery.html]
+
+  - id: nmap-tcp-all-ports
+    title: Todos los puertos TCP, rápido
+    cmd: |
+      sudo nmap -sS -p- --open --min-rate 5000 -n -Pn {{RHOST}} -oG allports.gnmap
+    phase: recon
+    tags: [port-scan, tcp]
+    notes: >-
+      Primera pasada: solo qué puertos están abiertos, sin versiones. --min-rate 5000 va bien en un
+      laboratorio; en una red real o con IDS, bájalo o quítalo, porque a esa velocidad se pierden
+      puertos y salta cualquier alerta.
+    refs: [https://nmap.org/book/man-port-scanning-techniques.html]
+
+  - id: nmap-extract-ports
+    title: Sacar los puertos abiertos de un escaneo
+    cmd: |
+      grep -oP '\d+(?=/open)' allports.gnmap | sort -un | paste -sd, -
+    phase: recon
+    tags: [port-scan]
+    notes: >-
+      Devuelve la lista separada por comas (22,80,445) que va en PORTS para la segunda pasada. Lee la
+      salida grepable (-oG) de cualquier escaneo.
+
+  - id: nmap-tcp-connect
+    title: Escaneo TCP sin root o a través de un proxy
+    cmd: |
+      nmap -sT -Pn -n --top-ports 1000 {{RHOST}}
+    phase: recon
+    tags: [port-scan, tcp, proxychains]
+    notes: >-
+      -sT completa cada conexión con connect(), así que no necesita root y funciona detrás de
+      proxychains, que no sabe reenviar paquetes SYN sueltos. A cambio, cada servicio ve y registra
+      la conexión.
+    refs: [https://nmap.org/book/scan-methods-connect-scan.html]
+
+  - id: nmap-subnet-common-ports
+    title: Puertos típicos en toda una red
+    cmd: |
+      sudo nmap -sS -n -Pn --open -p 21,22,80,135,139,443,445,1433,3389,5985,8080 {{SUBNET}} -oG subnet.gnmap
+    phase: recon
+    tags: [port-scan, tcp]
+    notes: >-
+      Con muchos hosts, primero un barrido corto de los puertos que más dan y después -p- solo contra
+      los equipos interesantes. Un -p- a todo un /16 puede llevar días.
+
+  - id: nmap-ack-firewall
+    title: Mapear el firewall con un ACK scan
+    cmd: |
+      sudo nmap -sA -n -Pn {{RHOST}}
+    phase: recon
+    tags: [port-scan, firewall]
+    notes: >-
+      No dice si un puerto está abierto. Un RST de vuelta (unfiltered) significa que no hay filtro en
+      medio; sin respuesta (filtered), que un firewall con estado descarta los paquetes que no
+      pertenecen a una conexión.
+    refs: [https://nmap.org/book/scan-methods-ack-scan.html]
+
+  - id: nmap-source-port-53
+    title: Comprobar si el firewall se fía del puerto de origen
+    cmd: |
+      sudo nmap -sS -g 53 -n -Pn {{RHOST}}
+    phase: recon
+    tags: [port-scan, firewall]
+    notes: >-
+      Algunos firewalls mal configurados dejan pasar todo lo que sale del puerto 53 (DNS) o del 88
+      (Kerberos). Si con -g 53 aparecen abiertos puertos que antes salían filtered, es un hallazgo
+      para el informe.
+    refs: [https://nmap.org/book/man-bypass-firewalls-ids.html]
+
+  - id: nmap-udp-top
+    title: Puertos UDP más comunes
+    cmd: |
+      sudo nmap -sU --top-ports 100 --open -n -Pn {{RHOST}} -oN udp-top.nmap
+    phase: recon
+    tags: [port-scan, udp]
+    notes: >-
+      UDP es lento porque Linux solo manda un ICMP port unreachable por segundo y nmap tiene que
+      esperarlo. 100 puertos tardan minutos; todos, horas. --open también muestra los open|filtered.
+    refs: [https://nmap.org/book/scan-methods-udp-scan.html]
+
+  - id: nmap-tcp-services
+    title: Versiones y scripts por defecto en los puertos abiertos
+    cmd: |
+      sudo nmap -sCV -p{{PORTS}} -n -Pn {{RHOST}} -oA targeted
+    phase: enum
+    tags: [port-scan, tcp, nse]
+    notes: >-
+      Segunda pasada. -sV identifica servicio y versión y -sC lanza los scripts NSE de la categoría
+      default. Solo contra los puertos abiertos tarda segundos. -oA guarda la salida normal,
+      grepable y XML.
+    refs: [https://nmap.org/book/man-version-detection.html]
+
+  - id: nmap-os-detection
+    title: Detección del sistema operativo
+    cmd: |
+      sudo nmap -O --osscan-guess -n -Pn {{RHOST}}
+    phase: enum
+    tags: [port-scan, os-detection]
+    notes: >-
+      Compara cómo responde la pila TCP/IP con su base de huellas. Necesita al menos un puerto
+      abierto y uno cerrado; --osscan-guess da la coincidencia más cercana cuando no hay una exacta.
+    refs: [https://nmap.org/book/man-os-detection.html]
+
+  - id: nmap-udp-services
+    title: Versiones de servicios UDP
+    cmd: |
+      sudo nmap -sUV -p{{PORTS}} --version-intensity 0 -n -Pn {{RHOST}}
+    phase: enum
+    tags: [port-scan, udp]
+    notes: >-
+      -sV manda payloads propios de cada protocolo: si el servicio contesta, el open|filtered pasa a
+      open. --version-intensity 0 prueba solo las sondas más probables y va mucho más rápido.
+    refs: [https://nmap.org/book/scan-methods-udp-scan.html]
+
+  - id: nmap-nse-search
+    title: Buscar scripts NSE
+    cmd: |
+      nmap --script-help 'smb-*'
+    phase: enum
+    tags: [nse]
+    notes: >-
+      Muestra las categorías y la descripción de cada script que encaja con el patrón. Están en
+      /usr/share/nmap/scripts; si añades alguno, actualiza el índice con nmap --script-updatedb.
+    refs: [https://nmap.org/book/nse-usage.html]
+
+  - id: nmap-nse-vuln
+    title: Buscar vulnerabilidades conocidas con NSE
+    cmd: |
+      sudo nmap -sV --script vuln -p{{PORTS}} -n -Pn {{RHOST}}
+    phase: enum
+    tags: [nse, vuln-scan]
+    notes: >-
+      La categoría vuln comprueba CVE concretos (MS17-010, Heartbleed...). Algunos scripts son
+      intrusivos: en producción, mira antes qué lanza cada uno. Con -sV eligen mejor a qué atacar.
+    refs: [https://nmap.org/nsedoc/categories/vuln.html]
+
+  - id: nmap-nse-script-args
+    title: Scripts NSE con credenciales
+    cmd: |
+      nmap -p445 --script smb-enum-shares,smb-enum-users --script-args smbusername={{USER}},smbpassword='{{PASS}}' {{RHOST}}
+    phase: enum
+    tags: [nse, smb]
+    notes: >-
+      --script-args pasa parámetros a los scripts, separados por comas. Con credenciales, muchos
+      scripts de SMB, HTTP o bases de datos ven bastante más que de forma anónima.
+    refs: [https://nmap.org/book/nse-usage.html]
+
+  - id: nmap-output-html
+    title: Informe HTML de un escaneo
+    cmd: |
+      xsltproc targeted.xml -o targeted.html
+    phase: enum
+    tags: [reporting]
+    notes: >-
+      La salida XML de nmap (-oX o -oA) apunta a su propia hoja de estilos; xsltproc la aplica y
+      genera un informe navegable para revisar o adjuntar.
+    refs: [https://nmap.org/book/output-formats-output-to-html.html]

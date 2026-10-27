@@ -4,7 +4,7 @@ summary: Saber qué equipos están vivos en una red antes de escanear puertos. A
 date: 2026-10-27
 area: recon
 order: 30
-related: [recon/subredes-y-cidr]
+related: [recon/subredes-y-cidr, recon/escaneo-tcp]
 tags: [host-discovery, ping-sweep, arp, icmp]
 ---
 
@@ -81,8 +81,8 @@ que casi todo equipo tiene (SSH, web, SMB, RDP, WinRM) y un par de UDP (DNS y SN
 <Cmd id="nmap-host-sweep-no-icmp" />
 
 Si ni así aparece nada y sabes que hay equipos, queda saltarse el descubrimiento con `-Pn`: nmap da
-todas las IP por vivas y pasa directamente a los puertos. En un rango grande es muy lento, así que
-resérvalo para objetivos concretos.
+todas las IP por vivas y pasa directamente a los puertos (ver [escaneo de puertos TCP](/biblia/recon/escaneo-tcp/)).
+En un rango grande es muy lento, así que resérvalo para objetivos concretos.
 
 ## Desde una máquina comprometida, sin herramientas
 
