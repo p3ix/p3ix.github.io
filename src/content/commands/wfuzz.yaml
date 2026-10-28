@@ -1,0 +1,37 @@
+# Comandos de wfuzz: el fuzzer HTTP veterano; filtra por código, palabras, líneas o caracteres.
+tool: wfuzz
+area: web
+url: https://wfuzz.readthedocs.io/
+commands:
+  - id: wfuzz-dir
+    title: Fuerza bruta de directorios
+    cmd: |
+      wfuzz -c -z file,{{WORDLIST}} --hc 404 {{URL}}/FUZZ
+    phase: enum
+    tags: [fuzzing, content-discovery]
+    notes: >-
+      -z file,<dicc> es la fuente de palabras y FUZZ, dónde se sustituyen. --hc 404 oculta los no
+      encontrados; --hc 404,403 también los prohibidos. -c da color.
+    refs: [https://wfuzz.readthedocs.io/]
+
+  - id: wfuzz-param
+    title: Descubrir parámetros GET
+    cmd: |
+      wfuzz -c -z file,{{WORDLIST}} --hw 0 '{{URL}}/index.php?FUZZ=test'
+    phase: enum
+    tags: [fuzzing, parameters]
+    notes: >-
+      La página base responde con un número fijo de palabras; --hw <n> oculta esas respuestas y deja
+      ver el parámetro que cambia la salida. También --hh (caracteres) y --hl (líneas).
+    refs: [https://wfuzz.readthedocs.io/]
+
+  - id: wfuzz-vhost
+    title: Virtual hosts por cabecera Host
+    cmd: |
+      wfuzz -c -z file,{{WORDLIST}} -H 'Host: FUZZ.{{DOMAIN}}' --hh 1234 http://{{RHOST}}/
+    phase: enum
+    tags: [fuzzing, vhost]
+    notes: >-
+      Mide primero el tamaño del vhost por defecto (con un Host inexistente) y pásalo a --hh para
+      ocultarlo; lo que se salga es un vhost real.
+    refs: [https://wfuzz.readthedocs.io/]

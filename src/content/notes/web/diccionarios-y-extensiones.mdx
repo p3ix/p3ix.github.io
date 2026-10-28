@@ -1,0 +1,72 @@
+---
+title: Diccionarios de SecLists y extensiones
+summary: Qué diccionario usar para cada tipo de fuzzing (rutas, ficheros, vhosts, parámetros), dónde están en Kali y en SecLists, y qué extensiones probar según la tecnología del servidor.
+date: 2026-10-28
+area: web
+order: 20
+related: [web/fuzzing-web, web/fuzzing-de-directorios]
+tags: [fuzzing, wordlists, content-discovery]
+---
+
+## Qué es
+
+El diccionario importa más que la herramienta: con la lista equivocada, la mejor herramienta no
+encuentra nada. Un diccionario es un fichero de texto con un candidato por línea (una ruta, un
+subdominio, un nombre de parámetro). La clave es elegir la lista **del tipo correcto** y **del tamaño
+correcto**: empezar corto para ir rápido y pasar a una lista grande solo si la corta no da nada.
+
+**SecLists** es la colección de referencia. En Kali se instala con `sudo apt install seclists` y queda
+en `/usr/share/seclists/`. Si no está, se clona de `github.com/danielmiessler/SecLists`.
+
+## Para cada trabajo, su lista
+
+| Trabajo | Diccionario | Ruta |
+| --- | --- | --- |
+| Rutas, rápido | `common.txt` | `/usr/share/wordlists/dirb/common.txt` |
+| Rutas, a fondo | `directory-list-2.3-medium.txt` | `/usr/share/wordlists/dirbuster/` o SecLists |
+| Rutas (recomendado) | `raft-medium-directories.txt` | `/usr/share/seclists/Discovery/Web-Content/` |
+| Ficheros | `raft-medium-files.txt` | `/usr/share/seclists/Discovery/Web-Content/` |
+| Vhosts y subdominios | `subdomains-top1million-5000.txt` | `/usr/share/seclists/Discovery/DNS/` |
+| Subdominios, a fondo | `subdomains-top1million-110000.txt` | `/usr/share/seclists/Discovery/DNS/` |
+| Parámetros | `burp-parameter-names.txt` | `/usr/share/seclists/Discovery/Web-Content/` |
+
+Las listas `raft-*` vienen en cuatro tamaños (`small`, `medium`, `large`) y en dos variantes,
+`directories` y `files`: se sacaron de aplicaciones reales, así que aciertan más que una lista
+alfabética. Las `directory-list-2.3-*` de DirBuster son el clásico para barrer a lo bruto.
+
+Ver qué hay sin salir de la terminal:
+
+```bash title="Explorar los diccionarios instalados"
+ls /usr/share/seclists/Discovery/Web-Content/ | grep -i raft
+wc -l /usr/share/seclists/Discovery/Web-Content/raft-medium-directories.txt
+```
+
+> **Cuidado con la barra inicial.** Algunos diccionarios traen rutas que empiezan por `/`, y producen
+> URLs dobles (`http://objetivo//ruta`) que unos servidores toleran y otros no. Para fuzzear rutas,
+> usa listas sin barra inicial. Y con las de SecLists que llevan comentarios en la cabecera, `-ic` en
+> ffuf los ignora.
+
+## Extensiones según la tecnología
+
+Sin extensiones, el fuzzing solo prueba nombres a pelo: encuentra `/config`, no `/config.php`. Qué
+extensiones añadir depende de con qué está hecho el servidor, y eso lo dice la cabecera `Server`, la
+cabecera `X-Powered-By` o la extensión de las páginas que ya ves.
+
+| Tecnología | Pista | Extensiones |
+| --- | --- | --- |
+| PHP (Apache, Nginx) | `Server: Apache`, páginas `.php` | `php,phtml,php3,php5` |
+| IIS / ASP.NET | `Server: Microsoft-IIS` | `asp,aspx,ashx,asmx` |
+| Java | `JSESSIONID`, Tomcat | `jsp,jspx,do,action` |
+| Python (Flask, Django) | `Server: gunicorn`/Werkzeug | normalmente **ninguna**: rutas como `/login` |
+| Siempre, sea cual sea | — | `txt,bak,old,zip,conf,json,xml,~` (datos y backups) |
+
+Las extensiones de **datos y backups** se prueban siempre: un `config.php.bak` o un `backup.zip` en la
+raíz web entrega credenciales o código fuente sin tener que explotar nada. Un servidor Flask o Node no
+usa extensiones en las rutas, así que ahí `-x php` solo triplica las peticiones sin ganar nada.
+
+## Cómo se detecta y se mitiga
+
+Un diccionario no deja rastro propio: lo que se ve en el servidor es el fuzzing que lo usa (ver
+[fuzzing web](/biblia/web/fuzzing-web/#c%C3%B3mo-se-detecta)). Del lado defensivo, lo que corta el
+valor de estas listas es no dejar en la raíz web nada que una de ellas vaya a encontrar: ni backups,
+ni ficheros de configuración, ni rutas de administración sin autenticar.

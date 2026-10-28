@@ -1,0 +1,81 @@
+---
+title: Virtual hosts y subdominios
+summary: La diferencia entre un virtual host (cabecera Host) y un subdominio (DNS), cómo fuzzear cada uno con gobuster y ffuf, y por qué el filtrado por tamaño es obligatorio en vhosts.
+date: 2026-10-28
+area: web
+order: 40
+related: [web/fuzzing-web, gobuster-vhost, gobuster-dns, ffuf-vhost]
+tags: [fuzzing, vhost, subdomains]
+---
+
+## Qué es
+
+Un mismo servidor web puede servir varios sitios distintos según el nombre con el que lo pidas. Ese
+nombre viaja en la cabecera `Host` de la petición, y el servidor decide qué sitio enseñar a partir de
+ella: son los **virtual hosts**. La web "aburrida" del puerto 80 suele esconder, en otro `Host`, el
+panel de administración o un entorno de desarrollo que nadie enlazó.
+
+Hay dos formas de descubrirlos, y la diferencia importa:
+
+- **Virtual host (vhost)**: se pregunta al **servidor web** cambiando la cabecera `Host` contra la
+  misma IP. Encuentra sitios aunque no estén en ningún DNS. Es lo que sirve en un laboratorio.
+- **Subdominio por DNS**: se pregunta al **DNS** por `algo.dominio.com`. Solo encuentra lo que
+  resuelve de verdad, pero da la IP de cada uno (pueden estar en servidores distintos).
+
+## Requisitos
+
+- Para vhost: la IP del servidor y el dominio base (de un certificado TLS, de la web, del alcance).
+- Para DNS: un dominio real con sus registros publicados.
+- Un diccionario de subdominios (ver [diccionarios](/biblia/web/diccionarios-y-extensiones/)):
+  `subdomains-top1million-5000.txt` para empezar.
+
+## Virtual hosts
+
+gobuster en modo `vhost` prueba `palabra.dominio` en la cabecera `Host`. Desde la v3.2 hace falta
+`--append-domain` o prueba solo `Host: palabra` y no encuentra nada:
+
+<Cmd id="gobuster-vhost" />
+
+Con ffuf, `FUZZ` va dentro de la cabecera `Host`. Aquí está el matiz más importante: **todas** las
+respuestas son `200` del vhost por defecto, así que sin filtrar por tamaño el resultado es inútil:
+
+<Cmd id="ffuf-vhost" />
+
+El método: medir primero el tamaño de la respuesta con un `Host` inexistente y filtrar por ese tamaño;
+lo que se salga es un vhost real.
+
+```bash title="Tamaño base antes de fuzzear vhosts"
+curl -s -H "Host: noexiste.{{DOMAIN}}" http://{{RHOST}}/ | wc -c
+```
+
+Lo que encuentres va a `/etc/hosts` para poder navegarlo, apuntando la IP del servidor a cada nombre:
+
+```bash title="/etc/hosts"
+echo '{{RHOST}} dev.{{DOMAIN}} admin.{{DOMAIN}}' | sudo tee -a /etc/hosts
+```
+
+## Subdominios por DNS
+
+Cuando el objetivo es un dominio real, gobuster en modo `dns` resuelve cada candidato y se queda con
+los que existen:
+
+<Cmd id="gobuster-dns" />
+
+Esto encuentra subdominios que viven en otras IP, fuera del servidor que estás mirando: amplía el
+alcance. En un laboratorio sin un DNS propio no sirve de nada; ahí, vhost.
+
+## Cómo se detecta
+
+El fuzzing de vhosts es un pico de peticiones a la misma IP cambiando solo la cabecera `Host`: visible
+en los registros del servidor y para un WAF. El de DNS es una ráfaga de consultas al servidor DNS,
+fáciles de ver en sus propios registros y en el tráfico de red.
+
+## Cómo se mitiga
+
+- **Un vhost por defecto que no filtre nada**: que un `Host` desconocido devuelva un error genérico,
+  no el sitio interno por descarte.
+- **Entornos de desarrollo fuera de Internet**: `dev.`, `staging.` y `test.` detrás de una VPN o de
+  una lista de IP, no accesibles cambiando una cabecera.
+- **Menos pistas en el DNS**: no publicar registros de subdominios internos en un DNS público; vigilar
+  los volcados de certificados (*certificate transparency*), que también los revelan.
+- **Rate limiting** en el servidor web y en el DNS contra las ráfagas de consultas.

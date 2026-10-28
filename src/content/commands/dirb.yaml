@@ -1,0 +1,28 @@
+# Comandos de dirb: fuerza bruta de directorios clásica, recursiva por defecto.
+tool: dirb
+area: web
+url: https://dirb.sourceforge.net/
+commands:
+  - id: dirb-basic
+    title: Barrido recursivo sin diccionario propio
+    cmd: |
+      dirb {{URL}}
+    phase: enum
+    tags: [fuzzing, content-discovery]
+    notes: >-
+      Viene en todo Kali y usa /usr/share/dirb/wordlists/common.txt sin pedir nada. Es recursivo por
+      defecto (entra en cada carpeta), así que es cómodo pero lento. Un aviso "Directory IS LISTABLE"
+      es un hallazgo: directory listing, ábrelo en el navegador.
+    refs: [https://dirb.sourceforge.net/]
+
+  - id: dirb-ext
+    title: Otro diccionario, con extensiones y sin recursión
+    cmd: |
+      dirb {{URL}} {{WORDLIST}} -X .php,.txt,.bak -r -o dirb.txt
+    phase: enum
+    tags: [fuzzing, content-discovery]
+    notes: >-
+      El segundo argumento es el diccionario (big.txt cuando common.txt se queda corto). -X añade
+      extensiones; -r desactiva la recursión y acelera mucho; -N ignora un código y -z mete retardo
+      entre peticiones para no tumbar el servidor.
+    refs: [https://dirb.sourceforge.net/]

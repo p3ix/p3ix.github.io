@@ -1,0 +1,27 @@
+# Comandos de feroxbuster: fuerza bruta de rutas en Rust, rápida y recursiva por defecto.
+tool: feroxbuster
+area: web
+url: https://github.com/epi052/feroxbuster
+commands:
+  - id: feroxbuster-recursive
+    title: Mapear un sitio con recursión automática
+    cmd: |
+      feroxbuster -u {{URL}} -w {{WORDLIST}} -x php,txt,html -o ferox.txt
+    phase: enum
+    tags: [fuzzing, content-discovery]
+    notes: >-
+      Recursiva por defecto: entra sola en cada directorio que encuentra, así que mapea un sitio a
+      fondo sin relanzarla a mano. Rápida y con buena gestión del estado (se puede pausar y reanudar).
+      -x añade extensiones.
+    refs: [https://github.com/epi052/feroxbuster]
+
+  - id: feroxbuster-filter
+    title: Filtrar por código y por tamaño
+    cmd: |
+      feroxbuster -u {{URL}} -w {{WORDLIST}} -C 404,403 -S 1234 --depth 2
+    phase: enum
+    tags: [fuzzing, content-discovery]
+    notes: >-
+      -C oculta códigos de estado y -S oculta respuestas de ese tamaño (la página comodín). --depth
+      limita la profundidad de la recursión para que no se vaya de las manos.
+    refs: [https://github.com/epi052/feroxbuster]

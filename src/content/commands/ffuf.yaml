@@ -1,0 +1,84 @@
+# Comandos de ffuf: fuzzer HTTP genérico (rutas, ficheros, vhosts, parámetros, logins).
+tool: ffuf
+area: web
+url: https://github.com/ffuf/ffuf
+commands:
+  - id: ffuf-dir
+    title: Fuerza bruta de directorios
+    cmd: |
+      ffuf -w {{WORDLIST}} -u {{URL}}/FUZZ -ac -c
+    phase: enum
+    tags: [fuzzing, content-discovery]
+    notes: >-
+      FUZZ marca dónde se sustituye cada palabra. -ac (autocalibración) deduce qué filtrar y resuelve
+      la mayoría de los comodines. -c pone color. Diccionario típico, raft-medium-directories.txt.
+    refs: [https://github.com/ffuf/ffuf]
+
+  - id: ffuf-files
+    title: Buscar ficheros por extensión
+    cmd: |
+      ffuf -w {{WORDLIST}} -u {{URL}}/FUZZ -e .php,.txt,.bak,.old,.zip -ac -c
+    phase: enum
+    tags: [fuzzing, content-discovery]
+    notes: >-
+      -e añade cada extensión a cada palabra. Ajústalas a la tecnología (php, asp, aspx) y suma
+      siempre las de datos y backups (txt, bak, old, zip, conf). Usa un diccionario de ficheros como
+      raft-medium-files.txt.
+    refs: [https://github.com/ffuf/ffuf]
+
+  - id: ffuf-recursion
+    title: Fuzzing recursivo
+    cmd: |
+      ffuf -w {{WORDLIST}} -u {{URL}}/FUZZ -recursion -recursion-depth 2 -ac -c
+    phase: enum
+    tags: [fuzzing, content-discovery]
+    notes: >-
+      Entra solo en cada directorio que encuentra, hasta la profundidad indicada. La URL tiene que
+      acabar en FUZZ o -recursion se ignora sin avisar. Útil en apps con estructura profunda.
+    refs: [https://github.com/ffuf/ffuf]
+
+  - id: ffuf-vhost
+    title: Virtual hosts por cabecera Host
+    cmd: |
+      ffuf -w {{WORDLIST}} -u http://{{RHOST}}/ -H 'Host: FUZZ.{{DOMAIN}}' -ac -c
+    phase: enum
+    tags: [fuzzing, vhost]
+    notes: >-
+      Todas las respuestas son 200 del vhost por defecto, así que hay que filtrar por tamaño. -ac lo
+      suele resolver; si no, mide el tamaño base con 'curl -s -H "Host: noexiste.{{DOMAIN}}"
+      http://{{RHOST}}/ | wc -c' y fíltralo con -fs.
+    refs: [https://github.com/ffuf/ffuf]
+
+  - id: ffuf-param-get
+    title: Descubrir parámetros GET
+    cmd: |
+      ffuf -w {{WORDLIST}} -u '{{URL}}/index.php?FUZZ=test' -ac -c
+    phase: enum
+    tags: [fuzzing, parameters]
+    notes: >-
+      Busca nombres de parámetros ocultos con un diccionario como burp-parameter-names.txt. El
+      parámetro que cambie el tamaño o el comportamiento de la respuesta es el candidato a LFI, SSRF
+      o IDOR.
+    refs: [https://github.com/ffuf/ffuf]
+
+  - id: ffuf-login-post
+    title: Fuerza bruta de un login (POST)
+    cmd: |
+      ffuf -w {{WORDLIST}} -X POST -d 'username={{USER}}&password=FUZZ' -H 'Content-Type: application/x-www-form-urlencoded' -u {{URL}}/login.php -fr 'Invalid credentials'
+    phase: credential-access
+    tags: [fuzzing, brute-force]
+    notes: >-
+      -fr filtra por el texto de error de la propia página, más fiable que el código cuando el login
+      siempre devuelve 200. Comprueba antes la política de bloqueo de cuentas.
+    refs: [https://github.com/ffuf/ffuf]
+
+  - id: ffuf-clusterbomb
+    title: Dos diccionarios, usuarios por contraseñas
+    cmd: |
+      ffuf -w users.txt:USER -w {{WORDLIST}}:PASS -X POST -d 'user=USER&pass=PASS' -H 'Content-Type: application/x-www-form-urlencoded' -u {{URL}}/login -mode clusterbomb -fr 'Invalid'
+    phase: credential-access
+    tags: [fuzzing, brute-force]
+    notes: >-
+      clusterbomb prueba todas las combinaciones de los dos diccionarios; pitchfork las empareja
+      línea a línea (la 1 con la 1). Cada -w lleva su propia palabra clave con dos puntos.
+    refs: [https://github.com/ffuf/ffuf]

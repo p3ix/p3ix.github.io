@@ -1,0 +1,95 @@
+---
+title: Fuzzing de directorios y ficheros
+summary: Descubrir rutas y ficheros ocultos con gobuster, ffuf, dirb y feroxbuster, la pasada por capas que hago en una web nueva, cómo tratar la recursión y los servidores comodín.
+date: 2026-10-28
+area: web
+order: 30
+related: [web/fuzzing-web, web/diccionarios-y-extensiones, gobuster-dir, ffuf-dir, feroxbuster-recursive]
+tags: [fuzzing, content-discovery]
+---
+
+## Qué es
+
+Es el fuzzing más habitual: probar nombres de carpetas y ficheros contra la raíz web para encontrar lo
+que no está enlazado. El objetivo no es la lista en sí, sino lo que cada hallazgo abre: un panel de
+login, un directorio con backups, una ruta de API, un `.git` expuesto.
+
+## Requisitos
+
+- Un puerto web abierto y confirmado (de nmap).
+- El diccionario y las extensiones adecuados (ver [diccionarios y extensiones](/biblia/web/diccionarios-y-extensiones/)).
+- Saber leer la respuesta: `301` es directorio, `403` existe-pero-prohibido, el tamaño separa señal de
+  ruido (ver [fuzzing web](/biblia/web/fuzzing-web/#la-pieza-clave-el-tama%C3%B1o-no-el-c%C3%B3digo)).
+
+## La primera pasada
+
+gobuster es rápido y simple para el primer barrido de directorios:
+
+<Cmd id="gobuster-dir" />
+
+ffuf hace lo mismo y añade autocalibración, que resuelve solo la mayoría de los comodines:
+
+<Cmd id="ffuf-dir" />
+
+## Ficheros por extensión
+
+Una vez vistos los directorios, la segunda pasada busca ficheros, con las extensiones de la tecnología
+más las de datos y backups:
+
+<Cmd id="gobuster-dir-ext" />
+
+El mismo trabajo con ffuf, que añade cada extensión a cada palabra con `-e`:
+
+<Cmd id="ffuf-files" />
+
+## Dentro de cada directorio
+
+gobuster, ffuf (sin `-recursion`) y dirb con `-r` **no son recursivos**: cada directorio interesante
+(`/admin`, `/data`, `/backup`) hay que lanzarlo a mano otra vez apuntando dentro. En una app con
+estructura profunda, ffuf lo automatiza si la URL acaba en `FUZZ`:
+
+<Cmd id="ffuf-recursion" />
+
+O directamente feroxbuster, que es recursivo de fábrica y mapea el sitio entero sin relanzarlo:
+
+<Cmd id="feroxbuster-recursive" />
+
+> La recursión es cómoda pero se va de las manos: entra en `css/`, `js/`, `vendor/`… que no valen
+> nada. Limita la profundidad (`--depth 2` en feroxbuster, `-recursion-depth 2` en ffuf) y filtra bien.
+
+## Servidores comodín y ruido
+
+Cuando el servidor responde `200` a cualquier ruta, hay que filtrar por el tamaño de la página falsa:
+
+<Cmd id="gobuster-dir-wildcard" />
+
+Y si la web está detrás de un login o usa HTTPS autofirmado de laboratorio, se le pasa la sesión y se
+ignora el certificado:
+
+<Cmd id="gobuster-dir-auth" />
+
+Para una web Flask o Node, recuerda: no uses extensiones, las rutas son tipo `/login` o `/api/users`,
+y el `308` es el framework añadiendo la barra final.
+
+## La pasada por capas, de un vistazo
+
+```bash title="Lo que hago en una web nueva"
+W=/usr/share/seclists/Discovery/Web-Content/raft-medium-directories.txt
+gobuster dir -u {{URL}} -w $W -q                               # 1. directorios (301) y prohibidos (403)
+gobuster dir -u {{URL}} -w $W -x php,txt,bak,zip -b 403,404 -q  # 2. ficheros por tecnología
+gobuster dir -u {{URL}}/admin -w $W -x php,txt,bak -b 403,404 -q  # 3. cada directorio jugoso
+```
+
+## Cómo se detecta
+
+Miles de `404` en segundos desde una sola IP, con el `User-Agent` de la herramienta. Es de lo más
+visible que hay en los registros de un servidor web y en cualquier WAF. Detalle en
+[fuzzing web](/biblia/web/fuzzing-web/#c%C3%B3mo-se-detecta).
+
+## Cómo se mitiga
+
+- **Nada sensible en una ruta "secreta"**: esconder no es proteger; la autorización sí.
+- **Sin backups ni ficheros de configuración en la raíz web** (`.bak`, `.old`, `.zip`, `.git`), que es
+  lo que estas pasadas buscan primero.
+- **Directory listing desactivado** para que una carpeta sin índice no muestre su contenido.
+- **Rate limiting y alertas por ráfagas de `404`** para frenar y detectar el barrido.

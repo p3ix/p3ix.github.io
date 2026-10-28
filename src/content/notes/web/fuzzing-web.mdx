@@ -1,0 +1,93 @@
+---
+title: Fuzzing web, de lo general a lo concreto
+summary: Qué es el fuzzing de contenido web, por qué el tamaño de la respuesta importa más que el código de estado, cómo tratar los servidores comodín y el orden en que ataco un puerto web nuevo.
+date: 2026-10-28
+area: web
+order: 10
+related: [web/diccionarios-y-extensiones, web/fuzzing-de-directorios, web/vhosts-y-subdominios, web/fuzzing-de-parametros]
+tags: [fuzzing, content-discovery, methodology]
+---
+
+## Qué es
+
+Fuzzing web es probar muchas variantes de una petición HTTP contra un servidor para descubrir lo que
+no está enlazado por ningún sitio: paneles (`/admin`, `/dashboard`), backups (`.bak`, `.old`,
+`.zip`), entornos de pruebas (`/dev`, `/test`), rutas de API, parámetros ocultos y virtual hosts.
+Cada hallazgo suele abrir otro camino: un login, una subida de ficheros, una fuga de información,
+una inyección.
+
+La idea es sencilla —pedir una lista de rutas y ver cuáles existen— pero el valor está en **leer bien
+la respuesta**. Un servidor casi nunca dice "esto no existe" con un `404` limpio: devuelve páginas de
+error con código `200`, redirecciones, o lo mismo para todo. Saber distinguir señal de ruido es lo
+que separa una lista de 4000 falsos positivos de tres rutas que importan.
+
+## La pieza clave: el tamaño, no el código
+
+Cada resultado trae su código de estado y su tamaño (`Size`), y el tamaño es el que de verdad separa
+señal de ruido:
+
+| Señal | Qué suele significar |
+| --- | --- |
+| `200` | Existe y responde. Pero una página de error personalizada también da `200`: míralo. |
+| `301` / `302` a la misma ruta con `/` | Es un **directorio** real: vuelve a fuzzear dentro. |
+| `403` | **Existe** pero está prohibido. Es un hallazgo: apúntalo (`/server-status`, `.htpasswd`). |
+| `401` | Pide credenciales: prueba las de por defecto o fuerza bruta. |
+| `308` | En apps Flask, la barra final que añade el framework (su `301`). |
+| Muchos resultados con el **mismo** `Size` | Son todos la misma página de error: fíltrala por tamaño. |
+
+El método es siempre el mismo: lanzar sin filtros, mirar qué tamaño se repite, filtrarlo y relanzar.
+`ffuf -ac` (autocalibración) automatiza ese cálculo la mayoría de las veces.
+
+## El servidor que responde a todo
+
+Un **servidor comodín** (*wildcard* o *catch-all*) responde `200` a *cualquier* ruta, exista o no.
+Sin tratarlo, el fuzzing devuelve miles de falsos positivos. Se detecta pidiendo una ruta inventada
+antes de empezar (`/estonoexiste123`): si responde `200`, hay comodín. La salida: filtrar por el
+tamaño de esa página falsa (`--exclude-length` en gobuster, `-fs` en ffuf, o `-ac`).
+
+## El orden en un puerto web nuevo
+
+En cuanto nmap confirma un puerto web, y antes de leerse la web a mano, conviene lanzar el fuzzing en
+capas de lo general a lo concreto:
+
+1. **Directorios**, lista corta: ver qué carpetas (`301`) y qué existe aunque esté prohibido (`403`).
+2. **Ficheros por extensión**, según la tecnología detectada: `.php` en Apache, `.aspx` en IIS, y
+   siempre las de datos y backups (`.txt`, `.bak`, `.old`, `.zip`, `.conf`).
+3. **Cada directorio jugoso**, otra pasada dentro (el fuzzing de directorios casi nunca es recursivo
+   solo).
+4. **Virtual hosts y subdominios**: la web "aburrida" del puerto 80 a menudo esconde un panel en un
+   vhost.
+5. **Parámetros**, cuando ya hay un endpoint dinámico (`index.php?...`) donde buscar.
+
+Cada paso tiene su nota: [diccionarios y extensiones](/biblia/web/diccionarios-y-extensiones/),
+[fuzzing de directorios](/biblia/web/fuzzing-de-directorios/),
+[vhosts y subdominios](/biblia/web/vhosts-y-subdominios/) y
+[fuzzing de parámetros](/biblia/web/fuzzing-de-parametros/).
+
+## Qué herramienta para qué
+
+| Herramienta | Cuándo la saco |
+| --- | --- |
+| [gobuster](/biblia/comandos/#gobuster-dir) | Descubrir rutas, vhosts y subdominios sin pensar: rápida y simple. |
+| [ffuf](/biblia/comandos/#ffuf-dir) | Fuzzear cualquier parte de la petición (parámetros, cuerpos, cabeceras) y filtrar fino. |
+| [feroxbuster](/biblia/comandos/#feroxbuster-recursive) | Recursión automática para mapear un sitio a fondo. |
+| [dirb](/biblia/comandos/#dirb-basic) | Está en todo Kali y es recursiva de fábrica; lenta. |
+| [wfuzz](/biblia/comandos/#wfuzz-dir) | El veterano; ffuf lo cubre casi todo, pero sigue valiendo. |
+
+## Cómo se detecta
+
+El fuzzing es ruidosísimo: miles de peticiones y miles de `404` en los registros del servidor en
+cuestión de segundos, todas desde la misma IP y a menudo con un `User-Agent` que delata la
+herramienta. Un WAF o un IDS con reglas al día lo marcan enseguida, y el pico de tráfico es visible
+en cualquier panel de métricas. En un laboratorio da igual; contra un objetivo real, es de lo
+primero que salta.
+
+## Cómo se mitiga
+
+- **Nada sensible sin autenticación**: que un panel esté en una ruta "secreta" no lo protege; el
+  fuzzing la encuentra. El control que importa es la autorización.
+- **Páginas de error coherentes**: devolver `404` de verdad para lo que no existe (no `200` con
+  "no encontrado") no evita el fuzzing, pero sí se lo pone más difícil al atacante.
+- **Sin directory listing** ni ficheros de backup (`.bak`, `~`, `.zip`) en la raíz web.
+- **Rate limiting y WAF**: limitar peticiones por IP y alertar de ráfagas de `404` detecta y frena el
+  barrido.

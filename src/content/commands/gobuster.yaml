@@ -1,0 +1,73 @@
+# Comandos de gobuster: fuerza bruta de rutas, ficheros, vhosts y subdominios web.
+tool: gobuster
+area: web
+url: https://github.com/OJ/gobuster
+commands:
+  - id: gobuster-dir
+    title: Fuerza bruta de directorios
+    cmd: |
+      gobuster dir -u {{URL}} -w {{WORDLIST}} -t 50 -o gobuster.txt
+    phase: enum
+    tags: [fuzzing, content-discovery]
+    notes: >-
+      La primera pasada contra cualquier puerto web. Empieza con una lista corta como
+      /usr/share/wordlists/dirb/common.txt; si no sale nada, pasa a raft-medium-directories.txt de
+      SecLists. Un 301 a la misma ruta con barra final es un directorio: lánzalo otra vez dentro.
+    refs: [https://github.com/OJ/gobuster]
+
+  - id: gobuster-dir-ext
+    title: Buscar ficheros por extensión
+    cmd: |
+      gobuster dir -u {{URL}} -w {{WORDLIST}} -x php,txt,html,bak,zip,old -b 403,404 -t 50
+    phase: enum
+    tags: [fuzzing, content-discovery]
+    notes: >-
+      Sin -x solo prueba nombres a pelo (config, no config.php). Ajusta las extensiones a la
+      tecnología: php en Apache, asp/aspx en IIS, y siempre las de datos (txt, bak, old, zip, conf)
+      para pillar backups y copias. -b 403,404 quita el ruido.
+    refs: [https://github.com/OJ/gobuster]
+
+  - id: gobuster-dir-wildcard
+    title: Web que responde 200 a cualquier ruta
+    cmd: |
+      gobuster dir -u {{URL}} -w {{WORDLIST}} --exclude-length 1234
+    phase: enum
+    tags: [fuzzing, content-discovery]
+    notes: >-
+      Cuando gobuster avisa de que el servidor devuelve el mismo código para URLs inexistentes
+      (comodín), mira el tamaño de esa página falsa y pásalo a --exclude-length para ignorarla.
+    refs: [https://github.com/OJ/gobuster]
+
+  - id: gobuster-dir-auth
+    title: Fuzzing detrás de login o con HTTPS de laboratorio
+    cmd: |
+      gobuster dir -u {{URL}} -w {{WORDLIST}} -k -c 'PHPSESSID=[redactado]' -t 50
+    phase: enum
+    tags: [fuzzing, content-discovery]
+    notes: >-
+      -k ignora el certificado autofirmado de los laboratorios. -c manda la cookie de sesión para
+      fuzzear la zona autenticada; -H añade cabeceras (Authorization) y -U/-P hacen Basic auth.
+    refs: [https://github.com/OJ/gobuster]
+
+  - id: gobuster-vhost
+    title: Virtual hosts por cabecera Host
+    cmd: |
+      gobuster vhost -u http://{{DOMAIN}} -w {{WORDLIST}} --append-domain -t 50
+    phase: enum
+    tags: [fuzzing, vhost]
+    notes: >-
+      Prueba palabra.dominio en la cabecera Host contra la misma IP; encuentra sitios que no están
+      en DNS. --append-domain es obligatorio desde la v3.2 (si no, prueba Host: palabra a secas).
+      Diccionario típico, subdomains-top1million-5000.txt de SecLists. Lo que salga, a /etc/hosts.
+    refs: [https://github.com/OJ/gobuster]
+
+  - id: gobuster-dns
+    title: Subdominios por DNS
+    cmd: |
+      gobuster dns -d {{DOMAIN}} -w {{WORDLIST}}
+    phase: enum
+    tags: [fuzzing, subdomains, dns]
+    notes: >-
+      Pregunta al DNS, así que solo encuentra subdominios que resuelven de verdad (al revés que
+      vhost, que pregunta al servidor web). En un laboratorio sin DNS propio, usa vhost.
+    refs: [https://github.com/OJ/gobuster]

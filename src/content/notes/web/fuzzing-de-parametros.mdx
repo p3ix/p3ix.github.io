@@ -1,0 +1,80 @@
+---
+title: Fuzzing de parámetros y logins
+summary: Descubrir parámetros GET y POST ocultos y forzar formularios de login con ffuf y wfuzz, filtrando por tamaño, palabras o texto de la respuesta en vez de por el código de estado.
+date: 2026-10-28
+area: web
+order: 50
+related: [web/fuzzing-web, ffuf-param-get, ffuf-login-post, ffuf-clusterbomb]
+tags: [fuzzing, parameters, brute-force]
+---
+
+## Qué es
+
+Más allá de rutas y ficheros, se puede fuzzear **cualquier parte de una petición HTTP**: el nombre de
+un parámetro, su valor, los campos de un formulario, una cabecera. Un parámetro oculto (`?debug=1`,
+`?file=...`, `?admin=true`) es a menudo la puerta a una inclusión de ficheros (LFI), un SSRF o un
+IDOR; y un login es donde se prueban credenciales por defecto o débiles.
+
+El reto aquí no es la lista, es **el filtrado**. Al fuzzear un parámetro, casi todas las respuestas
+son idénticas (la misma página, el mismo tamaño); lo interesante es la que se sale de la norma. Por
+eso se filtra por tamaño (`-fs`), por número de palabras (`-fw`), por líneas (`-fl`) o por un texto
+de la respuesta (`-fr`), no por el código de estado, que casi siempre es `200`.
+
+## Requisitos
+
+- Un endpoint dinámico donde probar: una página que acepte parámetros (`index.php?...`) o un
+  formulario (`login.php`).
+- El diccionario adecuado: `burp-parameter-names.txt` para nombres de parámetros; una lista de
+  contraseñas (`rockyou.txt`) para un login.
+- El tamaño o el texto de la respuesta "normal" para filtrarlo.
+
+## Parámetros GET ocultos
+
+Se sustituye `FUZZ` por cada nombre de la lista y se filtra la respuesta base. El parámetro que cambie
+el tamaño o el comportamiento es el candidato:
+
+<Cmd id="ffuf-param-get" />
+
+Lo mismo con wfuzz, ocultando las respuestas con el número de palabras de la página base:
+
+<Cmd id="wfuzz-param" />
+
+Una vez descubierto el nombre, se fuzzea su **valor**: números para buscar un IDOR
+(`?id=FUZZ`), rutas para un LFI (`?file=FUZZ`). La `Duration` anormalmente alta de un valor concreto
+también es una pista: algo se está procesando de más (una consulta a base de datos, una petición
+externa).
+
+## Logins
+
+Para un formulario de login, `FUZZ` va en el cuerpo de la petición `POST`. Lo fiable es filtrar por el
+**texto del error** de la propia página, porque el login suele devolver `200` tanto si aciertas como
+si no:
+
+<Cmd id="ffuf-login-post" />
+
+Con dos diccionarios a la vez se prueban usuarios y contraseñas en todas sus combinaciones:
+
+<Cmd id="ffuf-clusterbomb" />
+
+`clusterbomb` cruza todo con todo; `pitchfork` empareja las listas línea a línea (la credencial 1 con
+la 1), útil cuando ya tienes pares usuario:contraseña y quieres validarlos.
+
+> **La política de bloqueo de cuentas.** Un login a fuerza bruta puede bloquear las cuentas reales de
+> los usuarios tras unos pocos intentos fallidos. Antes de lanzar, piensa el umbral; para cuentas de
+> verdad, mejor una contraseña contra muchos usuarios (*password spraying*) que al revés.
+
+## Cómo se detecta
+
+El fuzzing de parámetros es un pico de peticiones casi idénticas a un mismo endpoint. El de logins
+deja una ráfaga de autenticaciones fallidas en los registros de la aplicación, dispara el bloqueo de
+cuentas y es de lo que mejor detecta un WAF. La `Duration` que a ti te da una pista, al defensor le da
+una alerta de carga anómala.
+
+## Cómo se mitiga
+
+- **Validar y listar los parámetros esperados**: ignorar (y registrar) los que no estén en la lista
+  blanca corta el valor de descubrir parámetros ocultos de depuración.
+- **Mensajes de error iguales**: que acertar o fallar el usuario en un login responda lo mismo evita
+  la enumeración de cuentas.
+- **Límite de intentos y bloqueo temporal**, más un segundo factor, contra la fuerza bruta de logins.
+- **Rate limiting y CAPTCHA** en los formularios sensibles, y alertas por ráfagas de fallos.
