@@ -1,0 +1,83 @@
+---
+title: Volcado de credenciales
+summary: Sacar hashes y contraseñas de un Windows comprometido (SAM, LSASS, credenciales cacheadas) y, como Domain Admin, la base entera del dominio (NTDS.dit) con secretsdump, mimikatz y NetExec.
+date: 2026-10-28
+area: ad
+order: 80
+related: [ad/movimiento-lateral, impacket-secretsdump-local, impacket-secretsdump-dcsync, mimikatz-logonpasswords, nxc-smb-sam]
+tags: [credential-dumping, ntlm, active-directory]
+---
+
+## Qué es
+
+Una vez con privilegios de administrador en un equipo, el objetivo es **sacar más credenciales** para
+seguir moviéndose. En Windows hay varios sitios donde viven:
+
+| Fuente | Qué contiene | Hace falta |
+| --- | --- | --- |
+| SAM | Hashes NTLM de las cuentas **locales** del equipo | Admin local / SYSTEM |
+| LSASS (memoria) | Hashes, tickets y, a veces, contraseñas en claro de las sesiones abiertas | Admin local / SYSTEM |
+| Secretos LSA | Contraseñas de servicios, tareas programadas | Admin local / SYSTEM |
+| Credenciales cacheadas | Hashes de usuarios de dominio que han iniciado sesión en ese equipo | Admin local / SYSTEM |
+| NTDS.dit (en el DC) | Hashes de **todas** las cuentas del dominio | Domain Admin / derechos de replicación |
+
+Lo que sacas se **reutiliza** por Pass-the-Hash (ver [movimiento lateral](/biblia/ad/movimiento-lateral/))
+o se **crackea** offline con hashcat (`-m 1000` para un hash NT).
+
+## Requisitos
+
+- Ser administrador local (o SYSTEM) en el equipo que vas a volcar.
+- Para el NTDS.dit, derechos de replicación en el dominio (los tiene Domain Admins).
+
+## Desde fuera: secretsdump
+
+`secretsdump` de Impacket vuelca en remoto la SAM, los secretos LSA y las credenciales cacheadas de un
+host, sin subir nada a él:
+
+<Cmd id="impacket-secretsdump-local" />
+
+Y NetExec hace el volcado de la SAM de paso, cuando ya sabe que eres admin local ahí (`(Pwn3d!)`):
+
+<Cmd id="nxc-smb-sam" />
+
+## Desde dentro: mimikatz
+
+Si ya tienes una shell en el equipo (por evil-winrm, por ejemplo), mimikatz lee LSASS directamente y
+saca lo que no está en la SAM: tickets y contraseñas en claro de las sesiones abiertas:
+
+<Cmd id="mimikatz-logonpasswords" />
+
+<Cmd id="mimikatz-sam" />
+
+mimikatz corre **en el objetivo** y lo detecta cualquier antivirus actual; en el eJPT suele valer
+porque los laboratorios no tienen EDR, pero en real hace falta ofuscarlo o usar alternativas (como
+`secretsdump` en remoto, que no toca el disco del objetivo).
+
+## El premio gordo: el dominio entero
+
+Al llegar a Domain Admin (o a una cuenta con derechos de replicación), se vuelca el **NTDS.dit**: los
+hashes de todas las cuentas del dominio, pidiéndolos por replicación como si fueras otro DC. Eso es un
+**DCSync**:
+
+<Cmd id="impacket-secretsdump-dcsync" />
+
+El mismo ataque desde una shell en Windows lo hace mimikatz con `lsadump::dcsync`. Con los hashes de
+todo el dominio —incluido el de `krbtgt`— el dominio es tuyo.
+
+## Cómo se detecta
+
+- **secretsdump / nxc --sam**: autenticación remota con privilegios y acceso a la SAM/registro
+  (eventos **4624**/**4672**, lectura de las ramas del registro de la SAM).
+- **mimikatz**: abrir un handle de lectura sobre `lsass.exe` es una de las alertas de más valor que
+  existen; un EDR lo marca al instante.
+- **DCSync**: una petición de replicación (`DRSUAPI`, `GetNCChanges`) desde una IP que **no es un
+  DC** es la firma inconfundible del ataque.
+
+## Cómo se mitiga
+
+- **Credential Guard** y **RunAsPPL** (LSASS protegido) dejan a mimikatz sin memoria que leer.
+- **No reutilizar el admin local** (LAPS) para que un volcado de la SAM no abra media red.
+- **Tiering de administración**: que las cuentas de Domain Admin no inicien sesión en equipos de
+  usuario, para que no queden sus credenciales en memoria.
+- **Vigilar las replicaciones** (`GetNCChanges`) desde orígenes que no sean DC: es la detección
+  directa del DCSync.

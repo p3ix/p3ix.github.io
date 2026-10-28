@@ -1,0 +1,50 @@
+# Comandos de smbclient: cliente SMB interactivo para entrar, listar y transferir ficheros.
+tool: smbclient
+area: ad
+url: https://www.samba.org/samba/docs/current/man-html/smbclient.1.html
+commands:
+  - id: smbclient-list
+    title: Listar shares con sesión nula
+    cmd: |
+      smbclient -L //{{RHOST}}/ -N
+    phase: enum
+    tags: [smb, shares]
+    notes: >-
+      -L lista los recursos compartidos, -N entra sin contraseña (sesión nula). Los que acaban en $
+      son administrativos u ocultos. Un NT_STATUS_LOGON_FAILURE significa que la sesión nula no está
+      permitida: hacen falta credenciales.
+    refs: [https://www.samba.org/samba/docs/current/man-html/smbclient.1.html]
+
+  - id: smbclient-list-creds
+    title: Listar shares con credenciales
+    cmd: |
+      smbclient -L //{{RHOST}}/ -U '{{DOMAIN}}/{{USER}}%{{PASS}}'
+    phase: enum
+    tags: [smb, shares]
+    notes: >-
+      El % separa usuario y contraseña; el / antepone el dominio. Entrecomilla siempre por si la
+      contraseña lleva caracteres raros. Poder listar un share no implica poder leer su contenido.
+    refs: [https://www.samba.org/samba/docs/current/man-html/smbclient.1.html]
+
+  - id: smbclient-connect
+    title: Conectarse a un share y navegar
+    cmd: |
+      smbclient //{{RHOST}}/SHARE -N
+    phase: enum
+    tags: [smb, shares]
+    notes: >-
+      Abre un prompt tipo FTP (smb: \>). Dentro: ls, cd, get fichero (descarga al directorio local),
+      put shell.php (sube si el share es escribible), mget * (todo), prompt off y recurse on para
+      bajar en bloque. Cambia SHARE por el nombre del recurso.
+    refs: [https://www.samba.org/samba/docs/current/man-html/smbclient.1.html]
+
+  - id: smbclient-download-all
+    title: Descargar un share entero de un tiro
+    cmd: |
+      smbclient //{{RHOST}}/SHARE -N -c 'prompt off; recurse on; mget *'
+    phase: exfil
+    tags: [smb, shares]
+    notes: >-
+      -c ejecuta los comandos y sale, sin modo interactivo. Cae en el directorio actual. Para
+      servidores que solo hablan SMB1, añade --option='client min protocol=NT1'.
+    refs: [https://www.samba.org/samba/docs/current/man-html/smbclient.1.html]

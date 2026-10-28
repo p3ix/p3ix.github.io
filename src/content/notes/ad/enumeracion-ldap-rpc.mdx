@@ -1,0 +1,86 @@
+---
+title: Enumeración por LDAP y RPC
+summary: "Leer el directorio de Active Directory por LDAP (ldapsearch) y por MSRPC (rpcclient): el contexto base, usuarios y grupos, contraseñas escondidas en descripciones y el RID cycling cuando la enumeración directa está capada."
+date: 2026-10-28
+area: ad
+order: 30
+related: [ad/enumeracion-smb, ldapsearch-naming, ldapsearch-users, rpcclient-enumdomusers]
+tags: [ldap, rpc, enumeration]
+---
+
+## Qué es
+
+SMB no es la única vía para leer un dominio. El controlador de dominio **es** un servidor LDAP (389,
+y 636 para LDAPS): AD se guarda como un directorio LDAP, así que consultarlo da usuarios, grupos,
+equipos y todos sus atributos. Y **MSRPC** (135, sobre SMB en el 445) expone interfaces como SAMR y
+LSARPC, que `rpcclient` usa para enumerar usuarios, grupos y traducir SID.
+
+Las dos vías se complementan con SMB: a menudo una deja enumerar lo que otra tiene capado, y LDAP da
+atributos (como `description`) que SMB no.
+
+## Requisitos
+
+- Para LDAP: el 389 abierto y, idealmente, una cuenta del dominio (muchos atributos exigen autenticar,
+  aunque algunos dominios permiten bind anónimo).
+- Para RPC: el 445 (o 135) y lo que permita la sesión nula; con credenciales, mucho más.
+
+## LDAP: el directorio entero
+
+Lo primero es averiguar el **contexto base** (el DN raíz del dominio), que piden todas las demás
+consultas:
+
+<Cmd id="ldapsearch-naming" />
+
+Devuelve algo como `DC=corp,DC=local`. Si el dominio permite bind anónimo, se puede volcar entero:
+
+<Cmd id="ldapsearch-anon" />
+
+Con cualquier cuenta del dominio, el directorio se abre casi del todo. La consulta más útil es la
+lista de usuarios:
+
+<Cmd id="ldapsearch-users" />
+
+Y un truco que paga sorprendentemente a menudo: buscar contraseñas que alguien dejó escritas en el
+campo `description` o `info` de una cuenta:
+
+<Cmd id="ldapsearch-descriptions" />
+
+> LDAP es la base de herramientas de enumeración más potentes (windapsearch, ldapdomaindump y, sobre
+> todo, BloodHound, que mapea las rutas de ataque del dominio). `ldapsearch` es el bisturí para
+> consultas concretas y para entender qué hay debajo.
+
+## RPC: usuarios y grupos por MSRPC
+
+`rpcclient` abre una sesión (nula o autenticada) y deja lanzar consultas RPC. En interactivo:
+
+<Cmd id="rpcclient-null" />
+
+Para scriptear, `-c` ejecuta una orden y sale. La lista de usuarios con su RID:
+
+<Cmd id="rpcclient-enumdomusers" />
+
+El detalle de un usuario a partir de su RID (en hexadecimal, de la salida anterior):
+
+<Cmd id="rpcclient-queryuser" />
+
+Otros comandos útiles dentro de `rpcclient`: `enumdomgroups`, `querygroup`, `querydominfo` (info del
+dominio) y `getdompwinfo` (política de contraseñas). Cuando `enumdomusers` está capado pero sí
+responde al SID, el RID cycling traduce identificadores a nombres uno a uno:
+
+<Cmd id="rpcclient-lookupnames" />
+
+## Cómo se detecta
+
+Las consultas LDAP masivas (sobre todo las que vuelcan todo el directorio, como hace BloodHound) son
+un patrón reconocible: muchas búsquedas LDAP desde una cuenta que normalmente no las hace. La
+enumeración por RPC deja los mismos eventos de autenticación y acceso que SMB (**4624**/**4625**,
+accesos a SAMR) en el DC.
+
+## Cómo se mitiga
+
+- **Prohibir el bind anónimo** en LDAP y exigir firma (LDAP signing y channel binding).
+- **Restringir la enumeración por sesión nula** de SAMR/LSARPC (`RestrictAnonymous`).
+- **Nada de contraseñas en `description`/`info`** ni en atributos legibles por cualquier usuario:
+  revisarlo periódicamente, porque es de lo primero que mira un atacante.
+- **Vigilar las consultas LDAP anómalas** (volcados completos del directorio) con herramientas de
+  detección tipo las de BloodHound al revés.

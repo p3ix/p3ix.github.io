@@ -1,0 +1,39 @@
+# Comandos de enum4linux (y enum4linux-ng): barrido todo-en-uno de SMB/NetBIOS.
+tool: enum4linux
+area: ad
+url: https://github.com/cddmp/enum4linux-ng
+commands:
+  - id: enum4linux-all
+    title: Barrido completo de SMB sin credenciales
+    cmd: |
+      enum4linux-ng -A {{RHOST}} -oA enum4linux
+    phase: enum
+    tags: [smb, enumeration, netbios]
+    notes: >-
+      enum4linux-ng es la reescritura moderna (Python, salida estructurada); el clásico es
+      'enum4linux -a {{RHOST}}'. -A hace todo lo básico: versión, dominio y SID, usuarios, grupos,
+      shares y política de contraseñas. Es lo primero que lanzo contra un 139/445 mientras miro otra cosa.
+    refs: [https://github.com/cddmp/enum4linux-ng]
+
+  - id: enum4linux-creds
+    title: Barrido completo con credenciales
+    cmd: |
+      enum4linux-ng -A -u {{USER}} -p '{{PASS}}' {{RHOST}}
+    phase: enum
+    tags: [smb, enumeration]
+    notes: >-
+      Contra Windows moderno la sesión nula da poco; en cuanto tengas una credencial, relánzalo
+      autenticado y la salida cambia radicalmente (usuarios, grupos y política completos).
+    refs: [https://github.com/cddmp/enum4linux-ng]
+
+  - id: enum4linux-rid
+    title: RID cycling para sacar usuarios
+    cmd: |
+      enum4linux-ng -R -u {{USER}} -p '{{PASS}}' {{RHOST}}
+    phase: enum
+    tags: [smb, enumeration]
+    notes: >-
+      Recorre los RID (el 500 es Administrator, los de usuario empiezan en 1000) y traduce cada uno a
+      su nombre. Saca usuarios aunque la enumeración directa por SAMR esté capada. A veces funciona
+      incluso con sesión nula; quita -u/-p para probarlo.
+    refs: [https://github.com/cddmp/enum4linux-ng]

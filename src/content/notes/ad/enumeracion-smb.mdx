@@ -1,0 +1,101 @@
+---
+title: Enumeración por SMB
+summary: Sacar la foto completa de un Windows por SMB (versión, dominio y SID, usuarios, shares y política de contraseñas) con sesión nula o credenciales, usando enum4linux, smbclient, smbmap y NetExec.
+date: 2026-10-28
+area: ad
+order: 20
+related: [ad/metodologia, enum4linux-all, smbmap-null, smbclient-list, nxc-smb-enum]
+tags: [smb, enumeration, active-directory]
+---
+
+## Qué es
+
+SMB (puertos 139 y 445) es el servicio que más da en una red Windows y la puerta de entrada a un
+dominio. Por él se sacan la versión del sistema, el nombre del dominio y su SID, la lista de usuarios
+y grupos, los recursos compartidos y la política de contraseñas. Buena parte de esto se consigue a
+veces **sin credenciales**, por una **sesión nula**: una conexión anónima que los Windows antiguos (y
+muchos laboratorios) permiten.
+
+Esta nota también vale contra un Windows suelto o un Samba que no sea parte de un dominio; el objetivo
+es siempre el mismo: pasar de "hay un 445 abierto" a una lista de usuarios y un mapa de permisos.
+
+## Requisitos
+
+- El puerto 445 (o 139) abierto y alcanzable.
+- Para la sesión nula, que el objetivo la permita (Windows moderno la capa casi siempre).
+- En cuanto tengas una credencial, relanza todo autenticado: la salida cambia radicalmente.
+
+## El barrido todo-en-uno
+
+enum4linux es un wrapper de las herramientas de Samba que de una orden saca versión, dominio y SID,
+usuarios, grupos, shares y política. Es lo primero que lanzo contra un 445 mientras miro otra cosa:
+
+<Cmd id="enum4linux-all" />
+
+Con credenciales, la foto es mucho más completa:
+
+<Cmd id="enum4linux-creds" />
+
+Lo que busco en el volcado: el **Domain SID** (base del RID cycling), los **usuarios con su RID** (el
+500 es Administrator), los **shares** con su permiso, y la **política de contraseñas** —que se lee
+**antes** de cualquier spraying, porque si el umbral de bloqueo es bajo, bloqueas cuentas reales.
+
+## Usuarios aunque la enumeración esté capada: RID cycling
+
+Si la enumeración directa de usuarios está bloqueada pero la sesión nula deja consultar el SID del
+dominio, se recorren los RID uno a uno y se traduce cada uno a su nombre:
+
+<Cmd id="enum4linux-rid" />
+
+## Recursos compartidos y permisos
+
+Para la pregunta "¿en cuál de estos shares puedo escribir?", smbmap da el permiso de cada uno de un
+vistazo (NO ACCESS / READ ONLY / READ, WRITE):
+
+<Cmd id="smbmap-null" />
+
+<Cmd id="smbmap-creds" />
+
+Un `READ, WRITE` en un share no administrativo es un vector directo (subir un payload); un `READ ONLY`
+en `NETLOGON`, `SYSVOL` o un share de backups suele esconder credenciales (scripts, ficheros de
+configuración, el `Groups.xml` de GPP).
+
+Para **entrar y trastear** un share en concreto —listar, descargar, subir— smbclient es el cliente
+interactivo:
+
+<Cmd id="smbclient-list" />
+
+<Cmd id="smbclient-connect" />
+
+Y para llevarte un share entero sin modo interactivo:
+
+<Cmd id="smbclient-download-all" />
+
+## A escala de red: NetExec
+
+Cuando hay muchos hosts, NetExec (`nxc`, sucesor de CrackMapExec) hace lo mismo pero a lo ancho de una
+subred, y valida credenciales de paso:
+
+<Cmd id="nxc-smb-enum" />
+
+<Cmd id="nxc-smb-users" />
+
+El `(Pwn3d!)` que a veces aparece al lado de un `[+]` es la señal clave: esa cuenta es **administradora
+local** de ese host, así que ya puedes ejecutar comandos y volcar hashes ahí (ver
+[movimiento lateral](/biblia/ad/movimiento-lateral/)).
+
+## Cómo se detecta
+
+La enumeración por SMB abre muchas conexiones en poco tiempo desde una sola IP: enum4linux y NetExec
+son especialmente ruidosos. Los intentos de autenticación (aunque sean nulos o fallidos) dejan
+eventos **4624**/**4625** en los DC y servidores, y un barrido con NetExec por toda una subred es un
+patrón muy reconocible para un IDS o un EDR.
+
+## Cómo se mitiga
+
+- **Desactivar las sesiones nulas y anónimas** (`RestrictAnonymous`, `RestrictAnonymousSAM`) para que
+  la enumeración sin credenciales no devuelva usuarios ni shares.
+- **SMBv1 apagado** y firma SMB obligatoria.
+- **Mínimos permisos en los shares**: nada de `READ, WRITE` para todos, y revisar qué hay en
+  `SYSVOL`/`NETLOGON` (scripts con contraseñas, GPP).
+- **Vigilar** los picos de autenticaciones y los accesos a muchos shares desde un mismo origen.

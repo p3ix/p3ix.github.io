@@ -1,0 +1,63 @@
+---
+title: AS-REP Roasting
+summary: Conseguir un hash crackeable offline de las cuentas que no exigen preautenticación de Kerberos, a veces sin ninguna credencial, solo con una lista de usuarios.
+date: 2026-10-28
+area: ad
+order: 50
+related: [ad/password-spraying, ad/kerberoasting, impacket-getnpusers]
+tags: [kerberos, as-rep-roasting]
+---
+
+## Qué es
+
+Cuando un usuario inicia sesión con Kerberos, lo normal es que primero **pruebe que es él**
+(preautenticación): manda al DC una marca de tiempo cifrada con su contraseña, y el DC solo responde
+si la descifra bien. Pero una cuenta puede tener desactivada esa preautenticación (el flag
+`DONT_REQ_PREAUTH`). En ese caso, el DC responde al primer mensaje (`AS-REP`) a **cualquiera** que lo
+pida, y parte de esa respuesta va cifrada con la contraseña del usuario.
+
+Eso es un hash crackeable **offline**: se pide el `AS-REP` de esas cuentas y se ataca la contraseña
+sin tocar más el dominio y **sin provocar bloqueos**. Lo mejor: para pedirlo no hacen falta
+credenciales, solo saber qué usuarios existen.
+
+## Requisitos
+
+- Una lista de usuarios (`users.txt`) de la [enumeración](/biblia/ad/enumeracion-smb/).
+- Alcance a un controlador de dominio por el puerto 88.
+- Que exista al menos una cuenta con la preautenticación desactivada (no siempre la hay).
+
+## Pedir los hashes
+
+Sin credenciales, solo con la lista de usuarios:
+
+<Cmd id="impacket-getnpusers" />
+
+Devuelve un hash `$krb5asrep$` por cada cuenta vulnerable. Con una cuenta de dominio ya en la mano,
+`GetNPUsers` con `-request` puede además **descubrir** qué cuentas son vulnerables sin adivinarlas, y
+NetExec lo hace con `nxc ldap {{DC_IP}} -u {{USER}} -p '{{PASS}}' --asreproast asrep.hash`.
+
+## Crackear
+
+El hash de AS-REP roasting es el modo **18200** de hashcat:
+
+```bash
+hashcat -m 18200 asrep.hash /usr/share/wordlists/rockyou.txt
+```
+
+Si cae, tienes una credencial de dominio válida para empezar el ciclo de enumeración autenticada,
+[Kerberoasting](/biblia/ad/kerberoasting/) y [movimiento lateral](/biblia/ad/movimiento-lateral/).
+
+## Cómo se detecta
+
+- Eventos **4768** (petición de TGT) con tipo de preautenticación `0` (sin preautenticación): una
+  cuenta que pide su AS-REP sin preautenticar es justo lo que busca el ataque.
+- Muchas peticiones de distintos usuarios desde un mismo origen en poco tiempo.
+
+## Cómo se mitiga
+
+- **Exigir preautenticación de Kerberos** en todas las cuentas: quitar el flag `DONT_REQ_PREAUTH`
+  salvo que haya una razón muy concreta (suele ser un resto de compatibilidad con sistemas viejos).
+- **Contraseñas largas y fuertes** en esas cuentas mientras tengan el flag, para que el crackeo
+  offline no sirva.
+- **Vigilar** las cuentas con la preautenticación desactivada (son pocas y fáciles de auditar) y los
+  eventos 4768 sin preautenticar.

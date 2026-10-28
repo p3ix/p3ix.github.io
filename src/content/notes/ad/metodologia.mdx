@@ -1,0 +1,75 @@
+---
+title: Active Directory de principio a fin
+summary: Qué es un dominio y cómo se ataca en el eJPT, el camino de usuario anónimo a Domain Admin (enumerar, conseguir una credencial, movernos y comprometer el DC) y el enlace a cada nota del área.
+date: 2026-10-28
+area: ad
+order: 10
+related: [ad/enumeracion-smb, ad/enumeracion-ldap-rpc, ad/password-spraying, ad/as-rep-roasting, ad/kerberoasting, ad/movimiento-lateral, ad/volcado-de-credenciales]
+tags: [active-directory, methodology]
+---
+
+## Qué es
+
+Active Directory (AD) es el servicio de directorio de Windows: la base de datos central donde una
+empresa guarda sus usuarios, equipos, grupos y las reglas de quién puede hacer qué. El servidor que
+la manda es el **controlador de dominio (DC)**, y casi todo el ataque gira en torno a hablar con él.
+
+Atacar AD no suele ser explotar una vulnerabilidad de software, sino **abusar de cómo funciona el
+protocolo y de malas configuraciones**: credenciales reutilizadas, permisos de más, cuentas de
+servicio con contraseñas débiles. Por eso la enumeración pesa tanto: casi todo el trabajo es
+averiguar quién es quién y qué puede hacer, y el "exploit" es usar una credencial donde no debería
+valer.
+
+## Las piezas que hay que tener claras
+
+| Pieza | Qué es |
+| --- | --- |
+| Dominio | El conjunto de usuarios, equipos y recursos bajo una misma administración (`corp.local`). |
+| Controlador de dominio (DC) | El servidor que guarda AD. Habla SMB (445), LDAP (389), Kerberos (88), DNS (53). |
+| SID / RID | El identificador único de cada objeto. El RID es su cola: 500 = Administrator, ≥1000 = usuarios. |
+| Sesión nula | Conexión SMB/RPC sin credenciales; en sistemas viejos deja enumerar mucho. |
+| NTLM / hash NT | El hash de la contraseña. Sirve para autenticar **sin** la contraseña (Pass-the-Hash). |
+| Ticket Kerberos | El "pase" que da el DC. La base de AS-REP roasting y Kerberoasting. |
+
+## El camino, de anónimo a Domain Admin
+
+El ataque de AD del eJPT sigue casi siempre este orden, y cada paso tiene su nota:
+
+1. **Enumerar sin credenciales**: qué hosts hay, cuál es el DC, el nombre del dominio y su SID, y qué
+   se saca por sesión nula (usuarios, shares, política). Ver
+   [enumeración por SMB](/biblia/ad/enumeracion-smb/) y
+   [enumeración por LDAP y RPC](/biblia/ad/enumeracion-ldap-rpc/).
+2. **Conseguir la primera credencial**: password spraying con la lista de usuarios, AS-REP roasting
+   (sin credenciales), o credenciales que aparecen en shares, descripciones LDAP o GPP. Ver
+   [password spraying](/biblia/ad/password-spraying/) y [AS-REP roasting](/biblia/ad/as-rep-roasting/).
+3. **Enumerar autenticado y escalar**: con una cuenta, el directorio se abre. Kerberoasting contra
+   las cuentas de servicio da más credenciales. Ver [Kerberoasting](/biblia/ad/kerberoasting/).
+4. **Moverse en lateral**: reutilizar credenciales o hashes para entrar en otros equipos
+   (Pass-the-Hash, psexec, wmiexec, evil-winrm). Ver
+   [movimiento lateral](/biblia/ad/movimiento-lateral/).
+5. **Comprometer el dominio**: al llegar a un host con sesión de un admin, volcar sus credenciales; al
+   ser Domain Admin, volcar toda la base del dominio (NTDS.dit). Ver
+   [volcado de credenciales](/biblia/ad/volcado-de-credenciales/).
+
+El bucle real es: enumerar → conseguir credencial → reutilizarla → enumerar más → repetir, cada vez
+con más privilegios, hasta el DC.
+
+## Las variables del área
+
+Casi todos los comandos de AD giran en torno a las mismas: `{{DC_IP}}` (el controlador), `{{RHOST}}`
+(el equipo del momento), `{{DOMAIN}}`, `{{USER}}`, `{{PASS}}` y `{{HASH}}` (el hash NT para
+Pass-the-Hash). Rellénalas una vez en la barra de variables y los comandos de todo el área salen
+listos.
+
+## Desde el lado defensivo
+
+AD es difícil de defender porque la mayoría de los ataques usan funciones legítimas: pedir un ticket,
+autenticarse, leer el directorio. La defensa va por capas, y cada nota tiene la suya; en resumen:
+
+- **Menos privilegios y menos reutilización**: que el admin local no sea el mismo en todas partes
+  (LAPS), y que las cuentas de servicio no sean Domain Admin.
+- **Contraseñas fuertes y gMSA** en las cuentas de servicio, que es lo que frena Kerberoasting y
+  AS-REP roasting.
+- **Vigilar lo anómalo**: ráfagas de eventos 4768/4769 (Kerberos), 4625 (logins fallidos) y 4624/4672
+  (logins con privilegios) desde sitios raros.
+- **Apagar lo viejo**: SMBv1, sesiones nulas, NTLM donde se pueda.

@@ -1,0 +1,48 @@
+# Comandos de rpcclient: enumeración de Windows por MSRPC (135/139/445).
+tool: rpcclient
+area: ad
+url: https://www.samba.org/samba/docs/current/man-html/rpcclient.1.html
+commands:
+  - id: rpcclient-null
+    title: Conectar con sesión nula
+    cmd: |
+      rpcclient -U '' -N {{RHOST}}
+    phase: enum
+    tags: [rpc, enumeration]
+    notes: >-
+      Abre un prompt (rpcclient $>) sin credenciales. Desde dentro, srvinfo (versión del SO),
+      enumdomusers, enumdomgroups, querydominfo... Con credenciales, -U '{{USER}}%{{PASS}}'.
+    refs: [https://www.samba.org/samba/docs/current/man-html/rpcclient.1.html]
+
+  - id: rpcclient-enumdomusers
+    title: Usuarios del dominio con su RID
+    cmd: |
+      rpcclient -U '' -N {{RHOST}} -c 'enumdomusers'
+    phase: enum
+    tags: [rpc, enumeration]
+    notes: >-
+      -c ejecuta el comando y sale. Devuelve cada usuario con su RID (rid:[0x3e8]). El 500 es
+      Administrator; los de usuario empiezan en 1000. La lista va a users.txt para spraying.
+    refs: [https://www.samba.org/samba/docs/current/man-html/rpcclient.1.html]
+
+  - id: rpcclient-queryuser
+    title: Detalle de un usuario por su RID
+    cmd: |
+      rpcclient -U '' -N {{RHOST}} -c 'queryuser 0x3e8'
+    phase: enum
+    tags: [rpc, enumeration]
+    notes: >-
+      Muestra nombre completo, descripción, último cambio de contraseña, flags de la cuenta y más.
+      El RID en hexadecimal sale de enumdomusers. queryusergroups da sus grupos.
+    refs: [https://www.samba.org/samba/docs/current/man-html/rpcclient.1.html]
+
+  - id: rpcclient-lookupnames
+    title: RID cycling para traducir SID a nombres
+    cmd: |
+      rpcclient -U '' -N {{RHOST}} -c 'lookupsids S-1-5-21-...-1000'
+    phase: enum
+    tags: [rpc, enumeration]
+    notes: >-
+      Cuando enumdomusers está capado, se traducen RIDs a nombres uno a uno a partir del SID del
+      dominio (de lsaquery o enum4linux). Para hacerlo a escala, enum4linux-ng -R o la herramienta lookupsid.py.
+    refs: [https://www.samba.org/samba/docs/current/man-html/rpcclient.1.html]

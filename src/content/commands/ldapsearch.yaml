@@ -1,0 +1,48 @@
+# Comandos de ldapsearch: consultar el directorio de Active Directory por LDAP (389/636).
+tool: ldapsearch
+area: ad
+url: https://linux.die.net/man/1/ldapsearch
+commands:
+  - id: ldapsearch-naming
+    title: Descubrir el contexto base del dominio
+    cmd: |
+      ldapsearch -x -H ldap://{{DC_IP}} -s base namingcontexts
+    phase: enum
+    tags: [ldap, enumeration]
+    notes: >-
+      -x es bind simple (sin SASL) y -s base consulta la raíz. Devuelve el defaultNamingContext
+      (DC=corp,DC=local), que es el -b que necesitan las demás consultas. No requiere credenciales.
+    refs: [https://linux.die.net/man/1/ldapsearch]
+
+  - id: ldapsearch-anon
+    title: Volcado anónimo del directorio
+    cmd: |
+      ldapsearch -x -H ldap://{{DC_IP}} -b 'DC=corp,DC=local'
+    phase: enum
+    tags: [ldap, enumeration]
+    notes: >-
+      Si el dominio permite bind anónimo, vuelca todo el directorio. Cambia DC=corp,DC=local por el
+      contexto base real (el de la consulta anterior). Fíltralo por el tipo de objeto que busques.
+    refs: [https://linux.die.net/man/1/ldapsearch]
+
+  - id: ldapsearch-users
+    title: Usuarios del dominio con credenciales
+    cmd: |
+      ldapsearch -x -H ldap://{{DC_IP}} -D '{{USER}}@{{DOMAIN}}' -w '{{PASS}}' -b 'DC=corp,DC=local' '(objectClass=user)' sAMAccountName
+    phase: enum
+    tags: [ldap, enumeration]
+    notes: >-
+      -D es el usuario que hace el bind y -w su contraseña. El filtro (objectClass=user) y pedir solo
+      sAMAccountName da una lista limpia de cuentas. Con cualquier cuenta del dominio se lee casi todo.
+    refs: [https://linux.die.net/man/1/ldapsearch]
+
+  - id: ldapsearch-descriptions
+    title: Contraseñas en el campo description
+    cmd: |
+      ldapsearch -x -H ldap://{{DC_IP}} -D '{{USER}}@{{DOMAIN}}' -w '{{PASS}}' -b 'DC=corp,DC=local' '(objectClass=user)' sAMAccountName description
+    phase: credential-access
+    tags: [ldap, enumeration]
+    notes: >-
+      Un clásico: administradores que dejan la contraseña en el campo description o info de una
+      cuenta. Rápido de mirar y sorprendentemente habitual en laboratorios y en entornos reales.
+    refs: [https://linux.die.net/man/1/ldapsearch]

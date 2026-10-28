@@ -1,0 +1,91 @@
+---
+title: Movimiento lateral
+summary: Reutilizar una credencial o un hash para ejecutar comandos y conseguir una shell en otros equipos del dominio con psexec, wmiexec, evil-winrm y NetExec, y cuándo usar cada uno.
+date: 2026-10-28
+area: ad
+order: 70
+related: [ad/password-spraying, ad/volcado-de-credenciales, impacket-psexec-pth, impacket-wmiexec, evil-winrm-pass]
+tags: [lateral-movement, pass-the-hash, active-directory]
+---
+
+## Qué es
+
+Movimiento lateral es usar una credencial (contraseña o hash) para pasar de un equipo a otro dentro
+del dominio, normalmente buscando uno donde haya iniciado sesión un usuario con más privilegios. La
+credencial tiene que valer en el destino, y la cuenta tiene que ser **administradora local** ahí para
+poder ejecutar. Esa condición es justo la que marca el `(Pwn3d!)` de NetExec: antes de lanzar nada,
+se confirma con él dónde funciona.
+
+Todas estas herramientas aceptan **Pass-the-Hash**: donde va una contraseña, va un hash NT. La
+diferencia entre ellas es **cómo** ejecutan y cuánto ruido dejan.
+
+## Requisitos
+
+- Una credencial válida (contraseña o hash) de una cuenta que sea **admin local** en el destino.
+- El servicio correspondiente abierto: SMB (445) para psexec/wmiexec, WinRM (5985) para evil-winrm.
+- Validar antes dónde funciona (ver [spraying y PtH](/biblia/ad/password-spraying/)):
+
+<Cmd id="nxc-smb-pth" />
+
+## psexec: shell como SYSTEM, pero ruidoso
+
+`psexec` sube un ejecutable y crea un **servicio** en el objetivo para lanzarlo: da una shell como
+`SYSTEM`, pero deja rastro (el evento 7045 de servicio nuevo):
+
+<Cmd id="impacket-psexec-pth" />
+
+## wmiexec: más sigiloso
+
+`wmiexec` ejecuta por **WMI** en vez de instalar un servicio, así que es más limpio. Da una shell
+semi-interactiva (cada comando es una conexión nueva):
+
+<Cmd id="impacket-wmiexec" />
+
+## evil-winrm: la shell cómoda por WinRM
+
+Si el puerto WinRM (5985) está abierto y la cuenta está en *Remote Management Users*, `evil-winrm` da
+una shell de PowerShell estable, la más cómoda para trabajar cuando ya tienes credenciales:
+
+<Cmd id="evil-winrm-pass" />
+
+Lo mismo con un hash, sin crackear nada:
+
+<Cmd id="evil-winrm-hash" />
+
+> Valida el acceso WinRM antes con `nxc winrm {{RHOST}} -u {{USER}} -p '{{PASS}}'`: si responde
+> `(Pwn3d!)`, evil-winrm entra.
+
+## Ejecutar sin shell
+
+A veces solo hace falta lanzar un comando (comprobar quién eres, volcar un hash). NetExec lo hace
+directo, sin abrir una sesión interactiva:
+
+<Cmd id="nxc-smb-exec" />
+
+## Qué usar y cuándo
+
+| Herramienta | Vía | Shell | Ruido |
+| --- | --- | --- | --- |
+| evil-winrm | WinRM 5985 | PowerShell estable | Bajo (servicio legítimo) |
+| wmiexec | WMI sobre 445 | Semi-interactiva | Bajo (sin servicio) |
+| psexec | Servicio SMB | SYSTEM completa | Alto (evento 7045) |
+| nxc -x | SMB | Sin shell (un comando) | Medio |
+
+## Cómo se detecta
+
+- **psexec**: creación de un servicio (evento **7045**) con nombre aleatorio y un binario que arranca
+  desde una ruta rara; es de lo más detectado.
+- **wmiexec**: procesos hijos de `WmiPrvSE.exe` ejecutando `cmd.exe`.
+- **evil-winrm**: sesiones WinRM y procesos hijos de `wsmprovhost.exe`.
+- **Todas**: logins (evento **4624** tipo 3, y **4672** si es privilegiado) del mismo origen en varios
+  equipos seguidos, el patrón del movimiento lateral.
+
+## Cómo se mitiga
+
+- **LAPS** (admin local distinto por equipo) corta la reutilización de credenciales, que es lo que
+  hace posible el movimiento lateral.
+- **Restringir quién es admin local y quién puede usar WinRM**, y segmentar la red para que los
+  equipos de usuario no se hablen entre sí por SMB/WinRM.
+- **Credential Guard** y no dejar sesiones de cuentas privilegiadas en equipos de usuario (así no hay
+  credenciales valiosas que robar en el siguiente salto).
+- **Vigilar** la creación de servicios, el uso de WMI/WinRM remoto y los logins entre equipos.

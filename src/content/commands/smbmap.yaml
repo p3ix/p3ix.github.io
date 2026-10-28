@@ -1,0 +1,49 @@
+# Comandos de smbmap: shares SMB con el permiso (READ/WRITE) que tengo en cada uno.
+tool: smbmap
+area: ad
+url: https://github.com/ShawnDEvans/smbmap
+commands:
+  - id: smbmap-null
+    title: Shares y permisos con sesión nula
+    cmd: |
+      smbmap -H {{RHOST}} -u '' -p ''
+    phase: enum
+    tags: [smb, shares]
+    notes: >-
+      La respuesta a "¿en cuál de estos shares puedo escribir?" de un vistazo, sin entrar uno a uno.
+      La columna Permissions marca NO ACCESS, READ ONLY o READ, WRITE por cada recurso.
+    refs: [https://github.com/ShawnDEvans/smbmap]
+
+  - id: smbmap-creds
+    title: Shares y permisos con credenciales
+    cmd: |
+      smbmap -H {{RHOST}} -u {{USER}} -p '{{PASS}}' -d {{DOMAIN}}
+    phase: enum
+    tags: [smb, shares]
+    notes: >-
+      Busca un READ, WRITE en un share no administrativo (vector directo: subir un payload) o un
+      READ ONLY en NETLOGON, SYSVOL o backups, donde suele haber credenciales. Un READ, WRITE sobre
+      un webroot es doble premio: lo que subas lo sirve el servidor web.
+    refs: [https://github.com/ShawnDEvans/smbmap]
+
+  - id: smbmap-recurse
+    title: Recorrer un share en recursivo
+    cmd: |
+      smbmap -H {{RHOST}} -u {{USER}} -p '{{PASS}}' -R SHARE
+    phase: enum
+    tags: [smb, shares]
+    notes: >-
+      -R lista el contenido completo del share (en minúscula, -r solo la raíz). Para descargar,
+      --download 'SHARE\ruta\fichero' manteniendo las barras invertidas de Windows y entrecomillando.
+    refs: [https://github.com/ShawnDEvans/smbmap]
+
+  - id: smbmap-exec
+    title: Ejecutar un comando por SMB
+    cmd: |
+      smbmap -H {{RHOST}} -u {{USER}} -p '{{PASS}}' -x 'ipconfig'
+    phase: lateral
+    tags: [smb]
+    notes: >-
+      -x ejecuta un comando usando un servicio tipo psexec por debajo: necesita credenciales con
+      privilegios de administrador local, con sesión nula no va.
+    refs: [https://github.com/ShawnDEvans/smbmap]
