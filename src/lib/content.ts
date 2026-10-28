@@ -1,5 +1,5 @@
 import { getCollection, type CollectionEntry } from 'astro:content';
-import type { AreaId, PhaseId } from './taxonomy';
+import type { AreaId, PhaseId, PromptId } from './taxonomy';
 import { VARIABLE_PATTERN, isVariableName, type VariableName } from './variables';
 
 type Dated = 'ctf' | 'bugbounty' | 'notes';
@@ -40,6 +40,7 @@ export interface Command {
   area: AreaId;
   phase: PhaseId;
   os: ('linux' | 'windows')[];
+  prompt: PromptId;
   tags: string[];
   notes?: string;
   refs: string[];
@@ -59,6 +60,7 @@ export async function getCommands(): Promise<Command[]> {
       tool: file.data.tool,
       toolUrl: file.data.url,
       area: c.area ?? file.data.area,
+      prompt: c.prompt ?? file.data.prompt,
       file: file.id,
     })),
   );

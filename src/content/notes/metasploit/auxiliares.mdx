@@ -1,0 +1,106 @@
+---
+title: Enumerar servicios con módulos auxiliares
+summary: Los módulos scanner y admin de Metasploit para sacar versión, configuración, usuarios y credenciales de FTP, SMB, HTTP, SQL, SSH y SMTP sin salir de la consola, guardándolo todo en la base de datos.
+date: 2026-10-28
+area: metasploit
+order: 30
+related: [metasploit/consola, msf-smb-version, msf-smb-enumshares, msf-smb-login, msf-ftp-anonymous, msf-ssh-login, msf-mysql-login, msf-smtp-enum]
+tags: [metasploit, enumeration, smb]
+---
+
+## Qué es
+
+Un módulo **auxiliary** es todo lo que no es explotar: escanear, enumerar, hacer fuerza bruta,
+fuzzear. Son el grueso de la fase de enumeración en Metasploit. La mayoría viven en
+`auxiliary/scanner/<servicio>/` y comparten la gracia de nmap pero integrados: lo que encuentran
+(versiones, usuarios, credenciales) cae en la base de datos del workspace y se reutiliza en el
+siguiente paso. Los `admin/` van un paso más allá y actúan con credenciales ya conseguidas.
+
+No sustituyen a nmap para el barrido inicial; brillan **después**, cuando ya sabes qué puertos hay y
+quieres exprimir cada servicio, o cuando escaneas una red interna a través de un pivot.
+
+## Requisitos
+
+- La base de datos arrancada si quieres que se guarde lo encontrado (ver [la consola](/biblia/metasploit/consola/)).
+- Alcance al servicio: directo, o por una ruta de Metasploit en el caso del pivoting.
+- Para los `admin/*` y algunos `scanner`, credenciales válidas (`SMBUser`/`SMBPass`, `USERNAME`/`PASSWORD`).
+
+## SMB, el más rentable
+
+SMB (139, 445) es el servicio que más da en una red Windows. El orden natural: versión, luego qué hay
+sin autenticar, luego validar credenciales.
+
+La versión dice qué Windows es, el dominio y si aún habla SMBv1 (la puerta de EternalBlue):
+
+<Cmd id="msf-smb-version" />
+
+Los recursos compartidos, con sesión nula o con credenciales:
+
+<Cmd id="msf-smb-enumshares" />
+
+Los usuarios locales, para fabricar la lista con la que hacer fuerza bruta:
+
+<Cmd id="msf-smb-enumusers" />
+
+Y validar usuarios y contraseñas (cada acierto va a `creds`):
+
+<Cmd id="msf-smb-login" />
+
+> **Cuidado con el bloqueo de cuentas.** Los módulos `*_login` prueban contraseñas, y una política de
+> bloqueo puede dejar sin acceso a los usuarios reales. Antes de un spraying, mira el umbral (por SMB
+> con sesión nula) y usa una sola contraseña contra muchos usuarios, no al revés.
+
+## FTP, SSH, HTTP
+
+El login anónimo de FTP es un clásico, y uno con permiso de escritura en la carpeta de la web es una
+webshell a un paso:
+
+<Cmd id="msf-ftp-anonymous" />
+
+La fuerza bruta de SSH abre una sesión de shell en cuanto acierta, y Metasploit trae diccionarios
+cortos pensados para laboratorios:
+
+<Cmd id="msf-ssh-login" />
+
+Para webs, los `scanner/http/*` cubren lo básico (`http_version`, `http_header`, `robots_txt`,
+`dir_scanner`). El de directorios:
+
+<Cmd id="msf-http-dir-scanner" />
+
+## Bases de datos SQL
+
+Primero validar credenciales (`root` con contraseña débil o en blanco es lo habitual en laboratorio):
+
+<Cmd id="msf-mysql-login" />
+
+Y con credenciales, enumerar de verdad: usuarios, hashes, privilegios y configuración. Los hermanos
+`mysql_sql`, `mysql_schemadump` y `mysql_hashdump` hacen el resto:
+
+<Cmd id="msf-mysql-enum" />
+
+Para MSSQL (1433) la familia equivalente es `scanner/mssql/mssql_login`, `mssql_schemadump` y, la
+joya, `admin/mssql/mssql_exec`, que ejecuta comandos por `xp_cmdshell` si está habilitado.
+
+## SMTP
+
+El correo (25, 465, 587) sirve para enumerar usuarios del sistema con `VRFY` o `RCPT TO`, que luego
+reutilizas en la fuerza bruta de SSH o FTP del mismo equipo:
+
+<Cmd id="msf-smtp-enum" />
+
+## Cómo se detecta
+
+Es la parte más ruidosa del trabajo con Metasploit. Los `*_login` generan una ráfaga de
+autenticaciones fallidas que queda en los registros del servicio (eventos 4625 en Windows por SMB,
+líneas en `/var/log/auth.log` por SSH) y dispara el bloqueo de cuentas y a `fail2ban`. Los escáneres
+de versión dejan conexiones a puertos que nadie usa, visibles para cualquier IDS.
+
+## Cómo se mitiga
+
+- **Bloqueo y ritmo**: política de bloqueo de cuentas y limitación de intentos (`fail2ban`) contra la
+  fuerza bruta.
+- **Nada de anónimo ni nulo**: desactivar el FTP anónimo y las sesiones nulas de SMB, que entregan la
+  lista de usuarios y recursos sin pedir nada.
+- **Menos superficie**: SMBv1 apagado, servicios de gestión (SMB, WinRM, SQL) sin exponer a la red de
+  usuarios.
+- **Vigilancia**: alertas por muchos fallos de autenticación seguidos desde una misma IP.

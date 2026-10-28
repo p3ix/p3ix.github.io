@@ -1,0 +1,116 @@
+---
+title: La consola, la base de datos y el ciclo de un módulo
+summary: Arrancar msfconsole con PostgreSQL, aislar cada objetivo en un workspace, importar escaneos y el ciclo search, use, info, set y run que es el 90% del uso.
+date: 2026-10-28
+area: metasploit
+order: 20
+related: [metasploit/metodologia, metasploit/auxiliares, msf-start, msf-workspace, msf-search]
+tags: [metasploit, database]
+---
+
+## Qué es
+
+`msfconsole` es la interfaz principal del framework. Por detrás se apoya en una base de datos
+PostgreSQL que guarda lo que vas descubriendo (hosts, puertos, credenciales, botín) para que no
+dependa de tu memoria ni de mil ficheros sueltos. Sin esa base de datos el framework funciona, pero
+pierdes `hosts`, `services`, `creds` y `db_nmap`: por eso el primer paso de cada sesión es
+arrancarla.
+
+## Arranque
+
+PostgreSQL primero, la consola después. `msfdb init` crea la base de datos la primera vez y las
+siguientes solo comprueba que está arriba:
+
+<Cmd id="msf-start" />
+
+Ya dentro, `db_status` tiene que decir `connected`. Si no, es que PostgreSQL no arrancó: míralo con
+`sudo systemctl status postgresql`.
+
+## Un workspace por objetivo
+
+El **workspace** aísla los datos de cada objetivo. Crear uno por máquina o por engagement evita
+mezclar los hosts de redes distintas, un lío fácil de montar en el examen:
+
+<Cmd id="msf-workspace" />
+
+`workspace` a secas los lista (el activo lleva un asterisco), `workspace nombre` cambia de uno a otro
+y `workspace -d nombre` lo borra.
+
+## El ciclo de un módulo
+
+El 90% del uso de Metasploit es este bucle. Buscar el módulo, cargarlo, ver qué pide, rellenarlo y
+lanzarlo:
+
+```text
+msf > search type:exploit platform:windows smb
+msf > use exploit/windows/smb/ms17_010_eternalblue
+msf > info
+msf > show options
+msf > show missing
+msf > set RHOSTS 10.10.10.5
+msf > run
+```
+
+- **`search`** acepta filtros que afinan mucho (`type:`, `platform:`, `cve:`, `name:`, `port:`,
+  `rank:`). Después, `use 3` carga el resultado número 3 sin teclear la ruta entera.
+
+<Cmd id="msf-search" />
+
+- **`info`** da la descripción, el CVE y lo que hace el módulo; léelo antes de disparar.
+- **`show options`** lista todo lo configurable y **`show missing`** solo lo obligatorio que falta.
+- **`run`** lanza auxiliares y post; **`exploit`** es su alias para los exploits. `run -j` lo manda a
+  segundo plano (un *job*), que es como se dejan los handlers y los escaneos largos.
+- **`back`** sale del módulo; **`check`**, en los exploits que lo traen, confirma que el objetivo es
+  vulnerable sin dispararlo.
+
+## set, setg y la trampa de las opciones pegadas
+
+`set` fija una opción solo para el módulo cargado. `setg` la fija **global**, para todos los módulos
+hasta que cierres la consola: cómodo para no repetir el objetivo y tu IP en cada módulo del mismo
+host.
+
+<Cmd id="msf-setg" />
+
+El precio es la gotcha más común de Metasploit: una opción global mal puesta te persigue de módulo en
+módulo. Si uno "no coge el objetivo que le pongo", revisa los `setg` con `get RHOSTS` y límpialos con
+`unsetg RHOSTS`.
+
+## Traer un escaneo a la base de datos
+
+Dos caminos. Lanzar nmap desde dentro, que guarda hosts y servicios solo:
+
+<Cmd id="msf-db-nmap" />
+
+O importar un XML hecho fuera (por eso nmap siempre con `-oX` o `-oA`):
+
+<Cmd id="msf-db-import" />
+
+Y después consultar lo que hay. `services -R` copia el resultado a `RHOSTS`, así que puedes filtrar
+por puerto y encadenar el siguiente módulo contra todos los equipos que lo tengan:
+
+<Cmd id="msf-db-query" />
+
+## Automatizar con resource scripts
+
+Un **resource script** (`.rc`) es un fichero de texto con comandos de consola, uno por línea, que se
+ejecutan en orden. El caso típico es dejar un handler escuchando sin teclearlo cada vez:
+
+```text
+msf > resource handler.rc     # ejecutar un .rc ya escrito
+msf > makerc /tmp/sesion.rc    # grabar en un .rc lo que YA has tecleado
+```
+
+`makerc` es el atajo: haces el flujo una vez a mano y lo vuelcas a un fichero para repetirlo. Desde
+la terminal, `msfconsole -q -r handler.rc` arranca ejecutándolo.
+
+## Cómo se detecta
+
+Los escaneos con `db_nmap` y los auxiliares `*_login` son ruidosos: barridos de puertos y ráfagas de
+autenticaciones fallidas que cualquier IDS y los registros del propio servicio recogen. La base de
+datos y los workspaces son cosa tuya, en tu Kali, y no dejan rastro en el objetivo.
+
+## Cómo se mitiga
+
+Nada que mitigar en la consola en sí; lo que se defiende es cada módulo que lanza, en su nota. Lo
+que sí conviene de tu lado: un workspace por cliente para no cruzar datos, y `-oA` en cada escaneo
+para no repetir trabajo lento contra una red real.

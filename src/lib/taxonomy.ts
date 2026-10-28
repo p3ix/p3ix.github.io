@@ -17,6 +17,7 @@ export const AREA_IDS = [
   'pivoting',
   'cracking',
   'shells',
+  'metasploit',
   'otros',
 ] as const;
 export type AreaId = (typeof AREA_IDS)[number];
@@ -30,6 +31,7 @@ export const areas: Record<AreaId, { label: string; color: ColorToken }> = {
   pivoting: { label: 'Pivoting', color: 'area-pivot' },
   cracking: { label: 'Cracking', color: 'area-crack' },
   shells: { label: 'Shells', color: 'area-shell' },
+  metasploit: { label: 'Metasploit', color: 'area-msf' },
   otros: { label: 'Otros', color: 'muted' },
 };
 
@@ -60,6 +62,20 @@ export const phases: Record<PhaseId, string> = {
 
 /** Sistema desde el que se lanza un comando. */
 export const LAUNCH_OS_IDS = ['linux', 'windows'] as const;
+
+/**
+ * Consola en la que se escribe un comando: decide el prompt de su tarjeta. En la shell, las
+ * líneas siguientes continúan el mismo comando; en msfconsole y meterpreter cada línea es un
+ * comando y lleva su propio prompt.
+ */
+export const PROMPT_IDS = ['shell', 'msf', 'meterpreter'] as const;
+export type PromptId = (typeof PROMPT_IDS)[number];
+
+export const prompts: Record<PromptId, { symbol: string; perLine: boolean }> = {
+  shell: { symbol: '$', perLine: false },
+  msf: { symbol: 'msf >', perLine: true },
+  meterpreter: { symbol: 'meterpreter >', perLine: true },
+};
 
 // ---------- CTF ----------
 

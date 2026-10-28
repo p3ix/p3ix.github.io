@@ -1,0 +1,137 @@
+---
+title: Explotar servicios con Metasploit
+summary: Cómo elegir un exploit con criterio en vez de dispararlos todos, confirmarlo con check, el porqué de db_autopwn y un catálogo de los exploits de servicio que caen en el eJPT.
+date: 2026-10-28
+area: metasploit
+order: 50
+related: [metasploit/payloads, metasploit/meterpreter, msf-eternalblue, msf-psexec, msf-hfs, msf-vsftpd-backdoor, searchsploit-nmap]
+tags: [metasploit, exploit-search, rce]
+---
+
+## Qué es
+
+Un módulo **exploit** aprovecha una vulnerabilidad concreta y, si funciona, deja correr el payload que
+le has emparejado. El flujo es siempre el mismo: identificar el servicio y su versión exacta, buscar
+el exploit, leer qué pide, confirmar que aplica y lanzarlo con criterio. La disciplina está en ese
+"con criterio": un exploit equivocado puede tumbar el servicio, y lanzarlos todos a la vez es ruido
+puro.
+
+## Requisitos
+
+- La versión exacta del servicio, de la enumeración (ver [auxiliares](/biblia/metasploit/auxiliares/)).
+  El número de versión es lo que decide qué exploit aplica.
+- El payload y el handler decididos (ver [payloads](/biblia/metasploit/payloads/)): casi todos los
+  exploits de RCE traen un payload por defecto, pero conviene fijar `LHOST` y `LPORT` a mano.
+- Para los exploits locales (escalada), una sesión ya abierta y su número (`set SESSION 1`).
+
+## Buscar, confirmar, lanzar
+
+Del `search` del servicio sale el módulo; de `info`, qué pide y qué CVE cubre. El paso que la gente se
+salta y no debería es **`check`**: muchos exploits saben comprobar si el objetivo es vulnerable sin
+dispararlo.
+
+```text
+msf > use exploit/windows/http/rejetto_hfs_exec
+msf > show options
+msf > check            # cuando el módulo lo soporta
+msf > set RHOSTS 10.10.10.5
+msf > exploit
+```
+
+Si tras `exploit` no aparece `session ... opened`, no hay sesión aunque diga `exploit completed`.
+Las causas de siempre: `LHOST` que el objetivo no alcanza, un firewall en medio, el objetivo no era
+vulnerable de verdad, o el payload no casa. Prueba a cambiar staged por stageless, o `LPORT` a un
+puerto común como el 443.
+
+## db_autopwn: saber qué es y no usarlo
+
+El eJPT menciona `db_autopwn`, la idea de "cruzar los servicios abiertos de la base de datos con los
+exploits que encajan y lanzarlos todos de golpe". Dos matices importan:
+
+1. Se **eliminó del núcleo de Metasploit en 2012**. En un Kali actual el comando no existe; hay que
+   cargarlo como plugin de la comunidad, y al usarlo avisa de que está `DEPRECATED`.
+2. En un trabajo real **no se usa**: dispara todos los exploits contra todos los hosts, es ruidosísimo,
+   puede tumbar servicios y lanza exploits que ni aplican. Va justo en contra de la disciplina de una
+   auditoría.
+
+Conviene saber qué es porque sale en el curso; el flujo correcto es el manual de esta nota.
+
+## Catálogo de exploits de servicio
+
+Los exploits de "servicio vulnerable" que el curso practica contra Metasploitable y compañía. Cada uno
+es `search` → `use` → `set RHOSTS` → `exploit`, confirmando la versión antes.
+
+| Servicio / versión | Módulo | Qué da |
+| --- | --- | --- |
+| Rejetto HFS 2.3 | `exploit/windows/http/rejetto_hfs_exec` | RCE → meterpreter en Windows |
+| SMBv1 (MS17-010) | `exploit/windows/smb/ms17_010_eternalblue` | meterpreter SYSTEM, sin credenciales |
+| SMB con credenciales de admin | `exploit/windows/smb/psexec` | shell/meterpreter como SYSTEM (acepta pass-the-hash) |
+| WinRM 5985 | `exploit/windows/winrm/winrm_script_exec` | ejecución con credenciales |
+| IIS + WebDAV | `exploit/windows/iis/iis_webdav_upload_asp` | sube una webshell ASP |
+| Apache Tomcat | `exploit/multi/http/tomcat_jsp_upload_bypass` | sube y ejecuta un JSP → shell |
+| Apache + CGI (Shellshock) | `exploit/multi/http/apache_mod_cgi_bash_env_exec` | RCE por la cabecera → shell |
+| vsftpd 2.3.4 | `exploit/unix/ftp/vsftpd_234_backdoor` | puerta trasera → shell root |
+| Samba 3.0.20–3.0.25 | `exploit/multi/samba/usermap_script` | inyección en el nombre de usuario → root |
+| PHP CGI < 5.3.12 | `exploit/multi/http/php_cgi_arg_injection` | query sin `=` → meterpreter (`www-data`) |
+
+La teoría de cada CVE está en su área. Los más usados en el examen, con sus variables ya puestas:
+
+EternalBlue, el rey del acceso inicial en Windows sin credenciales:
+
+<Cmd id="msf-eternalblue" />
+
+PsExec, el puente lateral con credenciales o con un hash (pass-the-hash):
+
+<Cmd id="msf-psexec" />
+
+HFS, el RCE web clásico de Windows:
+
+<Cmd id="msf-hfs" />
+
+vsftpd, el backdoor de Linux que da root y ni siquiera necesita `LHOST`:
+
+<Cmd id="msf-vsftpd-backdoor" />
+
+El resto del catálogo está en el buscador: [WinRM](/biblia/comandos/#msf-winrm-script-exec),
+[IIS WebDAV](/biblia/comandos/#msf-iis-webdav), [Samba usermap](/biblia/comandos/#msf-samba-usermap) y
+[Shellshock](/biblia/comandos/#msf-shellshock).
+
+## De una shell cruda a meterpreter
+
+Algunos exploits (vsftpd, usermap) devuelven una *command shell* cruda, sin las comodidades de
+meterpreter. El atajo `sessions -u 1` la mejora, o el módulo explícito si quieres controlar el
+`LHOST`:
+
+<Cmd id="msf-shell-to-meterpreter" />
+
+Esto **añade** una sesión meterpreter nueva empujándola por la shell existente; la cruda sigue
+abierta. A partir de ahí, [meterpreter](/biblia/metasploit/meterpreter/).
+
+## Exploits que no están en Metasploit
+
+No todo tiene módulo. `searchsploit` busca en Exploit-DB (offline) y complementa al `search` del
+framework; para las versiones de un escaneo de nmap:
+
+<Cmd id="searchsploit-nmap" />
+
+Un exploit de Exploit-DB en C o Python suele traer un shellcode con la IP de otro: ahí entra el
+[shellcode de msfvenom](/biblia/comandos/#msfvenom-shellcode) para regenerarlo con tu `LHOST` y sin los
+bytes que rompan el exploit.
+
+## Cómo se detecta
+
+Cada exploit tiene su firma. EternalBlue deja un patrón de transacciones SMB que las reglas de IDS
+cazan y a menudo un volcado de memoria si falla; `psexec` crea un servicio (evento 7045) con un nombre
+aleatorio que arranca un binario raro; las webshells de IIS y Tomcat dejan el fichero subido en el
+disco del servidor. Un `exploit completed, but no session was created` también queda en los registros
+del servicio atacado.
+
+## Cómo se mitiga
+
+- **Parchear**: todos los exploits de la tabla son vulnerabilidades conocidas con parche. MS17-010,
+  vsftpd y Samba viejo no deberían existir en una red mantenida.
+- **Retirar lo antiguo**: SMBv1 desactivado, servicios sin soporte (HFS, Tomcat viejo) fuera.
+- **Mínimos privilegios**: que el servicio web no corra como administrador limita lo que consigue un
+  RCE.
+- **Segmentar y vigilar**: restringir SMB entre equipos y alertar de la creación de servicios y de
+  ficheros nuevos en las carpetas que sirve la web.

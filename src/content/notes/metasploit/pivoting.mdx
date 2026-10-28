@@ -1,0 +1,93 @@
+---
+title: Pivoting con Metasploit
+summary: "Usar un equipo comprometido como puente hacia la red interna: autoroute para los módulos, portfwd y el proxy SOCKS para tus herramientas, y por qué a través de un pivot el payload tiene que ser bind."
+date: 2026-10-28
+area: metasploit
+order: 90
+related: [metasploit/post-windows, metasploit/post-linux, meterpreter-autoroute, meterpreter-portfwd, msf-socks-proxy, msfvenom-bind-exe]
+tags: [metasploit, pivoting, routing]
+---
+
+## Qué es
+
+**Pivotar** es usar una máquina ya comprometida como puente para llegar a una red que tu Kali no
+alcanza directamente. El equipo que controlas tiene una pata en tu red y otra en una red interna
+(`ipconfig`/`ip addr` desde la sesión lo revela); Metasploit sabe enrutar su tráfico por esa sesión
+para que ataques a la red de dentro como si estuvieras ahí.
+
+Hay tres piezas y conviene no mezclarlas: **autoroute** para los módulos de Metasploit, **portfwd**
+para traer un puerto a tu `localhost`, y el **proxy SOCKS** para tus herramientas externas.
+
+## Requisitos
+
+- Una sesión (mejor meterpreter) en un equipo con una segunda interfaz hacia la red interna.
+- Saber qué red hay detrás: la salida de [red del equipo comprometido](/biblia/comandos/#meterpreter-network)
+  da la IP y la máscara. Con ellas, el CIDR de la red a enrutar:
+
+<SubnetCalc />
+
+## autoroute: para los módulos de Metasploit
+
+`autoroute` lee las interfaces de la sesión y añade una ruta de Metasploit por cada red interna. Desde
+ese momento, cualquier módulo que apunte a esas redes sale por la sesión:
+
+<Cmd id="meterpreter-autoroute" />
+
+Con la ruta puesta, escaneas la red interna con un auxiliar (nmap no entiende las rutas de Metasploit,
+pero `scanner/portscan/tcp` sí):
+
+<Cmd id="msf-portscan-tcp" />
+
+Y los hosts vivos, lanzando los ping desde el propio equipo comprometido:
+
+<Cmd id="meterpreter-ping-sweep" />
+
+Si la red no aparece sola, se añade la ruta a mano con [`route add`](/biblia/comandos/#msf-route).
+
+## portfwd: un puerto concreto en tu localhost
+
+`autoroute` sirve a los módulos de Metasploit; para usar **tus** herramientas (navegador, `curl`,
+nmap) contra un servicio interno, tráetelo a tu `localhost` con `portfwd`:
+
+<Cmd id="meterpreter-portfwd" />
+
+El 80 de un host interno queda en tu `127.0.0.1:8080`. `portfwd list` los muestra; `portfwd delete`,
+con las mismas opciones, los quita.
+
+## Proxy SOCKS: toda tu caja de herramientas
+
+Para pasar herramientas enteras por el pivot, el proxy SOCKS enruta cualquier conexión TCP a través de
+las rutas de `autoroute`. Combinado con `proxychains`, es lo más potente:
+
+<Cmd id="msf-socks-proxy" />
+
+Con `socks4 127.0.0.1 9050` en `/etc/proxychains4.conf`, un `proxychains nmap -sT -Pn -p PORTS host`
+escanea la red interna con tu nmap. Solo pasa TCP, y nmap tiene que ir con `-sT` (connect scan) y
+`-Pn`, porque por un proxy SOCKS no se puede fabricar paquetes a mano ni hacer ping.
+
+## La regla de oro: a través de un pivot, bind
+
+El error que todo el mundo comete una vez. Un host de la red interna **no tiene ruta de vuelta a tu
+Kali**: un payload reverse nunca volvería. La solución es un payload **bind**, que escucha en el
+objetivo y deja que Metasploit entre por la ruta de `autoroute`:
+
+<Cmd id="msfvenom-bind-exe" />
+
+En el exploit o el handler, `set PAYLOAD windows/x64/meterpreter/bind_tcp` y `set RHOST` al host
+interno, sin `LHOST`. Regla corta: **a través de un pivot, bind**.
+
+## Cómo se detecta
+
+El pivoting genera tráfico que no debería existir: un equipo de usuario escaneando puertos de
+servidores, o conexiones entre dos máquinas internas que nunca se hablan. Para un sistema de detección
+con visibilidad este-oeste (dentro de la red, no solo en el perímetro) es una señal fuerte. El proxy y
+los forwards no dejan nada en disco, pero sí conexiones salientes anómalas desde el equipo puente.
+
+## Cómo se mitiga
+
+- **Segmentación de red**: es la defensa de fondo. Si la red de usuarios no alcanza los puertos de
+  gestión de los servidores, el pivot no llega a ningún sitio útil.
+- **Firewall interno (este-oeste)**, no solo perimetral: reglas entre segmentos, no una red plana.
+- **Inspección este-oeste**: vigilar el tráfico entre equipos internos, no solo el que sale a Internet.
+- **Mínimos privilegios de red por host**: que cada servidor solo pueda hablar con lo que necesita
+  reduce a qué se puede pivotar desde él.

@@ -1,0 +1,82 @@
+---
+title: Metasploit de principio a fin
+summary: Qué es el framework, cómo encajan sus módulos en un ataque y el recorrido completo (base de datos, enumeración, explotación, post y pivoting) con el enlace a cada nota del área.
+date: 2026-10-28
+area: metasploit
+order: 10
+related: [metasploit/consola, metasploit/auxiliares, metasploit/payloads, metasploit/explotacion, metasploit/meterpreter, metasploit/post-windows, metasploit/post-linux, metasploit/pivoting]
+tags: [metasploit, methodology]
+---
+
+## Qué es
+
+Metasploit es el framework de explotación de referencia y la columna vertebral del eJPT: una base de
+datos de miles de módulos (código ya escrito que el framework ejecuta por ti) con una interfaz común,
+`msfconsole`. No sustituye a nmap ni a las herramientas de cada servicio; es el pegamento que une
+enumeración, explotación y post-explotación guardando el estado (hosts, servicios, credenciales,
+botín) en un solo sitio.
+
+Todo en Metasploit es un **módulo**, y saber de qué tipo es cada uno explica dónde encaja en el
+ataque. Esta es la pieza que más confunde al empezar, y la que ordena todo lo demás:
+
+| Tipo | Qué es | Ejemplo |
+| --- | --- | --- |
+| exploit | Aprovecha una vulnerabilidad; se empareja con un payload | `exploit/windows/smb/ms17_010_eternalblue` |
+| payload | Código que corre en el objetivo tras explotar (una shell, meterpreter) | `windows/x64/meterpreter/reverse_tcp` |
+| auxiliary | Todo lo que no es explotar: escanear, enumerar, fuerza bruta | `scanner/smb/smb_version` |
+| post | Se ejecuta sobre una sesión ya abierta: enumerar, escalar, saquear | `post/windows/gather/hashdump` |
+| encoder | Reescribe el shellcode para cambiarle la firma (evasión vieja) | `x86/shikata_ga_nai` |
+| nop | Rellena para dar al payload un tamaño estable | `x86/single_byte` |
+
+## El recorrido
+
+El framework sigue el mismo orden que cualquier intrusión, y cada paso tiene su nota:
+
+1. **Montar la base de datos y la consola**: PostgreSQL, un workspace por objetivo y el ciclo
+   `search` → `use` → `set` → `run`. Ver [la consola](/biblia/metasploit/consola/).
+2. **Enumerar con auxiliares**: versión y configuración de FTP, SMB, HTTP, SQL, SSH y SMTP sin salir
+   de la consola, guardándolo todo. Ver [módulos auxiliares](/biblia/metasploit/auxiliares/).
+3. **Preparar el payload y el receptor**: qué devuelve el objetivo al explotar y cómo lo recoges, con
+   `msfvenom` y `multi/handler`. Ver [payloads y handlers](/biblia/metasploit/payloads/).
+4. **Explotar**: elegir un exploit con criterio, confirmarlo con `check` y lanzarlo. Ver
+   [explotación](/biblia/metasploit/explotacion/).
+5. **Vivir en el objetivo con meterpreter**: orientación, migración, escalada y botín desde una sola
+   sesión. Ver [meterpreter](/biblia/metasploit/meterpreter/).
+6. **Post-explotación por sistema**: enumeración, credenciales y persistencia, distintas en
+   [Windows](/biblia/metasploit/post-windows/) y en [Linux](/biblia/metasploit/post-linux/).
+7. **Pivotar**: usar el equipo comprometido como puente hacia la red interna. Ver
+   [pivoting](/biblia/metasploit/pivoting/).
+
+## El objetivo y tú: RHOST frente a LHOST
+
+La confusión más cara del framework es quién es quién en una conexión. Vale para todos los módulos:
+
+| Opción | Qué es |
+| --- | --- |
+| `RHOSTS` / `RPORT` | El objetivo y su puerto. Acepta IP, CIDR, rango o `file:lista.txt` |
+| `LHOST` / `LPORT` | **Tu** IP y tu puerto, a donde vuelve la conexión en un reverse shell |
+| `SRVHOST` | La IP donde Metasploit levanta un servidor (para servir un payload) |
+
+En una reverse shell, `LHOST` tiene que ser la IP que el objetivo **alcanza**: la de la VPN (`tun0`),
+no la de tu casa. Una `LHOST` mal puesta es la causa número uno de que "el exploit dice completado
+pero no vuelve la sesión".
+
+## Cómo leer la salida
+
+- `[+]` verde: éxito (login válido, recurso encontrado, host vulnerable).
+- `[*]` azul: información (progreso, banner).
+- `[-]` rojo: fallo (login incorrecto, no vulnerable, timeout).
+- Tras un exploit: `Meterpreter session 1 opened` o `Command shell session 1 opened`. **Sin esa
+  línea no hay sesión**, aunque el exploit diga `exploit completed`.
+- Un `run` que termina sin `[+]` no siempre es un fallo en un auxiliar: mira `hosts` y `services`,
+  porque a menudo el resultado quedó en la base de datos.
+
+## Desde el lado defensivo
+
+Metasploit es ruidoso por diseño, y eso es una ventaja para quien defiende. Cada exploit tiene una
+firma conocida: el servicio de `psexec` que aparece y desaparece, el nombre por defecto de los
+payloads, los named pipes de `getsystem`. Un IDS con reglas al día (las de Snort o Suricata para
+Metasploit) y un EDR marcan la mayoría de los módulos tal cual salen de la caja. Las defensas de cada
+técnica concreta están en su nota; en general: parchear lo que explotan los exploits de la
+[tabla de explotación](/biblia/metasploit/explotacion/#cat%C3%A1logo-de-exploits), restringir SMB y
+WinRM entre equipos, y vigilar la creación de servicios y tareas.

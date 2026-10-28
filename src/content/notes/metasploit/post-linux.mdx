@@ -1,0 +1,93 @@
+---
+title: Post-explotación de Linux
+summary: "Desde un meterpreter o una shell en Linux: enumerar el sistema con módulos post, recoger credenciales por aplicación, sugerir exploits locales de escalada y persistir con una clave SSH."
+date: 2026-10-28
+area: metasploit
+order: 80
+related: [metasploit/meterpreter, meterpreter-linux-enum, meterpreter-linux-creds, meterpreter-local-exploit-suggester, msf-chkrootkit, msf-ssh-key-persistence]
+tags: [metasploit, post-explotacion]
+---
+
+## Qué es
+
+Con acceso a un Linux (meterpreter nativo, una shell de un exploit o una sesión de `ssh_login`), la
+post-explotación busca **escalar a root** y **recoger credenciales** para saltar a otros equipos.
+Metasploit ayuda con los módulos `post/linux/*` y `post/multi/*`, aunque en Linux muchas veces una
+sesión SSH normal con credenciales encontradas es más estable y cómoda que meterpreter.
+
+## Requisitos
+
+- Una sesión abierta y su número (`sessions -l`). Los `post` se lanzan con `run post/...` desde la
+  sesión, o desde `msf` con `set SESSION <n>`.
+- Para `hashdump` de `/etc/shadow` y buena parte de la escalada, ser **root** (es justo lo que quieres
+  conseguir; antes, los módulos de enumeración trabajan como el usuario que tengas).
+
+## Enumerar el sistema
+
+La tanda de orientación: kernel y paquetes (candidatos a exploit local), red (pivoting), configuración
+de servicios, historiales de shell (donde aparecen contraseñas tecleadas) y las protecciones activas:
+
+<Cmd id="meterpreter-linux-enum" />
+
+`enum_system` y `enum_users_history` son los que más dan: el primero lista cron y paquetes con
+versión; el segundo saca `.bash_history` y `.mysql_history`, donde es habitual encontrar una
+contraseña escrita a mano.
+
+## Recoger credenciales
+
+La batería de *credential-gather* por aplicación: se lanza entera aunque casi todo salga vacío, porque
+basta con que una pegue. Claves SSH, tokens de Docker y `/etc/shadow`:
+
+<Cmd id="meterpreter-linux-creds" />
+
+`hashdump` de Linux necesita root y deja los hashes de `/etc/shadow` listos para John o para el
+[módulo crack_linux](/biblia/comandos/#msf-crack-linux) (ojo: los `$6$` necesitan `set SHA512 true` o
+los ignora). La colección trae también los `gather` de phpMyAdmin, VPN PPTP y Wi-Fi para casos
+concretos.
+
+## Escalar a root
+
+El sugeridor de exploits locales funciona igual que en Windows: compara kernel y versiones con los
+módulos de `exploit/linux/local` y marca los que encajan:
+
+<Cmd id="meterpreter-local-exploit-suggester" />
+
+Cuando la vía no es el kernel sino un programa mal configurado, hay módulos concretos. El clásico de
+laboratorio es `chkrootkit` 0.49, que ejecuta `/tmp/update` como root por cron:
+
+<Cmd id="msf-chkrootkit" />
+
+Más allá de Metasploit, la enumeración manual con LinPEAS o `sudo -l` suele encontrar la vía de
+escalada antes que ningún módulo; eso vive en el área de privesc de Linux.
+
+## Persistir con una clave SSH
+
+La forma más limpia de volver: plantar tu clave pública en `authorized_keys` del usuario (o de todos)
+y guardar la privada:
+
+<Cmd id="msf-ssh-key-persistence" />
+
+Después, `chmod 600` a la clave que te deja en loot y `ssh -i`. Una sesión SSH de verdad es más
+estable que meterpreter para seguir trabajando. Como toda persistencia, solo con permiso y anotada
+para retirarla.
+
+## Cómo se detecta
+
+- **Lectura de `/etc/shadow`**: un acceso a ese fichero por algo que no sea el sistema de
+  autenticación es sospechoso, y la auditoría de Linux (`auditd`) lo puede registrar.
+- **Exploits locales de kernel**: dejan rastros en `dmesg` y, si fallan, un *kernel oops* o un proceso
+  caído.
+- **`authorized_keys` nuevos**: una clave SSH que aparece de la nada es un indicador de persistencia
+  claro si se vigila el fichero.
+- **chkrootkit y compañía**: el fichero `/tmp/update` y su ejecución desde cron quedan en los
+  registros del sistema.
+
+## Cómo se mitiga
+
+- **Parches de kernel y de paquetes**: casi toda la escalada local es un CVE con parche.
+- **Permisos de `/etc/shadow` y `auditd`** vigilando su lectura.
+- **`sudo` sin comodines ni binarios peligrosos**, y nada de scripts que root ejecute desde rutas
+  escribibles por usuarios (el patrón de chkrootkit).
+- **Vigilar `~/.ssh/authorized_keys`** de las cuentas sensibles ante cambios no previstos.
+- **Historiales limpios**: no teclear contraseñas en la línea de comandos, para que no acaben en
+  `.bash_history`.

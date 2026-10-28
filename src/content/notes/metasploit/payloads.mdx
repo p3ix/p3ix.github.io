@@ -1,0 +1,107 @@
+---
+title: Payloads, msfvenom y handlers
+summary: Qué es un payload, la diferencia entre staged y stageless y entre reverse y bind, cómo fabricar ejecutables y webshells con msfvenom y cómo recoger la sesión con multi/handler.
+date: 2026-10-28
+area: metasploit
+order: 40
+related: [metasploit/explotacion, metasploit/meterpreter, msfvenom-windows-exe, msfvenom-php, msf-handler, msfvenom-bind-exe]
+tags: [metasploit, payloads, reverse-shell]
+---
+
+## Qué es
+
+Un **payload** es el código que se ejecuta en el objetivo después de explotar: lo que convierte "he
+colado una instrucción" en "tengo una shell". Dentro de un exploit lo eliges con `set PAYLOAD`;
+fuera, cuando necesitas un fichero que correr en el objetivo (un `.exe`, una webshell, shellcode para
+un exploit ajeno), lo fabrica **`msfvenom`**. En los dos casos, al otro lado tiene que haber algo
+escuchando: ese algo es **`multi/handler`**.
+
+La regla de oro, y el error número uno con diferencia: **el payload que generas y el del handler
+tienen que ser idénticos** (mismo `-p`, mismo `LHOST`, mismo `LPORT`). Si no casan, la sesión no
+vuelve.
+
+## Las dos decisiones de un payload
+
+Antes de elegir el nombre hay que decidir dos cosas.
+
+**Staged o stageless**, que se distingue por la puntuación del nombre:
+
+- **Staged** (`/`): `windows/meterpreter/reverse_tcp`. Va en dos partes: un *stager* pequeño abre la
+  conexión y descarga la segunda parte (el *stage*, el meterpreter entero) en memoria. Más pequeño,
+  pero necesita una red estable para traerse el stage.
+- **Stageless** (`_`): `windows/meterpreter_reverse_tcp`. Todo en un solo bloque. Más grande, pero si
+  la red es inestable o el staged no termina de conectar, el stageless a veces sí.
+
+El handler debe usar **exactamente el mismo nombre**, barra o guion bajo incluidos.
+
+**Reverse o bind**, que decide quién llama a quién:
+
+- **Reverse** (`reverse_tcp`): el objetivo conecta hacia ti. Es lo normal: atraviesa el NAT y el
+  firewall de salida del objetivo. Necesita que el objetivo alcance tu `LHOST`.
+- **Bind** (`bind_tcp`): el objetivo escucha y **tú** conectas. Para cuando el objetivo no tiene ruta
+  de vuelta hacia ti, el caso típico detrás de un pivot. En el handler pones `RHOST`, no `LHOST`.
+
+## Fabricar el payload
+
+Las banderas de `msfvenom` que importan: `-p` el payload, `LHOST`/`LPORT` tu IP y puerto, `-f` el
+formato (`exe`, `elf`, `raw`, `aspx`, `war`, `psh-cmd`...), `-o` el fichero de salida.
+
+El ejecutable de Windows con meterpreter, el más común:
+
+<Cmd id="msfvenom-windows-exe" />
+
+El equivalente de Linux:
+
+<Cmd id="msfvenom-linux-elf" />
+
+Una webshell PHP, para cuando el foothold es una web que ejecuta PHP:
+
+<Cmd id="msfvenom-php" />
+
+Y una shell sin meterpreter, que recoge un simple `nc` sin montar el framework:
+
+<Cmd id="msfvenom-windows-shell-exe" />
+
+La colección trae también las variantes [ASPX](/biblia/comandos/#msfvenom-aspx) para IIS,
+[WAR](/biblia/comandos/#msfvenom-war) para Tomcat, el
+[comando de PowerShell](/biblia/comandos/#msfvenom-psh-cmd) para inyecciones de comandos y el
+[shellcode con bytes prohibidos](/biblia/comandos/#msfvenom-shellcode) para exploits propios.
+
+> **Los encoders no evaden el antivirus moderno.** `-e x86/shikata_ga_nai -i 10` cambiaba la firma
+> hace años; hoy cualquier antivirus marca el binario igual. No es una técnica de evasión, es historia
+> del framework. Lo mismo con `-x`, meter el payload en un binario legítimo: entretenido de entender,
+> inútil contra un EDR serio. Eso queda fuera del eJPT.
+
+## Recoger la sesión
+
+`multi/handler` es un exploit vacío cuyo único trabajo es esperar a que llegue el payload. Con
+`ExitOnSession false` y `run -j` se queda en segundo plano y recoge todas las sesiones que lleguen:
+
+<Cmd id="msf-handler" />
+
+Desde la terminal, el mismo handler cabe en una línea con `-x`, útil para dejarlo montado mientras
+trabajas en la consola principal:
+
+<Cmd id="msf-handler-oneliner" />
+
+Para un payload bind la mecánica se invierte: generas el bind y en el handler pones el payload bind y
+`RHOST` apuntando al objetivo:
+
+<Cmd id="msfvenom-bind-exe" />
+
+## Cómo se detecta
+
+Un binario de msfvenom "crudo" tiene una firma conocidísima: lo marcan el antivirus en disco y el EDR
+al ejecutarse, incluso con encoders. El tráfico del stager y el patrón de la conexión de vuelta los
+reconocen las reglas de IDS para Metasploit. Un meterpreter corriendo deja conexiones salientes a un
+puerto poco habitual hacia una IP externa.
+
+## Cómo se mitiga
+
+- **Antivirus y EDR al día**: detienen los payloads de serie de msfvenom en el acto.
+- **Control de egress**: limitar las conexiones salientes por puerto y destino corta las reverse
+  shell; el firewall perimetral que solo deja salir 80 y 443 obliga al atacante a pelear.
+- **Application allowlisting** (AppLocker, WDAC): si solo corre software firmado, el `.exe` suelto no
+  se ejecuta.
+- **Segmentar**: sin ruta de vuelta desde los servidores a Internet, el reverse no vuelve y el
+  atacante depende de un bind, más fácil de bloquear.

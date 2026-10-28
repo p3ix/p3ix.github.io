@@ -1,0 +1,119 @@
+---
+title: Post-explotación de Windows
+summary: "Desde un meterpreter en Windows: escalar a SYSTEM con getsystem, incognito y los exploits locales, volcar credenciales con hashdump y kiwi, enumerar con módulos post, keylogging, RDP y persistencia."
+date: 2026-10-28
+area: metasploit
+order: 70
+related: [metasploit/meterpreter, meterpreter-getsystem, meterpreter-hashdump, meterpreter-kiwi, msf-bypassuac, meterpreter-keylogger, meterpreter-enable-rdp, msf-persistence-service]
+tags: [metasploit, post-explotacion, windows]
+---
+
+## Qué es
+
+Una vez con un [meterpreter](/biblia/metasploit/meterpreter/) en Windows, la post-explotación busca
+tres cosas por este orden: **subir a SYSTEM** (el administrador total de la máquina), **volcar
+credenciales** para reutilizarlas en otros equipos y **enumerar** el dominio para decidir a dónde ir.
+La persistencia y el keylogging llegan al final, y solo si el encargo lo autoriza.
+
+## Requisitos
+
+- Un meterpreter nativo de Windows (no una [variante pobre](/biblia/metasploit/meterpreter/#gotchas) de
+  PHP o Java).
+- Para casi todo el volcado de credenciales y la persistencia, ser **SYSTEM** o administrador elevado.
+- Para `kiwi` y algunos comandos, el meterpreter en un proceso de **64 bits**.
+
+## Escalar a SYSTEM
+
+La vía rápida prueba varias técnicas de named pipes y tokens de una vez:
+
+<Cmd id="meterpreter-getsystem" />
+
+`getsystem` funciona si **ya eres administrador elevado** o si tienes `SeImpersonatePrivilege` (típico
+de las cuentas de servicio). No hace magia desde un usuario raso.
+
+Si eres de un grupo de administradores pero en una sesión sin elevar (*medium integrity*) y
+`getsystem` falla, el problema es UAC. El bypass nativo abre una segunda sesión ya elevada:
+
+<Cmd id="msf-bypassuac" />
+
+Si nada de eso aplica (usuario sin privilegios), toca un exploit local. El sugeridor dice cuáles
+encajan con la versión y los parches:
+
+<Cmd id="meterpreter-local-exploit-suggester" />
+
+Y la otra vía con `SeImpersonatePrivilege` es robar un token de un usuario más poderoso con incognito:
+
+<Cmd id="meterpreter-incognito" />
+
+## Volcar credenciales
+
+Ya como SYSTEM. El volcado rápido de los hashes NTLM de la base SAM local:
+
+<Cmd id="meterpreter-hashdump" />
+
+Sale `usuario:RID:LM:NT`; el NT sirve para [pass-the-hash con PsExec](/biblia/comandos/#msf-psexec) o
+para crackear. Y la artillería, `kiwi` (mimikatz integrado), que lee LSASS: hashes, tickets y, en
+sistemas antiguos o con WDigest, contraseñas en claro:
+
+<Cmd id="meterpreter-kiwi" />
+
+Los hashes quedan en `creds` y de ahí los crackea el [módulo integrado](/biblia/comandos/#msf-crack-windows)
+con John, o los sacas para [hashcat](/biblia/comandos/#meterpreter-hashdump) con `-m 1000`.
+
+## Enumerar
+
+Los módulos `post/windows/gather/*` dan la foto del equipo y del dominio: privilegios y estado de UAC,
+usuarios con sesión, software con versión (pistas de exploits locales), parches y recursos
+compartidos:
+
+<Cmd id="meterpreter-windows-enum" />
+
+`enum_applications` cruzado con la fecha de los parches suele señalar el exploit local que falta.
+
+## Keylogging
+
+Para capturar lo que teclea el usuario hay que migrar antes a su escritorio: `explorer.exe` para el
+usuario con sesión, `winlogon.exe` (requiere SYSTEM) para el inicio de sesión. Sin migrar, capturas
+solo el proceso donde caíste, y si fue un servicio no interactivo, nada:
+
+<Cmd id="meterpreter-keylogger" />
+
+Más tarde, `keyscan_dump` vuelca lo tecleado y `keyscan_stop` para.
+
+## RDP y persistencia
+
+Habilitar el escritorio remoto (registro, servicio y firewall de una orden):
+
+<Cmd id="meterpreter-enable-rdp" />
+
+RDP necesita una cuenta válida con contraseña en claro; con `USERNAME` y `PASSWORD` el módulo crea una
+en vez de pisar la de un usuario real. Después, `xfreerdp /u:... /p:... /v:RHOST /cert-ignore`.
+
+La persistencia por servicio sobrevive a los reinicios y vuelve como SYSTEM a un handler:
+
+<Cmd id="msf-persistence-service" />
+
+> **Persistencia = autorización + ruido.** Deja un ejecutable en disco y un servicio en el registro.
+> Solo con permiso explícito, anotando todo para retirarlo. En el eJPT casi nunca hace falta. Lo mismo
+> con `clearev`, que vacía los registros de eventos: un log que se borra de golpe canta más que lo que
+> ocultaba.
+
+## Cómo se detecta
+
+- **`getsystem`**: crea un named pipe con un patrón conocido; un EDR lo marca.
+- **`kiwi` / `hashdump`**: abrir un handle de lectura sobre `lsass.exe` es una de las alertas de más
+  valor que existen.
+- **Bypass de UAC**: cada técnica (`fodhelper`, `eventvwr`) deja su rastro en el registro y en los
+  procesos hijos de un binario de confianza.
+- **Persistencia y RDP**: creación de servicios (evento 7045), tareas programadas, cambios en claves
+  `Run` del registro y la apertura del 3389 en el firewall.
+- **`clearev`**: el evento 1102 ("se borró el registro de auditoría") es, en sí mismo, una alarma.
+
+## Cómo se mitiga
+
+- **Credential Guard y WDigest apagado**: dejan a `kiwi` sin contraseñas en claro que leer.
+- **LSASS protegido** (RunAsPPL): corta el acceso de mimikatz a su memoria.
+- **Usuarios sin privilegios de administrador local**: sin admin no hay SYSTEM fácil ni volcado de la
+  SAM.
+- **Vigilar la creación de servicios y tareas** y los accesos a LSASS; alertar del evento 1102.
+- **Parches de escalada local**: el sugeridor explota CVEs con parche.

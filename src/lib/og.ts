@@ -39,6 +39,7 @@ const HEX: Record<string, string> = {
   'area-lpe': '#3dff9a',
   'area-wpe': '#4da3ff',
   'area-pivot': '#ff5fa2',
+  'area-msf': '#a6f33d',
   'dot-close': '#ff5f57',
   'dot-min': '#febc2e',
   'dot-max': '#28c840',

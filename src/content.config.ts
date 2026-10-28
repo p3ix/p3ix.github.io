@@ -9,6 +9,7 @@ import {
   DIFFICULTY_IDS,
   LAUNCH_OS_IDS,
   PHASE_IDS,
+  PROMPT_IDS,
   RETIRED_ONLY_PLATFORMS,
   SEVERITY_IDS,
   TARGET_OS_IDS,
@@ -129,6 +130,8 @@ const command = z
     area: z.enum(AREA_IDS).optional(),
     phase: z.enum(PHASE_IDS),
     os: z.array(z.enum(LAUNCH_OS_IDS)).min(1).default(['linux']),
+    /** Si se escribe en otra consola que el resto del archivo. */
+    prompt: z.enum(PROMPT_IDS).optional(),
     tags: z.array(kebab('Etiqueta')).default([]),
     notes: z.string().optional(),
     refs: z.array(z.url()).default([]),
@@ -153,6 +156,8 @@ const commands = defineCollection({
       area: z.enum(AREA_IDS),
       /** Web o repo de la herramienta. */
       url: z.url().optional(),
+      /** Consola en la que se escriben sus comandos: shell, msf o meterpreter. */
+      prompt: z.enum(PROMPT_IDS).default('shell'),
       commands: z.array(command).min(1),
     })
     .superRefine((file, ctx) => {

@@ -2,7 +2,7 @@
 import Icon from './Icon.astro';
 import { splitCommand, type Command } from '@/lib/content';
 import { tagHref } from '@/lib/tags';
-import { areas, phases } from '@/lib/taxonomy';
+import { areas, phases, prompts } from '@/lib/taxonomy';
 import { tone } from '@/lib/tone';
 import { variables } from '@/lib/variables';
 
@@ -15,6 +15,9 @@ interface Props {
 const { command: c, level = 3 } = Astro.props;
 const area = areas[c.area];
 const lines = c.cmd.split('\n').map(splitCommand);
+const prompt = prompts[c.prompt];
+// Prompt de cada línea; el texto que no cabe se parte con sangría francesa, alineado tras el prompt.
+const promptAt = (i: number) => (i === 0 || prompt.perLine ? `${prompt.symbol} ` : ' '.repeat(prompt.symbol.length + 1));
 const Title = level === 2 ? 'h2' : 'h3';
 ---
 
@@ -37,7 +40,7 @@ const Title = level === 2 ? 'h2' : 'h3';
   </header>
 
   <div class="flex items-start gap-3 rounded-lg border border-line bg-code px-3.5 py-3">
-    <code class="min-w-0 flex-1 font-mono text-sm leading-[1.85] wrap-anywhere whitespace-pre-wrap text-fg">{lines.map((parts, i) => (<span class="block"><span aria-hidden="true" class="tone-text select-none">{i === 0 ? '$ ' : '  '}</span>{parts.map((p) => ('variable' in p ? <span data-var={p.variable} class="var-chip" style={tone(variables[p.variable].color)}>{p.variable}</span> : p.text))}</span>))}</code>
+    <code class="min-w-0 flex-1 font-mono text-sm leading-[1.85] wrap-anywhere whitespace-pre-wrap text-fg">{lines.map((parts, i) => (<span class="flex"><span aria-hidden="true" class="tone-text shrink-0 whitespace-pre select-none">{promptAt(i)}</span><span class="min-w-0">{parts.map((p) => ('variable' in p ? <span data-var={p.variable} class="var-chip" style={tone(variables[p.variable].color)}>{p.variable}</span> : p.text))}</span></span>))}</code>
     <button
       type="button"
       data-copy-template={c.cmd}

