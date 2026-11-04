@@ -3,6 +3,18 @@ tool: hashcat
 area: cracking
 url: https://hashcat.net/wiki/doku.php?id=hashcat
 commands:
+  - id: hashcat-ntlm
+    title: Crackear hashes NTLM
+    cmd: |
+      hashcat -m 1000 ntlm.hash {{WORDLIST}}
+    phase: credential-access
+    tags: [ntlm, hash-cracking, credential-dumping]
+    notes: >-
+      El modo 1000 quiere solo el hash NT, uno por línea (el cuarto campo de un hashdump); con
+      --username acepta usuario:hash. NTLM no lleva sal y es rapidísimo: con GPU, rockyou entero cae
+      en segundos. Aunque no se crackee, el hash ya sirve para pass-the-hash.
+    refs: [https://hashcat.net/wiki/doku.php?id=example_hashes]
+
   - id: hashcat-netntlmv2
     title: Crackear hashes NetNTLMv2 de Responder
     cmd: |

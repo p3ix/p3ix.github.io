@@ -296,6 +296,18 @@ commands:
       host acepta NTLM relay, y es lo normal en todo lo que no sea un controlador de dominio.
     refs: [https://nmap.org/nsedoc/scripts/smb2-security-mode.html]
 
+  - id: nmap-smb-vuln
+    title: Vulnerabilidades conocidas de SMB (EternalBlue, MS08-067...)
+    cmd: |
+      nmap -p445 --script "smb-vuln*" -Pn {{RHOST}}
+    phase: enum
+    tags: [smb, nse, vuln-scan, ms17-010]
+    notes: >-
+      Lanza todos los smb-vuln-*. El de MS17-010 es seguro, pero otros del patrón (ms08-067,
+      regsvc-dos, cve2009-3103...) están en la categoría dos y pueden tumbar el servicio: fuera de un
+      laboratorio, lanza solo el que necesites. Un State VULNERABLE en ms17-010 es SYSTEM sin credenciales.
+    refs: [https://nmap.org/nsedoc/scripts/smb-vuln-ms17-010.html]
+
   - id: nmap-snmp-scripts
     title: SNMP con nmap, sistema, interfaces, procesos y usuarios
     cmd: |
