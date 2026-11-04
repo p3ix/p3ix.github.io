@@ -1,0 +1,37 @@
+---
+title: POP3 e IMAP
+name: Lectura de correo
+summary: Los protocolos con los que se lee el correo. Poco que atacar sin credenciales, pero en cuanto las hay, el buzón de un usuario está lleno de contraseñas, resets y nombres de otros sistemas.
+date: 2026-11-04
+ports: [110/tcp, 143/tcp, 993/tcp, 995/tcp]
+category: mail
+tags: [pop3, imap]
+phases:
+  enum: >-
+    Banner y capacidades: el software (Dovecot, Courier, Exchange), si admite login en claro sin TLS
+    (`USER`/`PASS` en POP3, `LOGIN` en IMAP) y el **certificado**, con el nombre del servidor de
+    correo y a veces del dominio.
+  credential-access: >-
+    Es buen sitio para comprobar credenciales encontradas en otra parte, porque no suele estar en el
+    radar de nadie. Sin TLS, el login viaja en claro por la red.
+  exfil: >-
+    Con una cuenta válida, lee la bandeja de entrada y las carpetas de enviados: correos de
+    bienvenida con la contraseña inicial, enlaces de reset, credenciales que alguien mandó por correo
+    y nombres de los demás sistemas de la empresa.
+defense:
+  - Solo los puertos con TLS (993 y 995) y `disable_plaintext_auth` en Dovecot.
+  - Limitar intentos de login y alertar de accesos desde IPs nuevas.
+  - No enviar contraseñas por correo, ni siquiera las iniciales; mejor un enlace de un solo uso.
+---
+
+## Qué es
+
+POP3 descarga el correo y normalmente lo borra del servidor; IMAP lo deja en el servidor y sincroniza
+carpetas, que es lo que usa cualquier cliente moderno. Ambos tienen una versión en claro (110 y 143,
+que pueden pasar a TLS con `STLS`/`STARTTLS`) y otra con TLS desde el principio (995 y 993).
+
+## Qué buscar
+
+- **Software y certificado**.
+- **Autenticación en claro** permitida.
+- **Credenciales** de otros servicios que funcionen aquí.

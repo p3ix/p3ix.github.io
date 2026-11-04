@@ -1,0 +1,45 @@
+---
+title: DNS
+name: Domain Name System
+summary: El listín de la red. Una transferencia de zona abierta regala todos los nombres internos, y en una red Windows el DNS apunta directamente a los controladores de dominio.
+date: 2026-11-04
+ports: [53/tcp, 53/udp]
+category: network
+tags: [dns, zone-transfer]
+related: [nmap-list-scan-dns]
+phases:
+  recon: >-
+    Pregunta al DNS por los nombres de las IP de la red (resolución inversa): en un dominio, nombres
+    como `SQL01` o `WEB-DEV` ya dicen qué es cada máquina sin tocarla. Un 53 TCP abierto junto a 88,
+    389 y 445 es un **controlador de dominio**.
+  enum: >-
+    Prueba la **transferencia de zona** (`AXFR`) con cada dominio que conozcas: si el servidor la
+    permite a cualquiera, devuelve todos los registros. En Active Directory, los registros **SRV**
+    (`_ldap._tcp.dc._msdcs`) listan todos los DCs. Para subdominios sin transferencia, fuerza bruta
+    con [gobuster dns](/biblia/web/vhosts-y-subdominios/).
+  credential-access: >-
+    El DNS no da credenciales, pero en una red Windows los nombres que **no** resuelve acaban
+    preguntándose por difusión con LLMNR y NBT-NS, que se pueden envenenar. Ver
+    [LLMNR y NBT-NS](/biblia/puertos/llmnr/).
+defense:
+  - Transferencias de zona solo a los servidores secundarios (`allow-transfer` en BIND; en Windows, a los servidores de la lista).
+  - No publicar nombres internos en el DNS externo y separar las dos vistas.
+  - Ocultar la versión del servidor y desactivar la recursión para clientes externos.
+  - Alertar de consultas AXFR y de ráfagas de consultas inversas, típicas de un reconocimiento.
+---
+
+## Qué es
+
+DNS traduce nombres a IP y al revés. Va por UDP en el 53 para las consultas normales y por **TCP**
+para las respuestas grandes y las **transferencias de zona**, con las que un servidor secundario copia
+todos los registros del primario. Si esa transferencia no está restringida, cualquiera puede pedirla.
+
+En Active Directory el DNS es parte del dominio: lo sirven los controladores y publica dónde está
+cada servicio (Kerberos, LDAP, catálogo global) con registros SRV.
+
+## Qué buscar
+
+- **Transferencia de zona** permitida.
+- **Nombres internos** por resolución inversa.
+- **Registros SRV** de Active Directory.
+- **Versión** del servidor (`version.bind`).

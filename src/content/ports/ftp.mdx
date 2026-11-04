@@ -1,0 +1,48 @@
+---
+title: FTP
+name: File Transfer Protocol
+summary: Transferencia de archivos de los años 70, todavía en todas partes. Login anónimo, credenciales en claro y carpetas que a veces son la raíz de una web.
+date: 2026-11-04
+ports: [21/tcp, 990/tcp]
+category: file-sharing
+tags: [ftp]
+phases:
+  enum: >-
+    Lo primero, la versión exacta (`-sV`) y el **login anónimo**: usuario `anonymous` con cualquier
+    contraseña. Si entra, descarga todo y busca configuraciones, copias de seguridad y credenciales.
+    Mira también si puedes escribir: una carpeta escribible que la web sirve es una webshell.
+  initial-access: >-
+    Dos caminos clásicos. Una versión vulnerable (vsftpd 2.3.4 con su puerta trasera, ProFTPD 1.3.5
+    con `mod_copy`) o una carpeta del FTP que es la raíz de la web: subes un `.php` o `.aspx` y lo
+    pides por HTTP.
+  credential-access: >-
+    FTP rara vez limita intentos, así que admite fuerza bruta, pero antes prueba las credenciales que
+    ya tengas: es uno de los servicios donde más se reutilizan. Todo viaja en claro: si capturas
+    tráfico de la red, el usuario y la contraseña están en el paquete `USER`/`PASS`.
+  exfil: >-
+    Con acceso de lectura, descarga recursiva de todo el árbol y `grep -ri` por `pass`, `user`,
+    `key` y `.config`. Es habitual encontrar `web.config`, `wp-config.php` o volcados de bases de datos.
+defense:
+  - Sustituir FTP por SFTP (sobre SSH) o, si hace falta FTP, exigir FTPS y desactivar el login anónimo.
+  - Si el anónimo es necesario, solo lectura y en una carpeta que no sirva ninguna web.
+  - Enjaular a los usuarios en su carpeta (`chroot_local_user` en vsftpd) y limitar intentos con fail2ban.
+  - Vigilar los logs de transferencia (`xferlog`) en busca de subidas de scripts.
+---
+
+## Qué es
+
+FTP usa dos conexiones: una de **control** en el 21, donde van los comandos (`USER`, `PASS`, `LIST`,
+`RETR`, `STOR`), y otra de **datos** para cada listado o archivo. En modo activo es el servidor quien
+abre la de datos hacia el cliente desde el 20; en modo pasivo, el cliente se conecta a un puerto
+alto que le indica el servidor. Por eso un FTP detrás de un firewall a veces deja entrar pero se
+cuelga al listar: el canal de datos está bloqueado.
+
+Nada va cifrado salvo en FTPS (FTP sobre TLS, implícito en el 990 o explícito con `AUTH TLS` en el
+21). SFTP es otra cosa: un subsistema de SSH en el 22.
+
+## Qué buscar
+
+- **Login anónimo** (`ftp-anon` de nmap lo comprueba y lista la raíz).
+- **Versión exacta** en el banner: hay exploits públicos para vsftpd 2.3.4, ProFTPD 1.3.3c y 1.3.5 y varios servidores de Windows.
+- **Permiso de escritura**, sobre todo si las carpetas se parecen a las de una web (`wwwroot`, `html`, `uploads`).
+- **Archivos sensibles**: copias de seguridad, scripts con credenciales, claves SSH.

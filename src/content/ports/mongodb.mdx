@@ -1,0 +1,35 @@
+---
+title: MongoDB
+summary: Base de datos de documentos que durante años se instaló sin autorización. Abierta, es lectura y escritura de todo; con credenciales, las de la aplicación suelen estar en su configuración.
+date: 2026-11-04
+ports: [27017/tcp]
+category: database
+tags: [mongodb]
+phases:
+  enum: >-
+    Versión con `-sV`. Si `listDatabases` responde sin credenciales, la **autorización está
+    desactivada** y se ve todo. Dentro, cada base, sus colecciones y unos pocos documentos de muestra.
+  credential-access: >-
+    Las colecciones de usuarios de la aplicación guardan hashes (bcrypt, a veces MD5 o en claro) y
+    tokens. Con autorización activa, la cadena de conexión (`mongodb://usuario:clave@...`) suele
+    estar en el `.env` de la aplicación.
+  exfil: >-
+    `mongodump` se lleva bases enteras. Con escritura, también se pueden modificar documentos, por
+    ejemplo el rol de tu usuario en la aplicación.
+defense:
+  - "`security.authorization: enabled` y `bindIp` en localhost o en la red interna."
+  - Un usuario por aplicación con el rol mínimo (`readWrite` solo en su base).
+  - TLS para las conexiones y una versión con soporte, parcheada.
+---
+
+## Qué es
+
+MongoDB guarda documentos BSON en **colecciones** dentro de bases de datos y habla un protocolo propio
+en el 27017. Hasta la versión 3.6 escuchaba en todas las interfaces por defecto y la autorización
+siempre ha sido algo que hay que activar, de ahí la cantidad de instancias abiertas.
+
+## Qué buscar
+
+- **Acceso sin autenticación**.
+- **Bases y colecciones** con usuarios o secretos.
+- **Cadena de conexión** en la configuración de la aplicación.

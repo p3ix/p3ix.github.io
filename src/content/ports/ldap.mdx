@@ -1,0 +1,44 @@
+---
+title: LDAP
+name: Lightweight Directory Access Protocol
+summary: >-
+  El directorio de Active Directory. Sin credenciales da el dominio; con cualquier cuenta, todo: usuarios, grupos, equipos, descripciones con contraseñas, SPNs y las relaciones que dibuja BloodHound.
+date: 2026-11-04
+ports: [389/tcp, 636/tcp, 3268/tcp, 3269/tcp]
+category: directory
+tags: [ldap]
+related: [ad/enumeracion-ldap-rpc]
+phases:
+  enum: >-
+    Sin credenciales, el **RootDSE** siempre se lee: contexto base (`DC=corp,DC=local`), nombre del DC
+    y nivel funcional. Prueba también el **bind anónimo** completo, que algunos dominios antiguos y
+    muchos OpenLDAP permiten. Con una cuenta cualquiera del dominio, el directorio entero: usuarios,
+    grupos, equipos, políticas. Ver [enumeración por LDAP y RPC](/biblia/ad/enumeracion-ldap-rpc/).
+  credential-access: >-
+    El campo **`description`** de los usuarios guarda contraseñas con una frecuencia sorprendente. Por
+    LDAP también se encuentran las cuentas sin preautenticación (AS-REP roasting), las cuentas con
+    SPN (kerberoasting) y, si hay LAPS y permisos, la contraseña de admin local de cada equipo.
+  privesc: >-
+    Los datos de LDAP son los que recoge **BloodHound**: quién puede cambiar la contraseña de quién,
+    quién es admin dónde, qué ACLs mal puestas llevan a Domain Admins. El camino de escalada en un
+    dominio casi siempre sale de aquí.
+defense:
+  - Sin bind anónimo y con LDAP signing y channel binding obligatorios en los controladores.
+  - Nada sensible en `description` ni en otros atributos legibles por todos.
+  - Revisar periódicamente las ACLs del dominio con las mismas herramientas que usaría un atacante.
+  - Alertar de consultas LDAP masivas desde equipos de usuario (evento 1644 o el tráfico de SharpHound).
+---
+
+## Qué es
+
+LDAP es el protocolo para consultar y modificar un directorio. En Active Directory es la forma de leer
+todo lo que hay en el dominio, y cualquier usuario autenticado puede leer casi todo por diseño. El
+**389** es LDAP (en claro o con StartTLS), el **636** LDAPS, y el **3268**/**3269** el **catálogo
+global**, que contesta por todos los dominios del bosque.
+
+## Qué buscar
+
+- **Contexto base y DC** sin credenciales.
+- **Bind anónimo**.
+- **Usuarios, descripciones, SPNs y cuentas sin preautenticación** con credenciales.
+- **ACLs** abusables, con BloodHound.

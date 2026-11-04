@@ -1,0 +1,31 @@
+---
+title: rpcbind
+name: portmapper de Sun RPC
+summary: El índice de servicios RPC de Unix. Por sí solo da poco, pero dice qué hay detrás, casi siempre NFS, y en qué puertos escuchan sus piezas.
+date: 2026-11-04
+ports: [111/tcp, 111/udp]
+category: network
+tags: [rpcbind]
+related: [nfs-showmount]
+phases:
+  enum: >-
+    `rpcinfo -p RHOST` (o el script `rpcinfo` de nmap) lista cada programa RPC con su versión y su
+    puerto. Lo que importa: **`nfs` y `mountd`** (hay exports que mirar, ver [NFS](/biblia/puertos/nfs/)),
+    `ypbind` (NIS, un directorio antiguo que puede dar los hashes de todos los usuarios) y servicios
+    raros que merezcan un `searchsploit`.
+defense:
+  - Si no hay servicios RPC que publicar (ni NFS ni NIS), desactivar rpcbind.
+  - Filtrar el 111 desde redes que no necesiten montar nada.
+  - Sustituir NIS por LDAP o por un directorio moderno.
+---
+
+## Qué es
+
+Los servicios Sun RPC (NFS, mountd, NIS, statd) escuchan en puertos que cambian en cada arranque.
+**rpcbind** (antes portmapper) es quien los registra y le dice a cada cliente dónde está el que busca.
+Por eso basta con preguntarle a él para saber todo lo que la máquina ofrece por RPC.
+
+## Qué buscar
+
+- **NFS y mountd**: casi siempre la razón de que el 111 esté abierto.
+- **NIS** (`ypserv`, `ypbind`).

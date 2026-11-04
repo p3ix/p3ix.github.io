@@ -1,0 +1,40 @@
+---
+title: MSRPC
+name: Microsoft RPC (endpoint mapper)
+summary: El índice de servicios RPC de Windows. Dice qué interfaces hay (impresión, cifrado de archivos, gestión) y es la base de WMI, DCOM y muchas técnicas para obligar a un equipo a autenticarse contra ti.
+date: 2026-11-04
+ports: [135/tcp, 593/tcp]
+category: directory
+tags: [msrpc, rpc]
+related: [impacket-wmiexec, ad/enumeracion-ldap-rpc]
+phases:
+  enum: >-
+    El endpoint mapper (135) responde sin credenciales con la lista de **interfaces RPC** y en qué
+    puerto dinámico escucha cada una (del 49152 al 65535). Las que importan: `MS-RPRN`/`MS-PAR`
+    (spooler de impresión, PrinterBug y PrintNightmare) y `MS-EFSR` (PetitPotam). Usuarios y grupos se
+    sacan por RPC sobre SMB con `rpcclient`, más en [enumeración por LDAP y RPC](/biblia/ad/enumeracion-ldap-rpc/).
+  credential-access: >-
+    Las interfaces de impresión y de EFS permiten **forzar** a un equipo (incluso un controlador de
+    dominio) a autenticarse contra tu máquina. Esa autenticación se reenvía con NTLM relay a otro
+    servicio, por ejemplo a la web de certificados de AD CS.
+  lateral: >-
+    Con admin local, **WMI** (DCOM sobre el 135 y un puerto dinámico) ejecuta comandos sin crear
+    servicios, menos ruidoso que PsExec. `wmiexec` de Impacket lo hace con contraseña o hash.
+defense:
+  - Bloquear el 135 y el rango dinámico entre segmentos de usuarios y servidores.
+  - Desactivar el spooler de impresión en los controladores de dominio y en todo servidor que no imprima.
+  - Firma SMB y EPA en AD CS para que la autenticación forzada no se pueda reenviar.
+  - Vigilar la creación de procesos por `WmiPrvSE.exe` (evento 4688 o Sysmon 1).
+---
+
+## Qué es
+
+Windows expone muchos servicios por RPC (llamadas a procedimiento remoto). Como cada uno escucha en un
+puerto dinámico, hace falta un índice: el **endpoint mapper** en el 135, al que se le pregunta dónde
+está la interfaz que se busca. El 593 es lo mismo sobre HTTP. Otras interfaces RPC (SAMR, LSARPC)
+van por *named pipes* dentro de SMB.
+
+## Qué buscar
+
+- **Interfaces expuestas**, sobre todo spooler y EFS.
+- **Admin local** en algún equipo para usar WMI.

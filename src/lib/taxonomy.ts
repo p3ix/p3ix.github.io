@@ -152,3 +152,32 @@ export const bbStatuses: Record<BbStatusId, string> = {
   duplicate: 'Duplicado',
   informative: 'Informativo',
 };
+
+// ---------- Puertos y servicios de la biblia ----------
+
+/** Familia de un servicio: agrupa y da color a /biblia/puertos/. */
+export const PORT_CATEGORY_IDS = ['remote-access', 'file-sharing', 'web', 'directory', 'mail', 'database', 'network', 'devops'] as const;
+export type PortCategoryId = (typeof PORT_CATEGORY_IDS)[number];
+
+export const portCategories: Record<PortCategoryId, { label: string; color: ColorToken }> = {
+  'remote-access': { label: 'Acceso remoto', color: 'area-shell' },
+  'file-sharing': { label: 'Ficheros', color: 'area-lpe' },
+  web: { label: 'Web', color: 'area-web' },
+  directory: { label: 'Directorio y Windows', color: 'area-ad' },
+  mail: { label: 'Correo', color: 'area-wpe' },
+  database: { label: 'Bases de datos', color: 'area-crack' },
+  network: { label: 'Red e infraestructura', color: 'area-recon' },
+  devops: { label: 'Contenedores y DevOps', color: 'area-pivot' },
+};
+
+/** Nombre corto de cada fase, para columnas estrechas (la matriz de /biblia/puertos/). */
+export const phaseShort: Record<PhaseId, string> = {
+  recon: 'Recon',
+  enum: 'Enum',
+  'initial-access': 'Acceso',
+  'credential-access': 'Creds',
+  privesc: 'Privesc',
+  lateral: 'Lateral',
+  persistence: 'Persist.',
+  exfil: 'Exfil',
+};

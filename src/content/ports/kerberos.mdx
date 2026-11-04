@@ -1,0 +1,51 @@
+---
+title: Kerberos
+summary: La autenticación de Active Directory. Si el 88 está abierto es un controlador de dominio, y Kerberos da usuarios válidos sin credenciales, hashes de AS-REP roasting y, con una cuenta, kerberoasting.
+date: 2026-11-04
+ports: [88/tcp, 88/udp, 464/tcp]
+category: directory
+tags: [kerberos]
+related: [ad/metodologia]
+phases:
+  recon: >-
+    El 88 abierto (junto a 53, 389 y 445) identifica un **controlador de dominio**. Apunta su IP como
+    `DC_IP` y el dominio como `DOMAIN`: casi todo lo que viene después los necesita. Kerberos es
+    sensible a la hora: si tu reloj va más de 5 minutos desfasado, sincronízalo con el DC
+    (`ntpdate`).
+  enum: >-
+    El KDC responde distinto a un usuario que existe y a uno que no, así que se pueden **validar
+    nombres de usuario** sin credenciales y sin bloquear cuentas. Con una lista de nombres (de la
+    web, de LinkedIn, de los metadatos de documentos), sale la lista de usuarios reales.
+  credential-access: >-
+    Sin credenciales, **AS-REP roasting**: los usuarios sin preautenticación devuelven un hash
+    crackeable. Con cualquier cuenta del dominio, **kerberoasting**: un ticket de servicio por cada
+    cuenta con SPN, cifrado con su contraseña. Y **password spraying** por Kerberos, que deja menos
+    rastro que por SMB. Ver [AS-REP roasting](/biblia/ad/as-rep-roasting/) y
+    [kerberoasting](/biblia/ad/kerberoasting/).
+  lateral: >-
+    Con un hash o un ticket se puede pedir acceso a otros servicios como ese usuario (Pass-the-Ticket,
+    Overpass-the-Hash). Ver [movimiento lateral](/biblia/ad/movimiento-lateral/).
+defense:
+  - Preautenticación obligatoria para todas las cuentas (revisar `DONT_REQ_PREAUTH`).
+  - Contraseñas largas y aleatorias, o gMSA, para las cuentas de servicio con SPN; AES en vez de RC4.
+  - Vigilar los eventos 4768 (TGT), 4769 (ticket de servicio, sobre todo con cifrado RC4) y 4771 (fallo de preautenticación).
+  - Política de bloqueo y detección de spraying (muchos usuarios, la misma contraseña, poco tiempo).
+---
+
+## Qué es
+
+Kerberos autentica con **tickets** en vez de enviar contraseñas. El usuario pide al KDC (el
+controlador de dominio) un **TGT** demostrando que conoce su contraseña (la preautenticación), y con
+el TGT pide **tickets de servicio** (TGS) para cada servicio al que quiere acceder. El 464 sirve para
+cambiar contraseñas (kpasswd).
+
+Los dos ataques clásicos aprovechan que partes de esos mensajes van cifradas con la contraseña de una
+cuenta: si se capturan, se crackean sin conexión y sin que nadie lo vea.
+
+## Qué buscar
+
+- **Dominio y DC**: en el banner de nmap, en LDAP y en el certificado de RDP.
+- **Usuarios válidos**.
+- **Cuentas sin preautenticación** y **cuentas con SPN**.
+
+Toda la cadena en [Active Directory de principio a fin](/biblia/ad/metodologia/).

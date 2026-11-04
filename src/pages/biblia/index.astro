@@ -4,13 +4,14 @@ import EmptyState from '@/components/EmptyState.astro';
 import Icon from '@/components/Icon.astro';
 import PageHeader from '@/components/PageHeader.astro';
 import { utilities, utilityHref } from '@/data/utilities';
-import { getCommands, getNotes } from '@/lib/content';
+import { getCommands, getNotes, getPorts } from '@/lib/content';
 import { sectionById } from '@/lib/sections';
 import { AREA_IDS, areas } from '@/lib/taxonomy';
 import { tone } from '@/lib/tone';
 
 const notes = await getNotes();
 const commands = await getCommands();
+const ports = await getPorts();
 const tools = new Set(commands.map((c) => c.tool));
 
 // Solo las áreas que ya tienen algo, en el orden de taxonomy.ts.
@@ -48,6 +49,27 @@ const description =
       <Icon name="arrow-right" size={16} class="transition-transform group-hover:translate-x-0.5" />
     </span>
   </a>
+
+  {
+    ports.length > 0 && (
+      <a
+        href="/biblia/puertos/"
+        class="group flex flex-wrap items-center gap-5 rounded-2xl border border-line-strong bg-panel/90 p-5 transition-transform hover:-translate-y-0.5 sm:p-6"
+      >
+        <span class="grid size-14 shrink-0 place-items-center rounded-xl border border-biblia/45 bg-biblia/10 font-mono text-lg font-extrabold text-biblia">:22</span>
+        <span class="flex min-w-[220px] flex-1 flex-col gap-1">
+          <span class="text-xl font-bold text-fg-strong">Puertos y servicios</span>
+          <span class="text-[15px] text-muted">
+            {ports.length} servicios: qué hay detrás de cada puerto y qué hacer con él en cada fase del ataque, con sus comandos.
+          </span>
+        </span>
+        <span class="inline-flex items-center gap-2 font-mono text-sm text-biblia">
+          Abrir
+          <Icon name="arrow-right" size={16} class="transition-transform group-hover:translate-x-0.5" />
+        </span>
+      </a>
+    )
+  }
 
   <section aria-labelledby="utilities-title" class="flex flex-col gap-4">
     <h2 id="utilities-title" class="font-mono text-xl font-bold text-fg-strong">

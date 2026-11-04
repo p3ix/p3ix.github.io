@@ -1,0 +1,47 @@
+---
+title: NFS
+name: Network File System
+summary: Carpetas de red de Unix que confían en el cliente para decir quién es. Exports abiertos a cualquiera, archivos legibles cambiando de UID y root en el servidor si falta root_squash.
+date: 2026-11-04
+ports: [2049/tcp, 2049/udp]
+category: file-sharing
+tags: [nfs]
+related: [nmap-rpcbind-nfs]
+phases:
+  enum: >-
+    `showmount -e` dice qué carpetas se exportan y a qué redes. Un `*` o tu red significan que
+    puedes montarlas. NFS suele ir con [rpcbind](/biblia/puertos/rpcbind/) en el 111, que es quien
+    publica el resto de piezas (mountd, nlockmgr).
+  credential-access: >-
+    Con NFSv3, el servidor se cree el UID que dice tu cliente. Si los archivos son del UID 1001,
+    crea en tu máquina un usuario con ese UID y podrás leerlos: claves SSH, historiales,
+    configuraciones con contraseñas.
+  privesc: >-
+    Si un export tiene **`no_root_squash`**, lo que crees como root desde tu máquina es de root
+    también en el servidor. Copias una bash, le pones SUID desde fuera y la ejecutas dentro con `-p`.
+    Se ve en `/etc/exports` en cuanto tienes una shell en la víctima.
+  exfil: >-
+    Montado el export, es una carpeta más: `cp -r`, `find` y `grep` como en local. Cuidado con no
+    modificar nada sin querer: es el sistema de archivos real del servidor.
+defense:
+  - Exportar solo a las IP que lo necesitan, nunca a `*`, y en solo lectura si es posible.
+  - Mantener `root_squash` (el valor por defecto) y añadir `all_squash` en exports públicos.
+  - Usar NFSv4 con Kerberos (`sec=krb5p`) para que la identidad no dependa de lo que diga el cliente.
+  - Revisar `/etc/exports` en cada auditoría interna.
+---
+
+## Qué es
+
+NFS monta carpetas de otra máquina como si fueran locales. En NFSv2 y v3 el control de acceso es por
+**IP del cliente** y los permisos se aplican con el **UID y GID que envía el cliente**, sin
+verificarlos: el servidor confía en que la máquina que monta es de fiar.
+
+Para protegerse de un root remoto, NFS aplica por defecto `root_squash`: las peticiones del UID 0
+se convierten en `nobody`. Si alguien lo desactiva con `no_root_squash` (para que funcionen copias de
+seguridad, por ejemplo), un root en cualquier cliente es root en el export.
+
+## Qué buscar
+
+- **Exports y a quién** se exportan.
+- **UIDs** de los archivos montados (`ls -n`).
+- **`no_root_squash`** en `/etc/exports` una vez dentro.

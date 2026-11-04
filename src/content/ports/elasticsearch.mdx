@@ -1,0 +1,35 @@
+---
+title: Elasticsearch
+summary: Motor de búsqueda que habla HTTP. Las versiones antiguas venían sin autenticación, y todavía aparecen índices enteros con logs, datos de clientes y credenciales legibles con un curl.
+date: 2026-11-04
+ports: [9200/tcp, 9300/tcp]
+category: database
+tags: [elasticsearch]
+phases:
+  enum: >-
+    `curl http://RHOST:9200/` devuelve el nombre del clúster y la **versión**. Si contesta sin pedir
+    credenciales, `_cat/indices` lista los índices con su tamaño. Kibana suele estar al lado en el 5601.
+  exfil: >-
+    Cada índice se lee con `_search`. Los de logs (de aplicaciones, de Logstash) llevan cabeceras de
+    autorización, cookies y contraseñas que se registraron por error; otros son directamente bases de
+    datos de usuarios.
+  initial-access: >-
+    Versiones muy antiguas (1.x) ejecutaban scripts dinámicos (CVE-2014-3120, CVE-2015-1427). Hoy la
+    entrada suele ser la información de los índices, no un exploit.
+defense:
+  - Seguridad activada (`xpack.security.enabled`, por defecto desde la 8.0) con TLS y usuarios con roles mínimos.
+  - "`network.host` en la red interna y nunca expuesto a internet."
+  - No registrar cabeceras de autorización ni cuerpos de peticiones con datos personales.
+---
+
+## Qué es
+
+Elasticsearch guarda documentos JSON en **índices** y los sirve por una API REST en el 9200. El 9300
+es el transporte entre nodos del clúster. Hasta la versión 8 la seguridad venía desactivada por
+defecto, y por eso es una de las fuentes más habituales de filtraciones masivas.
+
+## Qué buscar
+
+- **Versión** y si pide autenticación.
+- **Índices** y qué contienen.
+- **Kibana** en el 5601.

@@ -28,3 +28,30 @@ export function entryBadge(data: { date: Date; draft: boolean }) {
   if (Date.now() - data.date.valueOf() < NEW_DAYS * 24 * 60 * 60 * 1000) return 'NUEVO';
   return undefined;
 }
+
+const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/**
+ * Markdown en línea para textos cortos del frontmatter: `código`, **negrita** y [texto](/ruta/).
+ * Devuelve HTML (para `set:html`); todo lo demás se escapa. Con `links: false` los enlaces se quedan
+ * en su texto (para meterlo dentro de otro enlace).
+ */
+export function inlineMarkdown(text: string, { links = true } = {}) {
+  return text
+    .split(/(`[^`]+`)/)
+    .map((part) => {
+      if (part.length > 1 && part.startsWith('`') && part.endsWith('`')) return `<code>${escapeHtml(part.slice(1, -1))}</code>`;
+      return escapeHtml(part)
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_, label: string, href: string) => {
+          if (!links) return label;
+          const external = /^https?:/.test(href);
+          return `<a href="${href}"${external ? ' target="_blank" rel="noopener"' : ''}>${label}</a>`;
+        });
+    })
+    .join('');
+}
+
+/** Lo anterior como texto plano: meta descriptions y la paleta. */
+export const stripInlineMarkdown = (text: string) =>
+  text.replace(/`([^`]+)`/g, '$1').replace(/\*\*(.+?)\*\*/g, '$1').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');

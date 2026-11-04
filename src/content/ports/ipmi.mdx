@@ -1,0 +1,40 @@
+---
+title: IPMI
+name: Intelligent Platform Management Interface
+summary: La gestión fuera de banda de los servidores (iLO, iDRAC, BMC). Por diseño entrega el hash de cualquier usuario sin autenticarse, y quien entra controla el hardware como si estuviera delante.
+date: 2026-11-04
+ports: [623/udp]
+category: network
+tags: [ipmi]
+phases:
+  enum: >-
+    Escaneo UDP del 623 y versión con nmap. Si es **IPMI 2.0**, prueba también el **cipher 0**, que
+    en algunos BMC deja entrar con cualquier contraseña. El BMC suele tener además una web (80/443)
+    con el modelo y el fabricante.
+  credential-access: >-
+    El protocolo RAKP de IPMI 2.0 envía el **hash** de la contraseña de un usuario antes de
+    autenticarlo: se pide para `ADMIN`, `root` o `Administrator` y se crackea sin conexión. Prueba
+    antes las de fábrica: `ADMIN:ADMIN` en Supermicro, `root:calvin` en Dell iDRAC.
+  lateral: >-
+    Con acceso al BMC tienes consola remota del servidor, puedes montar una ISO y reiniciarlo. Las
+    contraseñas de los BMC suelen ser las mismas en todos y reutilizarse en otros sistemas.
+defense:
+  - Las interfaces de gestión en una red aislada a la que solo llegan los administradores.
+  - Cambiar las credenciales de fábrica, desactivar el cipher 0 y usar contraseñas largas que resistan el crackeo.
+  - Actualizar el firmware del BMC como cualquier otro sistema.
+---
+
+## Qué es
+
+IPMI es el estándar para gestionar un servidor a través de su **BMC**, un pequeño ordenador en la
+placa base que funciona aunque el servidor esté apagado. HP lo llama iLO, Dell iDRAC y Supermicro
+simplemente IPMI. Da consola remota, control de encendido y montaje de medios virtuales.
+
+El fallo del hash no es un bug de un fabricante sino de la especificación de IPMI 2.0, así que no se
+corrige con un parche.
+
+## Qué buscar
+
+- **Versión 2.0** y **cipher 0**.
+- **Hashes RAKP** de los usuarios por defecto.
+- **Credenciales de fábrica**.

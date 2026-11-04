@@ -1,0 +1,15 @@
+# Comandos de onesixtyone: comunidades SNMP por fuerza bruta.
+tool: onesixtyone
+area: recon
+url: https://github.com/trailofbits/onesixtyone
+commands:
+  - id: onesixtyone-communities
+    title: Adivinar la comunidad SNMP
+    cmd: |
+      onesixtyone -c /usr/share/seclists/Discovery/SNMP/snmp.txt {{RHOST}}
+    phase: credential-access
+    tags: [snmp, brute-force]
+    notes: >-
+      onesixtyone manda una petición por comunidad sin esperar respuesta, así que prueba cientos en
+      segundos. Vale también con un archivo de IPs (-i hosts.txt). Solo SNMP v1 y v2c.
+    refs: [https://github.com/trailofbits/onesixtyone]

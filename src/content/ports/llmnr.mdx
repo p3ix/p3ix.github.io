@@ -1,0 +1,43 @@
+---
+title: LLMNR y NBT-NS
+name: Resolución de nombres por difusión
+summary: Cuando el DNS no encuentra un nombre, Windows pregunta a toda la red. Quien conteste se lleva la autenticación NTLM del equipo que preguntó, y ese hash se crackea o se reenvía.
+date: 2026-11-04
+ports: [137/udp, 5353/udp, 5355/udp]
+category: network
+tags: [llmnr, responder]
+related: [nxc-smb-relay-list]
+phases:
+  recon: >-
+    No hace falta escanear nada: en modo análisis, Responder escucha las peticiones que ya circulan.
+    Si ves equipos preguntando por nombres (impresoras viejas, shares mal escritos, `wpad`), la red es
+    vulnerable. Solo funciona en tu mismo segmento de red, porque son difusiones.
+  credential-access: >-
+    En modo normal, Responder contesta "soy yo" a esas peticiones y pide autenticación al equipo
+    víctima, que manda un **hash NetNTLMv2** de su usuario. No sirve para Pass-the-Hash, pero se
+    crackea con hashcat (`-m 5600`) y las contraseñas de usuario suelen caer.
+  lateral: >-
+    Sin crackear nada: si la víctima es admin en otro equipo que no exige **firma SMB**, `ntlmrelayx`
+    reenvía su autenticación en tiempo real y te da su SAM o una shell. Desactiva antes SMB y HTTP en
+    `Responder.conf` para que no se los quede Responder.
+defense:
+  - Desactivar LLMNR por GPO (`Turn off multicast name resolution`) y NBT-NS en cada adaptador o por DHCP.
+  - Firma SMB obligatoria en todos los equipos, que deja sin destino al relay.
+  - Desactivar WPAD si no se usa o publicarlo en el DNS para que nadie lo pregunte por difusión.
+  - Detectar respuestas LLMNR o NBT-NS desde equipos que no deberían darlas (un señuelo con un nombre que no existe lo destapa).
+---
+
+## Qué es
+
+Si el DNS no resuelve un nombre, Windows lo pregunta por **difusión** a toda la red local con LLMNR
+(5355/udp), NBT-NS (137/udp) y, en sistemas recientes, mDNS (5353/udp). Cualquier equipo puede
+contestar y nadie comprueba que la respuesta sea legítima.
+
+El cliente, convencido de que ha encontrado el servidor, intenta autenticarse con NTLM usando la
+sesión del usuario. El atacante recibe un desafío-respuesta derivado de su contraseña.
+
+## Qué buscar
+
+- **Peticiones** por difusión en tu segmento.
+- **Equipos sin firma SMB** como destino del relay.
+- **WPAD**: los navegadores lo preguntan solos y devuelven autenticación HTTP.

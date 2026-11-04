@@ -1,0 +1,42 @@
+---
+title: RDP
+name: Remote Desktop Protocol
+summary: El escritorio remoto de Windows. Sin credenciales revela el nombre del equipo y del dominio; con ellas, un escritorio completo. Expuesto a internet, es una de las entradas favoritas del ransomware.
+date: 2026-11-04
+ports: [3389/tcp]
+category: remote-access
+tags: [rdp]
+phases:
+  enum: >-
+    La negociación NTLM y el **certificado** dan sin credenciales el nombre del equipo, el dominio y la
+    versión de Windows. Mira si exige **NLA**: sin él, la pantalla de login (con la lista de usuarios
+    en algunos sistemas) se ve sin autenticarse, y versiones viejas son vulnerables a BlueKeep.
+  initial-access: >-
+    Credenciales encontradas o reutilizadas. En sistemas sin parchear y sin NLA, BlueKeep
+    (CVE-2019-0708, Windows 7 y Server 2008), con riesgo serio de tumbar la máquina.
+  credential-access: >-
+    **Spraying** lento de una contraseña contra muchos usuarios. RDP bloquea cuentas como cualquier
+    login de Windows, así que primero la política de bloqueo.
+  lateral: >-
+    Con credenciales de un usuario con permiso de escritorio remoto, `xfreerdp` y una carpeta
+    compartida para mover archivos. Con un hash, solo si el modo **Restricted Admin** está activo. Si
+    eres admin y RDP está apagado, se puede encender.
+defense:
+  - Nunca expuesto a internet directamente; detrás de VPN o de una pasarela RD Gateway con MFA.
+  - NLA obligatorio y sistemas parcheados.
+  - Limitar el grupo Remote Desktop Users y aplicar bloqueo de cuentas.
+  - Vigilar los eventos 4624 de tipo 10 (logon remoto interactivo) y 4625 en ráfaga.
+---
+
+## Qué es
+
+RDP transmite pantalla, teclado, ratón, portapapeles y unidades entre un cliente y un Windows. La
+autenticación moderna es **NLA** (Network Level Authentication, sobre CredSSP): el usuario demuestra
+quién es antes de que el servidor cree una sesión gráfica. Sin NLA, el servidor dibuja la pantalla
+de login a cualquiera que se conecte.
+
+## Qué buscar
+
+- **Nombre, dominio y versión** del equipo.
+- **NLA** exigido o no.
+- **Qué cuentas** tienen permiso de escritorio remoto.

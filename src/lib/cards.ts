@@ -2,7 +2,7 @@ import type { CollectionEntry } from 'astro:content';
 import type { ImageMetadata } from 'astro';
 import { entryBadge, monogram } from './format';
 import type { IconName } from './icons';
-import { areas, bbPlatforms, ctfPlatforms, difficulties, severities, targetOs } from './taxonomy';
+import { areas, bbPlatforms, ctfPlatforms, difficulties, portCategories, severities, targetOs } from './taxonomy';
 import type { ColorToken } from './tone';
 
 export interface EntryCardProps {
@@ -41,6 +41,20 @@ export function noteCard(entry: CollectionEntry<'notes'>): EntryCardProps {
     color: 'biblia',
     accent: { text: area.label.toLowerCase(), color: area.color },
     cover: { kind: 'icon', icon: 'book' },
+    badge: entryBadge(d),
+  };
+}
+
+export function portCard(entry: CollectionEntry<'ports'>): EntryCardProps {
+  const d = entry.data;
+  const category = portCategories[d.category];
+  return {
+    href: `/biblia/puertos/${entry.id}/`,
+    title: d.title,
+    meta: `Puerto · ${d.ports.slice(0, 2).join(', ')}`,
+    color: 'biblia',
+    accent: { text: category.label.toLowerCase(), color: category.color },
+    cover: { kind: 'monogram', text: d.ports[0].split('/')[0] },
     badge: entryBadge(d),
   };
 }

@@ -1,8 +1,8 @@
 import { getCollection, type CollectionEntry } from 'astro:content';
-import type { AreaId, PhaseId, PromptId } from './taxonomy';
+import { PHASE_IDS, type AreaId, type PhaseId, type PromptId } from './taxonomy';
 import { VARIABLE_PATTERN, isVariableName, type VariableName } from './variables';
 
-type Dated = 'ctf' | 'bugbounty' | 'notes';
+type Dated = 'ctf' | 'bugbounty' | 'notes' | 'ports';
 
 /**
  * Entradas que se publican: en producción sin borradores, en `npm run dev` todas (para poder
@@ -108,4 +108,66 @@ export function variablesIn(...texts: (string | undefined)[]): VariableName[] {
     }
   }
   return [...found];
+}
+
+// ---------- Puertos y servicios ----------
+
+export const portHref = (id: string) => `/biblia/puertos/${id}/`;
+
+/** `445/tcp` → 445. */
+export const portNumber = (port: string) => Number(port.split('/')[0]);
+
+/**
+ * Servicios publicados, del puerto más bajo al más alto. Falla si dos servicios reclaman el mismo
+ * puerto (un número tiene que llevar a una sola página).
+ */
+export async function getPorts() {
+  const entries = await getPublished('ports');
+  const owner = new Map<string, string>();
+  for (const entry of entries) {
+    for (const port of entry.data.ports) {
+      const other = owner.get(port);
+      if (other) throw new Error(`El puerto ${port} está en ports/${other}.mdx y en ports/${entry.id}.mdx.`);
+      owner.set(port, entry.id);
+    }
+  }
+  return entries.sort((a, b) => portNumber(a.data.ports[0]) - portNumber(b.data.ports[0]) || a.id.localeCompare(b.id));
+}
+
+/**
+ * Todo lo que cuelga de un servicio: los comandos con alguna de sus etiquetas o en `related`,
+ * agrupados por fase, y las notas con sus etiquetas o en `related`. `exclude` son los comandos ya
+ * incrustados en el cuerpo con <Cmd>, que no se repiten. Falla con un `related` que no existe.
+ */
+export function linkedToPort(
+  entry: CollectionEntry<'ports'>,
+  commands: Command[],
+  notes: CollectionEntry<'notes'>[],
+  exclude: string[] = [],
+) {
+  const d = entry.data;
+  const tags = new Set(d.tags);
+  const linked = new Set(commands.filter((c) => c.tags.some((t) => tags.has(t))));
+  const linkedNotes = new Set(notes.filter((n) => n.data.tags.some((t) => tags.has(t))));
+  for (const id of d.related) {
+    const command = commands.find((c) => c.id === id);
+    const note = notes.find((n) => n.id === id);
+    if (command) linked.add(command);
+    else if (note) linkedNotes.add(note);
+    else throw new Error(`Puerto ${entry.id}: "${id}" en related no es ningún comando ni ninguna nota.`);
+  }
+
+  const shown = [...linked].filter((c) => !exclude.includes(c.id));
+  // Una sección por fase, en el orden del ataque: las que tienen texto o algún comando.
+  const byPhase = PHASE_IDS.map((phase) => ({
+    phase,
+    text: d.phases[phase],
+    commands: shown.filter((c) => c.phase === phase),
+  })).filter((g) => g.text || g.commands.length > 0);
+
+  return {
+    byPhase,
+    commands: shown,
+    notes: [...linkedNotes].sort((a, b) => a.data.area.localeCompare(b.data.area) || (a.data.order ?? Infinity) - (b.data.order ?? Infinity)),
+  };
 }

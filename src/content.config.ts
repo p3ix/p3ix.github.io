@@ -9,6 +9,7 @@ import {
   DIFFICULTY_IDS,
   LAUNCH_OS_IDS,
   PHASE_IDS,
+  PORT_CATEGORY_IDS,
   PROMPT_IDS,
   RETIRED_ONLY_PLATFORMS,
   SEVERITY_IDS,
@@ -171,4 +172,30 @@ const commands = defineCollection({
     }),
 });
 
-export const collections = { ctf, bugbounty, notes, commands };
+const PORT = /^\d{1,5}\/(?:tcp|udp)$/;
+
+/** Un servicio de red (SSH, SMB...) y qué hacer con él en cada fase. Página: /biblia/puertos/<id>/. */
+const ports = defineCollection({
+  loader: glob({ pattern: '*.mdx', base: './src/content/ports' }),
+  schema: z.object({
+    ...common,
+    /** Nombre completo si el título es una sigla: SSH → "Secure Shell". */
+    name: z.string().optional(),
+    /** Puertos por defecto, `22/tcp` o `161/udp`. El primero es el principal. */
+    ports: z.array(z.string().regex(PORT, { error: 'Puerto: número/protocolo, p. ej. 22/tcp o 161/udp' })).min(1),
+    category: z.enum(PORT_CATEGORY_IDS),
+    /**
+     * Qué se hace con el servicio en cada fase, en un párrafo (admite `código`, **negrita** y
+     * [enlaces](/ruta/)). Bajo cada fase salen solos los comandos de esa fase con alguna de las `tags`.
+     */
+    phases: z
+      .partialRecord(z.enum(PHASE_IDS), z.string().min(1))
+      .refine((p) => Object.keys(p).length > 0, { error: 'phases: al menos una fase' }),
+    /** Detección y mitigación, un punto por elemento (mismo formato que phases). */
+    defense: z.array(z.string().min(1)).default([]),
+    /** ids de comandos o de notas que no comparten etiqueta con el servicio. */
+    related: z.array(z.string()).default([]),
+  }),
+});
+
+export const collections = { ctf, bugbounty, notes, commands, ports };

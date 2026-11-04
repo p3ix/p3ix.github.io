@@ -1,0 +1,176 @@
+---
+import type { MarkdownHeading } from 'astro';
+import { render, type CollectionEntry } from 'astro:content';
+import ArticleLayout from '@/layouts/ArticleLayout.astro';
+import Cmd from '@/components/Cmd.astro';
+import CommandCard from '@/components/CommandCard.astro';
+import VarBar from '@/components/VarBar.astro';
+import { getCommands, getNotes, getPorts, linkedToPort, portHref, variablesIn } from '@/lib/content';
+import { formatDate, inlineMarkdown, isoDate } from '@/lib/format';
+import { tagHref } from '@/lib/tags';
+import { areas, phases, portCategories } from '@/lib/taxonomy';
+import { tone } from '@/lib/tone';
+
+export async function getStaticPaths() {
+  const ports = await getPorts();
+  return ports.map((entry, i) => ({
+    params: { id: entry.id },
+    props: { entry, prev: ports[i - 1], next: ports[i + 1] },
+  }));
+}
+
+interface Props {
+  entry: CollectionEntry<'ports'>;
+  prev?: CollectionEntry<'ports'>;
+  next?: CollectionEntry<'ports'>;
+}
+
+const { entry, prev, next } = Astro.props;
+const { Content, headings } = await render(entry);
+const d = entry.data;
+const category = portCategories[d.category];
+const [commands, notes] = await Promise.all([getCommands(), getNotes()]);
+
+// Los comandos incrustados con <Cmd> en el cuerpo no se repiten en su fase (ni su id en el HTML).
+const embeddedIds = [...(entry.body ?? '').matchAll(/<Cmd\s+id=["']([^"']+)["']/g)].map((m) => m[1]);
+const embedded = commands.filter((c) => embeddedIds.includes(c.id));
+const linked = linkedToPort(entry, commands, notes, embeddedIds);
+
+const phaseSlug = (phase: string) => `fase-${phase}`;
+const toc: MarkdownHeading[] = [
+  ...headings,
+  { depth: 2, slug: 'por-fase', text: 'Qué hacer en cada fase' },
+  ...linked.byPhase.map((g) => ({ depth: 3, slug: phaseSlug(g.phase), text: phases[g.phase] })),
+  ...(d.defense.length > 0 ? [{ depth: 2, slug: 'defensa', text: 'Detección y mitigación' }] : []),
+  ...(linked.notes.length > 0 ? [{ depth: 2, slug: 'notas', text: 'Para profundizar' }] : []),
+];
+
+const varNames = variablesIn(entry.body, ...embedded.map((c) => c.cmd), ...linked.commands.map((c) => c.cmd));
+const title = `${d.title} · ${d.ports.join(', ')}`;
+---
+
+<ArticleLayout
+  title={title}
+  description={d.summary}
+  section="biblia"
+  path={['biblia', 'puertos', entry.id]}
+  headings={toc}
+  draft={d.draft}
+  ogImage={`/og/biblia/puertos/${entry.id}.png`}
+  publishedTime={d.date}
+>
+  <div slot="header" class="flex flex-col gap-5">
+    <header style={tone(category.color)} class="tone-border relative flex flex-col gap-4 overflow-hidden rounded-2xl border bg-panel/90 p-5 sm:p-6">
+      <a href="/biblia/puertos/" class="tone-text inline-flex items-center gap-2.5 self-start font-mono text-[13px] tracking-[0.2em] uppercase hover:underline">
+        <span class="tone-pill size-2.5 rounded-full"></span>
+        Puertos · {category.label}
+      </a>
+      <div class="flex flex-wrap items-end gap-x-5 gap-y-2">
+        <h1 class="font-mono text-[34px] leading-none font-extrabold tracking-tight text-fg-strong sm:text-[42px]">{d.title}</h1>
+        {d.name && <p class="pb-1 font-mono text-sm text-muted">{d.name}</p>}
+      </div>
+      <ul class="flex flex-wrap gap-2" aria-label="Puertos por defecto">
+        {
+          d.ports.map((p) => (
+            <li class="tone-border tone-soft rounded-lg border px-3 py-1 font-mono text-[15px] font-bold text-fg-strong">
+              {p.split('/')[0]}
+              <span class="tone-text font-normal">/{p.split('/')[1]}</span>
+            </li>
+          ))
+        }
+      </ul>
+      <p class="text-[17px] leading-relaxed text-muted">{d.summary}</p>
+      <nav aria-label="Fases" class="flex flex-wrap gap-2">
+        {
+          linked.byPhase.map((g) => (
+            <a href={`#${phaseSlug(g.phase)}`} class="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-line-strong px-3 font-mono text-xs text-muted transition-colors hover:tone-border hover:text-fg-strong">
+              {phases[g.phase]}
+              {g.commands.length > 0 && <span class="tone-text">{g.commands.length}</span>}
+            </a>
+          ))
+        }
+      </nav>
+      <p class="flex flex-wrap gap-x-3 gap-y-1 font-mono text-xs text-subtle">
+        <time datetime={isoDate(d.updated ?? d.date)}>{formatDate(d.date)}{d.updated && ` · actualizada ${formatDate(d.updated)}`}</time>
+        {d.tags.map((t) => <a href={tagHref(t)} class="text-tags/80 hover:text-tags hover:underline">#{t}</a>)}
+      </p>
+    </header>
+    <VarBar names={varNames} />
+  </div>
+
+  <Content components={{ Cmd }} />
+
+  <h2 id="por-fase">Qué hacer en cada fase</h2>
+  <p>
+    El servicio a lo largo de un ataque, en orden. Bajo cada fase, los comandos de la biblia que la cubren{d.tags.length > 0 && <> (los etiquetados con {d.tags.map((t, i) => <>{i > 0 && ', '}<a href={tagHref(t)}>#{t}</a></>)})</>}.
+  </p>
+  {
+    linked.byPhase.map((g) => (
+      <section aria-labelledby={phaseSlug(g.phase)} style={tone(category.color)} class="mt-9 flex flex-col gap-3.5">
+        <div class="not-prose tone-border border-b pb-2">
+          <h3 id={phaseSlug(g.phase)} class="flex scroll-mt-24 flex-wrap items-center gap-x-3 gap-y-1 font-mono text-lg font-bold text-fg-strong">
+            <span class="tone-pill size-2.5 rounded-full" />
+            {phases[g.phase]}
+            {g.commands.length > 0 && (
+              <span class="text-[13px] font-normal text-subtle">
+                {g.commands.length} {g.commands.length === 1 ? 'comando' : 'comandos'}
+              </span>
+            )}
+          </h3>
+        </div>
+        {g.text && <p set:html={inlineMarkdown(g.text)} />}
+        {g.commands.map((c) => (
+          <CommandCard command={c} level={3} />
+        ))}
+      </section>
+    ))
+  }
+
+  {
+    d.defense.length > 0 && (
+      <>
+        <h2 id="defensa">Detección y mitigación</h2>
+        <ul>
+          {d.defense.map((item) => (
+            <li set:html={inlineMarkdown(item)} />
+          ))}
+        </ul>
+      </>
+    )
+  }
+
+  {
+    linked.notes.length > 0 && (
+      <>
+        <h2 id="notas">Para profundizar</h2>
+        <ul>
+          {linked.notes.map((n) => (
+            <li>
+              <a href={`/biblia/${n.id}/`}>{n.data.title}</a>
+              <span class="text-subtle"> · {areas[n.data.area].label}</span>. {n.data.summary}
+            </li>
+          ))}
+        </ul>
+      </>
+    )
+  }
+
+  <nav slot="footer" aria-label="Otros servicios" data-pagefind-ignore class="grid gap-3 border-t border-line pt-6 sm:grid-cols-2">
+    {
+      prev && (
+        <a href={portHref(prev.id)} class="group flex flex-col gap-1 rounded-xl border border-line px-4 py-3 transition-colors hover:border-line-strong">
+          <span class="font-mono text-xs text-subtle">← {prev.data.ports[0]}</span>
+          <span class="font-semibold text-fg-strong group-hover:text-biblia">{prev.data.title}</span>
+        </a>
+      )
+    }
+    {
+      next && (
+        <a href={portHref(next.id)} class="group flex flex-col gap-1 rounded-xl border border-line px-4 py-3 text-right transition-colors hover:border-line-strong sm:col-start-2">
+          <span class="font-mono text-xs text-subtle">{next.data.ports[0]} →</span>
+          <span class="font-semibold text-fg-strong group-hover:text-biblia">{next.data.title}</span>
+        </a>
+      )
+    }
+  </nav>
+</ArticleLayout>

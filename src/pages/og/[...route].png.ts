@@ -1,16 +1,16 @@
 import type { APIRoute, GetStaticPaths } from 'astro';
 import { tools } from '@/data/profile';
 import { utilities } from '@/data/utilities';
-import { getNotes, getPublished } from '@/lib/content';
+import { getNotes, getPorts, getPublished } from '@/lib/content';
 import { monogram } from '@/lib/format';
 import { renderOg, type OgCard } from '@/lib/og';
 import { getTags, tagBreakdown } from '@/lib/tags';
-import { areas, bbPlatforms, ctfPlatforms, difficulties, severities, targetOs } from '@/lib/taxonomy';
+import { PHASE_IDS, areas, bbPlatforms, ctfPlatforms, difficulties, portCategories, severities, targetOs } from '@/lib/taxonomy';
 
 // Una imagen por página: /og/default.png, /og/ctf/forest.png, /og/biblia/ad/kerberoasting.png...
 // Cada página pasa la suya a BaseLayout con `ogImage`; sin ella, /og/default.png.
 export const getStaticPaths = (async () => {
-  const [ctf, bugbounty, notes, tags] = await Promise.all([getPublished('ctf'), getPublished('bugbounty'), getNotes(), getTags()]);
+  const [ctf, bugbounty, notes, tags, ports] = await Promise.all([getPublished('ctf'), getPublished('bugbounty'), getNotes(), getTags(), getPorts()]);
 
   const pages: { route: string; card: OgCard }[] = [
     {
@@ -39,6 +39,28 @@ export const getStaticPaths = (async () => {
       route: 'biblia/comandos',
       card: { kicker: 'Biblia', title: 'Buscador de comandos', summary: 'Rellena el objetivo una vez y copia cada comando listo para pegar.', color: 'biblia', path: 'biblia/comandos' },
     },
+    {
+      route: 'biblia/puertos',
+      card: { kicker: 'Biblia', title: 'Puertos y servicios', summary: 'Qué hay detrás de cada puerto y qué hacer con él en cada fase del ataque.', color: 'biblia', path: 'biblia/puertos' },
+    },
+    ...ports.map((e) => {
+      const category = portCategories[e.data.category];
+      return {
+        route: `biblia/puertos/${e.id}`,
+        card: {
+          kicker: `Biblia · Puertos · ${category.label}`,
+          title: e.data.name ? `${e.data.title} · ${e.data.name}` : e.data.title,
+          summary: e.data.summary,
+          color: category.color,
+          path: `biblia/puertos/${e.id}`,
+          monogram: e.data.ports[0].split('/')[0],
+          chips: [
+            { text: e.data.ports.slice(0, 3).join(' · '), color: category.color },
+            { text: `${PHASE_IDS.filter((p) => e.data.phases[p]).length} fases` },
+          ],
+        },
+      };
+    }),
     ...utilities.map((u) => ({
       route: `biblia/utilidades/${u.id}`,
       card: { kicker: 'Biblia · Utilidades', title: u.title, summary: u.summary, color: u.color, path: `biblia/utilidades/${u.id}` },

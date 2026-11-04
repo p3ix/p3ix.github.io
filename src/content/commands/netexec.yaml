@@ -90,3 +90,70 @@ commands:
       Si responde (Pwn3d!), esa cuenta abre una shell interactiva: salta a evil-winrm con las mismas
       credenciales o hash. También acepta -H para Pass-the-Hash por WinRM.
     refs: [https://www.netexec.wiki/]
+
+  - id: nxc-smb-relay-list
+    title: Hosts sin firma SMB obligatoria (objetivos de relay)
+    cmd: |
+      nxc smb {{SUBNET}} --gen-relay-list relay-targets.txt
+    phase: enum
+    tags: [smb, relay, ntlm]
+    notes: >-
+      Guarda los equipos que no exigen firma SMB: ahí se puede reenviar una autenticación NTLM
+      capturada con Responder (ntlmrelayx -tf relay-targets.txt).
+    refs: [https://www.netexec.wiki/smb-protocol/enumeration/smb-signing]
+
+  - id: nxc-ssh-spray
+    title: Probar una contraseña en SSH contra varios usuarios
+    cmd: |
+      nxc ssh {{RHOST}} -u users.txt -p '{{PASS}}' --continue-on-success
+    phase: credential-access
+    area: recon
+    tags: [ssh, spraying]
+    notes: >-
+      Para comprobar una credencial encontrada en otro sitio en todos los usuarios conocidos. Con -x
+      ejecuta un comando en cuanto entra.
+    refs: [https://www.netexec.wiki/ssh-protocol/password-spraying]
+
+  - id: nxc-rdp-spray
+    title: Validar credenciales por RDP en una red
+    cmd: |
+      nxc rdp {{SUBNET}} -u {{USER}} -p '{{PASS}}'
+    phase: credential-access
+    tags: [rdp, spraying]
+    notes: >-
+      Marca (Pwn3d!) donde la cuenta puede abrir escritorio. Con --screenshot --screentime 5 captura la
+      pantalla de login, útil cuando NLA está desactivado.
+    refs: [https://www.netexec.wiki/rdp-protocol/password-spraying]
+
+  - id: nxc-mssql-auth
+    title: Validar credenciales en MSSQL, de Windows o locales
+    cmd: |
+      nxc mssql {{RHOST}} -u {{USER}} -p '{{PASS}}' -d {{DOMAIN}}
+    phase: credential-access
+    tags: [mssql, spraying]
+    notes: >-
+      Por defecto usa autenticación de Windows; --local-auth prueba usuarios del propio SQL Server
+      (sa). Pwn3d! significa que la cuenta es sysadmin del servidor.
+    refs: [https://www.netexec.wiki/mssql-protocol/authentication]
+
+  - id: nxc-mssql-exec
+    title: Ejecutar comandos en el sistema desde MSSQL
+    cmd: |
+      nxc mssql {{RHOST}} -u {{USER}} -p '{{PASS}}' -d {{DOMAIN}} -x whoami
+    phase: initial-access
+    tags: [mssql, rce]
+    notes: >-
+      Activa xp_cmdshell si hace falta y lo usa. Los comandos corren como la cuenta del servicio SQL,
+      que suele tener SeImpersonatePrivilege: una escalada a SYSTEM con una patata.
+    refs: [https://www.netexec.wiki/mssql-protocol/command-execution]
+
+  - id: nxc-ldap-asreproast
+    title: AS-REP Roasting de todo el dominio por LDAP
+    cmd: |
+      nxc ldap {{DC_IP}} -u {{USER}} -p '{{PASS}}' --asreproast asrep.hash
+    phase: credential-access
+    tags: [ldap, kerberos, as-rep-roasting]
+    notes: >-
+      Con una cuenta cualquiera busca por LDAP los usuarios sin preautenticación y pide su AS-REP. El
+      hash sale en formato de hashcat (-m 18200).
+    refs: [https://www.netexec.wiki/ldap-protocol/asreproast]

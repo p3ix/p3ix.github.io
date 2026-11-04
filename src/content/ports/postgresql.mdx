@@ -1,0 +1,36 @@
+---
+title: PostgreSQL
+summary: Base de datos robusta y extensible, y precisamente por eso peligrosa en manos de un superusuario, que ejecuta comandos del sistema con un COPY.
+date: 2026-11-04
+ports: [5432/tcp]
+category: database
+tags: [postgresql]
+phases:
+  enum: >-
+    Versión con `-sV`. El mensaje de error al conectar ya informa: `no pg_hba.conf entry` significa
+    que tu IP no puede entrar con ninguna contraseña; `password authentication failed`, que sí puede y
+    la contraseña es lo que falla. Dentro, `\l`, `\du` (roles y si son **Superuser**) y `\dt`.
+  credential-access: >-
+    `postgres:postgres` sigue funcionando en muchos sitios. Las credenciales de la aplicación suelen
+    estar en su configuración (`.env`, `database.yml`). En `pg_shadow`, como superusuario, están los
+    hashes de todos los roles.
+  initial-access: >-
+    Un superusuario o un rol con `pg_execute_server_program` ejecuta comandos con **`COPY ... FROM
+    PROGRAM`** como el usuario `postgres` del sistema. Con `pg_read_server_files`, lee archivos.
+defense:
+  - "`listen_addresses = 'localhost'` si la aplicación es local, y `pg_hba.conf` con solo las IP necesarias y `scram-sha-256`."
+  - La aplicación conecta con un rol sin privilegios de superusuario.
+  - Contraseña fuerte para `postgres` y registro de conexiones (`log_connections`).
+---
+
+## Qué es
+
+PostgreSQL controla quién se conecta en dos niveles: **`pg_hba.conf`** decide desde qué IP, a qué base
+y con qué método puede entrar cada rol, y después se comprueba la contraseña. Los **roles** con
+`SUPERUSER` saltan cualquier permiso y, por diseño, pueden interactuar con el sistema operativo.
+
+## Qué buscar
+
+- **Si tu IP está admitida** (el error lo dice).
+- **Credenciales** por defecto o de la aplicación.
+- **Rol superusuario**.

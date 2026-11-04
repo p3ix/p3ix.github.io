@@ -1,9 +1,9 @@
 import type { APIRoute } from 'astro';
 import { tools } from '@/data/profile';
 import { utilities, utilityHref } from '@/data/utilities';
-import { getCommands, getNotes, getPublished } from '@/lib/content';
+import { getCommands, getNotes, getPorts, getPublished, portHref } from '@/lib/content';
 import { getTags, tagBreakdown } from '@/lib/tags';
-import { areas, ctfPlatforms, severities } from '@/lib/taxonomy';
+import { areas, ctfPlatforms, portCategories, severities } from '@/lib/taxonomy';
 
 /**
  * Índice de la paleta Ctrl+K: comandos y páginas. Se genera en el build (en producción sin
@@ -15,12 +15,13 @@ export interface SearchIndex {
 }
 
 export const GET: APIRoute = async () => {
-  const [commands, ctf, bugbounty, notes, tags] = await Promise.all([
+  const [commands, ctf, bugbounty, notes, tags, ports] = await Promise.all([
     getCommands(),
     getPublished('ctf'),
     getPublished('bugbounty'),
     getNotes(),
     getTags(),
+    getPorts(),
   ]);
 
   const index: SearchIndex = {
@@ -39,6 +40,17 @@ export const GET: APIRoute = async () => {
       { id: 'bb', url: '/bugbounty/', title: 'Bug bounty', summary: 'Reportes divulgados', kind: 'Sección', color: 'bb', tags: 'reportes' },
       { id: 'biblia', url: '/biblia/', title: 'Biblia', summary: 'Notas y metodología', kind: 'Sección', color: 'biblia', tags: 'notas' },
       { id: 'comandos', url: '/biblia/comandos/', title: 'Buscador de comandos', summary: 'Todos los comandos con variables', kind: 'Sección', color: 'biblia', tags: 'cheatsheet' },
+      { id: 'puertos', url: '/biblia/puertos/', title: 'Puertos y servicios', summary: 'Qué hacer con cada puerto en cada fase', kind: 'Sección', color: 'biblia', tags: 'ports services servicios' },
+      // Los números van en el título para que "445" encuentre SMB.
+      ...ports.map((e) => ({
+        id: `ports/${e.id}`,
+        url: portHref(e.id),
+        title: `${e.data.title} · ${e.data.ports.map((p) => p.split('/')[0]).join(', ')}`,
+        summary: e.data.summary,
+        kind: `Puerto · ${e.data.ports[0]}`,
+        color: portCategories[e.data.category].color,
+        tags: [e.data.name ?? '', ...e.data.ports, ...e.data.tags].join(' '),
+      })),
       ...utilities.map((u) => ({
         id: `utilidad/${u.id}`,
         url: utilityHref(u),

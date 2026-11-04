@@ -1,0 +1,15 @@
+# Comandos de mongosh (MongoDB Shell).
+tool: mongosh
+area: otros
+url: https://www.mongodb.com/docs/mongodb-shell/
+commands:
+  - id: mongosh-list-dbs
+    title: Bases de datos de un MongoDB sin autenticación
+    cmd: |
+      mongosh "mongodb://{{RHOST}}:27017" --quiet --eval 'db.adminCommand({ listDatabases: 1 })'
+    phase: enum
+    tags: [mongodb]
+    notes: >-
+      Si responde con la lista, no hay autorización. Para mirar dentro: use NOMBRE, show collections
+      y db.COLECCION.find().limit(5). Con credenciales, mongodb://usuario:clave@host/?authSource=admin.
+    refs: [https://www.mongodb.com/docs/manual/reference/command/listDatabases/]

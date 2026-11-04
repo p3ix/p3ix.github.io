@@ -1,0 +1,46 @@
+---
+title: Docker API
+name: API del demonio de Docker
+summary: La API con la que se maneja Docker. Expuesta sin TLS en el 2375 es root en el host para cualquiera que llegue al puerto, y dentro de una máquina el grupo docker equivale a lo mismo.
+date: 2026-11-04
+ports: [2375/tcp, 2376/tcp]
+category: devops
+tags: [docker]
+phases:
+  enum: >-
+    Si el **2375** devuelve la versión, la API habla HTTP sin TLS ni autenticación. Lista
+    contenedores e imágenes: las **variables de entorno** de cada contenedor suelen llevar contraseñas
+    de bases de datos y claves de API. El 2376 es la misma API con TLS y, normalmente, certificado de
+    cliente.
+  initial-access: >-
+    Con la API abierta, arrancas un contenedor con la **raíz del host montada** y haces `chroot`: eres
+    root en el host. Usa una imagen que ya esté descargada si la máquina no tiene salida a internet.
+  privesc: >-
+    Dentro de un Linux, pertenecer al **grupo docker** o poder escribir en `/var/run/docker.sock` es lo
+    mismo que ser root, por la misma razón. Si estás **dentro** de un contenedor, busca el socket
+    montado, el modo `--privileged` y capacidades de más para escapar al host.
+  lateral: >-
+    Los contenedores tienen sus propias redes internas: desde uno comprometido se ven servicios que
+    desde fuera no existen (bases de datos, APIs internas).
+defense:
+  - No exponer nunca el demonio por TCP sin TLS mutuo; mejor, solo el socket local o acceso por SSH (`DOCKER_HOST=ssh://`).
+  - Tratar el grupo docker como acceso de root y valorar Docker sin root (rootless).
+  - No montar el socket de Docker en contenedores ni usar `--privileged` sin necesidad real.
+  - No pasar secretos como variables de entorno; Docker secrets o un gestor de secretos.
+---
+
+## Qué es
+
+El cliente `docker` no hace nada por sí mismo: le pide al **demonio** `dockerd`, que corre como root,
+que cree y arranque contenedores. Normalmente se comunican por el socket Unix
+`/var/run/docker.sock`, pero el demonio se puede publicar por TCP para administrarlo en remoto: en
+claro en el 2375 o con TLS en el 2376.
+
+Quien puede pedirle al demonio que monte cualquier carpeta del host en un contenedor tiene, en la
+práctica, control total del host.
+
+## Qué buscar
+
+- **2375 abierto** sin autenticación.
+- **Variables de entorno** y montajes de los contenedores.
+- **Grupo docker** y socket escribible en las máquinas que controles.

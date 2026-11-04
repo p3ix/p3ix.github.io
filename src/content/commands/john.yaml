@@ -1,0 +1,15 @@
+# Comandos de John the Ripper y sus scripts *2john.
+tool: john
+area: cracking
+url: https://www.openwall.com/john/doc/
+commands:
+  - id: john-ssh-key
+    title: Crackear la passphrase de una clave SSH
+    cmd: |
+      ssh2john id_rsa > id_rsa.hash && john --wordlist={{WORDLIST}} id_rsa.hash
+    phase: credential-access
+    tags: [ssh, hash-cracking]
+    notes: >-
+      ssh2john convierte la clave cifrada en un hash que john entiende. john --show id_rsa.hash
+      enseña lo ya crackeado. La misma passphrase se reutiliza a menudo como contraseña del usuario.
+    refs: [https://www.openwall.com/john/doc/]

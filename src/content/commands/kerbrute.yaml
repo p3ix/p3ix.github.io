@@ -1,0 +1,27 @@
+# Comandos de kerbrute: usuarios y spraying por Kerberos.
+tool: kerbrute
+area: ad
+url: https://github.com/ropnop/kerbrute
+commands:
+  - id: kerbrute-userenum
+    title: Usuarios válidos del dominio sin credenciales
+    cmd: |
+      kerbrute userenum -d {{DOMAIN}} --dc {{DC_IP}} users.txt
+    phase: enum
+    tags: [kerberos, user-enum]
+    notes: >-
+      Pide un TGT sin preautenticación para cada nombre: el KDC dice si el usuario existe. Es rápido y
+      no bloquea cuentas. Avisa además de los usuarios sin preautenticación (AS-REP roastables).
+      Diccionario: /usr/share/seclists/Usernames/xato-net-10-million-usernames.txt.
+    refs: [https://github.com/ropnop/kerbrute]
+
+  - id: kerbrute-spray
+    title: Password spraying por Kerberos
+    cmd: |
+      kerbrute passwordspray -d {{DOMAIN}} --dc {{DC_IP}} users.txt '{{PASS}}'
+    phase: credential-access
+    tags: [kerberos, spraying]
+    notes: >-
+      Un fallo de preautenticación sí suma al contador de bloqueo, igual que por SMB, pero genera el
+      evento 4771 en vez del 4625: algunas detecciones solo miran el segundo.
+    refs: [https://github.com/ropnop/kerbrute]

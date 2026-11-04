@@ -1,0 +1,41 @@
+---
+title: SNMP
+name: Simple Network Management Protocol
+summary: Monitorización de equipos por UDP, protegida con una "comunidad" que suele ser public. Da interfaces y redes ocultas, procesos con sus argumentos, software instalado y a veces usuarios y contraseñas.
+date: 2026-11-04
+ports: [161/udp, 162/udp]
+category: network
+tags: [snmp]
+phases:
+  enum: >-
+    Es UDP: no sale en un escaneo TCP y hay que buscarlo con `-sU -p161`. Con la comunidad correcta,
+    `snmpwalk` vuelca el árbol entero: **interfaces y sus IP** (redes que no sabías que existían),
+    tabla de rutas y ARP, puertos en escucha, **software instalado** con versiones y, en Windows, los
+    usuarios locales y los shares.
+  credential-access: >-
+    La comunidad es la contraseña: prueba `public` y `private` y luego un diccionario con
+    onesixtyone, que va muy rápido. Dentro, los **argumentos de los procesos** enseñan contraseñas
+    pasadas por línea de comandos. Una comunidad de escritura (`private`) en un router permite
+    descargar su configuración, contraseñas incluidas.
+  lateral: >-
+    Las interfaces y rutas que muestra SNMP son el mapa de por dónde pivotar: una segunda tarjeta de
+    red en un servidor es una red interna nueva.
+defense:
+  - SNMPv3 con autenticación y cifrado (`authPriv`); v1 y v2c mandan la comunidad en claro.
+  - Si hay que mantener v2c, comunidades largas y aleatorias, solo lectura y restringidas a la IP del servidor de monitorización.
+  - Limitar las vistas a lo que la monitorización necesita (sin la tabla de procesos).
+  - Filtrar el 161/udp desde cualquier red que no sea la de gestión.
+---
+
+## Qué es
+
+SNMP permite leer (y a veces escribir) el estado de un equipo: un árbol de valores identificados por
+**OID** y organizados en MIBs. En v1 y v2c, el único control de acceso es la **comunidad**, un texto
+que viaja en claro en cada petición y que por defecto es `public` (lectura) y `private` (escritura).
+El 162 es el de los *traps*, las alertas que el equipo envía por su cuenta.
+
+## Qué buscar
+
+- **Que esté abierto** (escaneo UDP).
+- **Comunidades** válidas.
+- **Interfaces y redes**, **procesos con argumentos**, **software** y **usuarios**.

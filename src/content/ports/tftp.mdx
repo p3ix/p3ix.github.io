@@ -1,0 +1,38 @@
+---
+title: TFTP
+name: Trivial File Transfer Protocol
+summary: Transferencia de archivos por UDP sin autenticación ni listado. Se usa para arrancar equipos por red y guardar configuraciones de routers y teléfonos IP, que es justo lo que interesa.
+date: 2026-11-04
+ports: [69/udp]
+category: file-sharing
+tags: [tftp]
+phases:
+  enum: >-
+    TFTP no tiene listado de directorios: hay que adivinar los nombres. `tftp-enum` de nmap prueba los
+    habituales (configuraciones de Cisco, archivos de arranque PXE, perfiles de teléfonos IP). Necesita
+    escaneo UDP, que es lento: lánzalo solo contra el 69.
+  credential-access: >-
+    Las configuraciones de routers y switches (`running-config`, `startup-config`) llevan contraseñas,
+    a menudo como hashes tipo 7 de Cisco, que se descifran al instante, o comunidades SNMP. Los
+    perfiles de teléfonos IP suelen tener las credenciales SIP en claro.
+  exfil: >-
+    Con un nombre conocido, `tftp RHOST -c get archivo` lo descarga. Si el servidor admite escritura,
+    también se pueden subir archivos, lo que en un servidor PXE permite cambiar lo que arrancan los
+    equipos de la red.
+defense:
+  - Solo en la red de gestión o de arranque, nunca accesible desde la de usuarios.
+  - Servidor en modo solo lectura (`--secure` y sin `-c` en tftpd-hpa) y con una carpeta propia.
+  - No dejar configuraciones con secretos en la carpeta servida.
+---
+
+## Qué es
+
+TFTP es FTP reducido al mínimo: UDP, sin usuarios ni contraseñas, sin listar carpetas; solo leer o
+escribir un archivo cuyo nombre ya conoces. Existe para que equipos sin disco ni sistema (arranque
+PXE, teléfonos IP, routers) puedan descargar su imagen o su configuración.
+
+## Qué buscar
+
+- **Que responda**: en UDP, un puerto filtrado y uno abierto se parecen. `-sU -sV` lo confirma.
+- **Nombres típicos** de configuraciones y archivos de arranque.
+- **Si permite escribir**.

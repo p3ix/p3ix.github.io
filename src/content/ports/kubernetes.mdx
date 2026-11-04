@@ -1,0 +1,43 @@
+---
+title: Kubernetes
+name: API server y kubelet
+summary: El orquestador de contenedores. Un kubelet que acepta peticiones anónimas ejecuta comandos en cualquier pod del nodo, y un token de cuenta de servicio con permisos de más da el clúster entero.
+date: 2026-11-04
+ports: [6443/tcp, 10250/tcp]
+category: devops
+tags: [kubernetes]
+phases:
+  enum: >-
+    El **6443** es el API server: `curl -k https://RHOST:6443/version` da la versión, y con
+    autenticación anónima activa, algunos recursos. El **10250** es el kubelet de cada nodo: si
+    `/pods` responde sin credenciales, lista todo lo que corre en él, con imágenes y variables.
+  initial-access: >-
+    Un kubelet anónimo ejecuta comandos en cualquier contenedor del nodo con
+    `/run/NAMESPACE/POD/CONTENEDOR`. En una web vulnerable que corre en Kubernetes, la entrada suele
+    ser la propia aplicación, y lo interesante viene después.
+  credential-access: >-
+    Dentro de un pod, el **token de su cuenta de servicio** está en
+    `/var/run/secrets/kubernetes.io/serviceaccount/token`. Con él, `kubectl auth can-i --list` dice
+    qué puedes hacer; los `secrets` del namespace guardan contraseñas y claves.
+  privesc: >-
+    Con permiso para crear pods, uno **privilegiado** con el sistema de archivos del nodo montado
+    (`hostPath: /`) da root en el nodo. Con permisos sobre `secrets` en `kube-system`, el clúster entero.
+defense:
+  - "Kubelet con `--anonymous-auth=false` y `--authorization-mode=Webhook`; API server sin acceso anónimo."
+  - "RBAC mínimo para cada cuenta de servicio y `automountServiceAccountToken: false` donde no se use."
+  - Pod Security Admission en `restricted` para impedir pods privilegiados y montajes del host.
+  - Las APIs del clúster nunca expuestas a internet.
+---
+
+## Qué es
+
+Un clúster de Kubernetes tiene un **API server** (6443), por el que pasa toda la administración, y
+en cada nodo un **kubelet** (10250), el agente que arranca los contenedores y da acceso a sus logs
+y a ejecutar comandos en ellos. Cada pod se identifica ante el API server con el token de su
+**cuenta de servicio**, montado automáticamente dentro del contenedor.
+
+## Qué buscar
+
+- **Acceso anónimo** al kubelet o al API server.
+- **Tokens de cuentas de servicio** dentro de los pods.
+- **Permisos** de esas cuentas (crear pods, leer secrets).

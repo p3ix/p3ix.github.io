@@ -1,0 +1,53 @@
+---
+title: SSH
+name: Secure Shell
+summary: La puerta de administración de casi todo Linux. Rara vez es la entrada por sí sola, pero con una credencial o una clave encontradas en otro sitio es la shell más cómoda, y el mejor túnel para pivotar.
+date: 2026-11-04
+ports: [22/tcp]
+category: remote-access
+tags: [ssh]
+phases:
+  enum: >-
+    La versión del banner da la distribución y su antigüedad (`OpenSSH 8.2p1 Ubuntu-4ubuntu0.5` es un
+    Ubuntu 20.04). Mira qué **métodos de autenticación** acepta: si solo `publickey`, la fuerza bruta
+    no tiene sentido y lo que buscas es una clave privada. Las versiones anteriores a la 7.7 permiten
+    saber si un usuario existe (CVE-2018-15473).
+  initial-access: >-
+    La entrada habitual es con algo encontrado en otro servicio: una contraseña en un archivo de
+    configuración de la web, una clave `id_rsa` en un share o en un FTP, o una credencial reutilizada.
+    Con una clave, `chmod 600` y dentro.
+  credential-access: >-
+    Fuerza bruta solo como último recurso y con diccionarios cortos: es lenta, ruidosa y suele haber
+    fail2ban. Mucho más rentable: buscar claves privadas legibles en el sistema y crackear la
+    passphrase de las que estén cifradas.
+  lateral: >-
+    SSH es la herramienta de pivoting más limpia: `-L` trae un puerto interno a tu máquina, `-D` monta
+    un proxy SOCKS por el que pasa todo tu arsenal con proxychains y `-R` saca un puerto cuando solo
+    puedes salir. El `known_hosts` y el `.bash_history` del usuario dicen a qué otras máquinas se conecta.
+    Más en [pivoting con Metasploit](/biblia/metasploit/pivoting/).
+  persistence: >-
+    Tu clave pública en `~/.ssh/authorized_keys` sobrevive a un cambio de contraseña. En un pentest,
+    documentado y borrado al terminar.
+defense:
+  - Solo autenticación por clave (`PasswordAuthentication no`) y sin login directo de root (`PermitRootLogin no`).
+  - fail2ban o equivalente, y no exponer el 22 a internet si hay VPN.
+  - Revisar periódicamente los `authorized_keys` de todos los usuarios; una clave desconocida es un indicio claro.
+  - En los logs (`auth.log`, journal), ráfagas de `Failed password` y logins aceptados desde IPs nuevas.
+---
+
+## Qué es
+
+SSH da una shell cifrada y autenticada, y además transfiere archivos (SFTP, `scp`) y reenvía puertos.
+Al conectar, cliente y servidor negocian algoritmos, el servidor demuestra su identidad con su
+**clave de host** (la huella que te pregunta la primera vez) y el usuario se autentica con contraseña,
+con clave pública o con ambas.
+
+Una clave privada (`id_rsa`, `id_ed25519`) vale tanto como una contraseña y a menudo más, porque no
+caduca. Puede estar protegida con una passphrase; si no, basta con tener el archivo.
+
+## Qué buscar
+
+- **Versión** y distribución en el banner; con la versión exacta, `searchsploit`.
+- **Métodos de autenticación**: contraseña, clave o ambas.
+- **Claves privadas** en otros servicios (shares, FTP, copias de seguridad, repos git) y el usuario al que pertenecen (comentario del `.pub`).
+- **Credenciales reutilizadas** de bases de datos o de la web.

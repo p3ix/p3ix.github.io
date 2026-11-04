@@ -1,0 +1,54 @@
+---
+title: HTTP y HTTPS
+name: Servidores y aplicaciones web
+summary: Donde está casi siempre la entrada. Cada puerto web es una aplicación distinta que mapear, desde un CMS desactualizado hasta un panel de administración olvidado en un puerto alto.
+date: 2026-11-04
+ports: [80/tcp, 443/tcp, 8000/tcp, 8080/tcp, 8443/tcp]
+category: web
+tags: [http, webdav, tomcat, iis]
+related: [web/fuzzing-web, web/fuzzing-de-directorios, web/vhosts-y-subdominios, web/fuzzing-de-parametros, ffuf-dir, ffuf-vhost, searchsploit-nmap]
+phases:
+  recon: >-
+    Abre cada puerto web en el navegador y mira el **certificado**: sus nombres (CN y SAN) revelan
+    dominios y subdominios que añadir a `/etc/hosts`. Una IP que redirige a un nombre es un virtual
+    host: sin ese nombre, ves otra web o ninguna.
+  enum: >-
+    Tecnologías y versiones (cabeceras, cookies, `whatweb`), luego **directorios y archivos**,
+    **virtual hosts** y **parámetros**. El orden y los diccionarios están en
+    [fuzzing web](/biblia/web/fuzzing-web/). Revisa `robots.txt`, el código fuente y los `.js`: rutas
+    de API, comentarios y claves que se olvidaron.
+  initial-access: >-
+    Según lo que haya: una versión con exploit público, una subida de archivos sin validar, una
+    inyección (SQL, comandos, plantillas), un **Tomcat** con `tomcat:s3cret` en el manager (despliegas
+    un `.war`), un **WebDAV** que acepta `PUT` o credenciales por defecto en un panel.
+  credential-access: >-
+    Fuerza bruta de logins con ffuf o hydra cuando no hay bloqueo, credenciales en archivos de
+    configuración legibles (`.env`, `web.config`, `wp-config.php`) y en repos `.git` expuestos.
+  lateral: >-
+    Desde la shell del servidor web, la configuración de la aplicación da acceso a su **base de
+    datos** y a menudo a otros servicios internos que solo se ven desde dentro (`ss -tlnp`).
+defense:
+  - Inventario de todo lo que escucha HTTP, incluidos los puertos altos y los paneles de administración.
+  - Parchear el software web y sus plugins; quitar las páginas por defecto y los listados de directorio.
+  - Que los paneles de gestión (Tomcat manager, Jenkins, phpMyAdmin) no se publiquen fuera de la red de administración.
+  - Un WAF y alertas por ráfagas de 404 ayudan a ver el fuzzing; los logs de acceso son la mejor evidencia.
+---
+
+## Qué es
+
+HTTP es texto sobre TCP: una petición (método, ruta, cabeceras, cuerpo) y una respuesta. HTTPS es lo
+mismo dentro de TLS. Lo que importa en una auditoría no es el protocolo sino lo que hay detrás:
+**servidor** (Apache, nginx, IIS), **lenguaje** (PHP, ASP.NET, Java, Node) y **aplicación** (un CMS,
+un panel, una API propia).
+
+Un mismo puerto puede servir varias webs según la cabecera `Host` (virtual hosts), y una misma
+máquina suele tener varias webs en puertos distintos: el 80 público y un 8080 de administración.
+
+## Qué buscar
+
+- **Nombres**: certificado, redirecciones y virtual hosts.
+- **Tecnología y versión** de cada pieza.
+- **Contenido oculto**: directorios, copias de seguridad (`.bak`, `.old`, `~`), `.git`, paneles.
+- **Funcionalidades peligrosas**: subidas de archivos, parámetros que cargan rutas o URLs, logins.
+
+La metodología completa está en el área [Web](/biblia/web/fuzzing-web/) de la biblia.

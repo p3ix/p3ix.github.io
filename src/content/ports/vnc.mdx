@@ -1,0 +1,38 @@
+---
+title: VNC
+name: Virtual Network Computing
+summary: Escritorio remoto multiplataforma. Con frecuencia sin contraseña o con una débil de 8 caracteres, y las contraseñas guardadas en el equipo se descifran con una clave fija conocida.
+date: 2026-11-04
+ports: [5900/tcp, 5901/tcp]
+category: remote-access
+tags: [vnc]
+phases:
+  enum: >-
+    Cada pantalla usa su puerto: la `:0` es el 5900, la `:1` el 5901 y así. `vnc-info` dice el tipo
+    de seguridad: **None** es que se entra sin contraseña. Algunas versiones de RealVNC tienen un bypass
+    de autenticación conocido.
+  initial-access: >-
+    Sin contraseña, un `vncviewer RHOST::5900` y estás en el escritorio del usuario con su sesión
+    abierta. Cuidado: el usuario ve lo mismo que tú.
+  credential-access: >-
+    VNC no tiene usuario, solo contraseña, y el protocolo clásico solo usa sus **8 primeros
+    caracteres**: la fuerza bruta es viable. Ya dentro de una máquina, las contraseñas que guardan
+    TightVNC, RealVNC o UltraVNC (registro o `.ini`) van cifradas con DES y una clave fija pública:
+    se descifran al momento.
+defense:
+  - No exponer VNC; si hace falta, solo por un túnel SSH o una VPN y escuchando en localhost.
+  - Contraseña larga y, mejor, un servidor que autentique con usuarios del sistema.
+  - Pedir confirmación al usuario antes de aceptar una conexión.
+---
+
+## Qué es
+
+VNC transmite la pantalla con el protocolo RFB. A diferencia de RDP, no crea una sesión nueva:
+comparte la que hay, así que quien se conecta ve y controla lo mismo que el usuario sentado delante.
+La autenticación clásica es un desafío-respuesta con una sola contraseña.
+
+## Qué buscar
+
+- **Tipo de seguridad** (None, VNC, otros).
+- **Versión** del servidor.
+- **Contraseñas guardadas** en los equipos que ya controles.

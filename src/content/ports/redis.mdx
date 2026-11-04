@@ -1,0 +1,38 @@
+---
+title: Redis
+summary: Base de datos en memoria que en muchas instalaciones no pide contraseña. Guarda sesiones y cachés, y su comando CONFIG SET permite escribir archivos en el disco del servidor.
+date: 2026-11-04
+ports: [6379/tcp]
+category: database
+tags: [redis]
+phases:
+  enum: >-
+    `redis-cli -h RHOST info`: si contesta con la versión y el sistema, **no hay autenticación**.
+    `NOAUTH` es que la hay. Con acceso, las claves guardadas (`--scan`, nunca `KEYS *` en
+    producción) y la configuración (`CONFIG GET dir`).
+  initial-access: >-
+    `CONFIG SET dir` y `CONFIG SET dbfilename` cambian dónde vuelca Redis su base de datos, y el
+    volcado contiene lo que tú hayas guardado. Así se escribe tu clave pública como
+    **`authorized_keys`** del usuario de Redis, una webshell en la carpeta de una web o un cron. En
+    versiones 4 y 5, el *replica attack* carga un módulo y da ejecución directa.
+  exfil: >-
+    Sesiones de usuarios de la web (que se pueden reutilizar para entrar como ellos), tokens y datos
+    en caché. Si la sesión de un administrador está en Redis, no hace falta su contraseña.
+defense:
+  - Escuchar solo en localhost o en la red interna (`bind`) y con `protected-mode yes`.
+  - "`requirepass` o, en Redis 6 o superior, ACLs con usuarios y permisos por comando."
+  - Renombrar o desactivar `CONFIG`, `SAVE` y `MODULE` (`rename-command`) y no ejecutarlo como root.
+---
+
+## Qué es
+
+Redis es un almacén clave-valor en memoria que se usa como caché, cola o almacén de sesiones. Durante
+años vino sin contraseña y escuchando en todas las interfaces, y sigue apareciendo así en
+laboratorios y en internet. Persiste los datos volcándolos a disco en un archivo cuya ruta y nombre
+se cambian en caliente, y ahí está el problema.
+
+## Qué buscar
+
+- **Acceso sin contraseña**.
+- **Usuario** con el que corre (en `info server`, `executable` y `config_file`).
+- **Claves** con sesiones o secretos.

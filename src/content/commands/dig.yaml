@@ -1,0 +1,49 @@
+# Comandos de dig: consultas DNS, transferencias de zona y registros de Active Directory.
+tool: dig
+area: recon
+url: https://bind9.readthedocs.io/en/latest/manpages.html#dig-dns-lookup-utility
+commands:
+  - id: dig-axfr
+    title: Transferencia de zona (AXFR)
+    cmd: |
+      dig axfr {{DOMAIN}} @{{RHOST}}
+    phase: enum
+    tags: [dns, zone-transfer]
+    notes: >-
+      Si el servidor la permite a cualquiera, devuelve todos los registros de la zona: subdominios,
+      hosts internos, servidores de correo. Transfer failed significa que está restringida a los
+      secundarios.
+    refs: [https://bind9.readthedocs.io/en/latest/manpages.html#dig-dns-lookup-utility]
+
+  - id: dig-any
+    title: Todos los registros de un nombre
+    cmd: |
+      dig any {{DOMAIN}} @{{RHOST}} +noall +answer
+    phase: enum
+    tags: [dns]
+    notes: >-
+      Registros A, MX, NS, TXT y SOA de una vez. Los TXT revelan proveedores (SPF, verificaciones de
+      Google o Microsoft) y el SOA, el servidor primario. Muchos servidores ya no contestan a ANY.
+    refs: [https://bind9.readthedocs.io/en/latest/manpages.html#dig-dns-lookup-utility]
+
+  - id: dig-srv-dc
+    title: Controladores de dominio por sus registros SRV
+    cmd: |
+      dig srv _ldap._tcp.dc._msdcs.{{DOMAIN}} @{{DC_IP}} +short
+    phase: enum
+    tags: [dns, ldap, kerberos]
+    notes: >-
+      Active Directory publica sus servicios en DNS: _kerberos._tcp, _ldap._tcp, _gc._tcp. Así se
+      encuentran todos los DCs del dominio sin escanear.
+    refs: [https://learn.microsoft.com/en-us/troubleshoot/windows-server/networking/verify-srv-dns-records-have-been-created]
+
+  - id: dig-version-bind
+    title: Versión del servidor DNS
+    cmd: |
+      dig version.bind CHAOS TXT @{{RHOST}} +short
+    phase: enum
+    tags: [dns]
+    notes: >-
+      BIND contesta con su versión salvo que se haya ocultado en named.conf. Con la versión exacta,
+      searchsploit.
+    refs: [https://bind9.readthedocs.io/en/latest/reference.html#namedconf-statement-version]

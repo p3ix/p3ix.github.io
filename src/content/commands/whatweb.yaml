@@ -1,0 +1,15 @@
+# Comandos de whatweb: tecnologías de una web.
+tool: whatweb
+area: web
+url: https://github.com/urbanadventurer/WhatWeb
+commands:
+  - id: whatweb-fingerprint
+    title: Tecnologías y versiones de una web
+    cmd: |
+      whatweb -a 3 {{URL}}
+    phase: enum
+    tags: [http, fingerprinting]
+    notes: >-
+      Servidor, lenguaje, CMS, frameworks y sus versiones a partir de cabeceras, cookies y el HTML.
+      -a 3 hace algunas peticiones extra para afinar. Cada versión que salga, a searchsploit.
+    refs: [https://github.com/urbanadventurer/WhatWeb]

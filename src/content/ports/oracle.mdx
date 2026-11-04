@@ -1,0 +1,41 @@
+---
+title: Oracle TNS
+name: Oracle Database Listener
+summary: El listener de las bases de datos Oracle. Para entrar hay que adivinar primero el SID o el nombre del servicio; después, cuentas por defecto que siguen activas en muchas instalaciones.
+date: 2026-11-04
+ports: [1521/tcp]
+category: database
+tags: [oracle]
+phases:
+  enum: >-
+    La versión sale con `-sV`. Para conectar hace falta el **SID** o el nombre del servicio, que en
+    las versiones modernas el listener no revela: se adivina con diccionarios (`XE`, `ORCL`, `PROD`)
+    usando `odat sidguesser` o el script `oracle-sid-brute` de nmap.
+  credential-access: >-
+    Con el SID, prueba las **cuentas por defecto**: `scott:tiger`, `system:manager`, `sys:change_on_install`,
+    `dbsnmp:dbsnmp`. `odat passwordguesser` las recorre todas. Las bases antiguas guardan los hashes de
+    contraseña en `SYS.USER$`, crackeables.
+  initial-access: >-
+    Con privilegios suficientes, Oracle ejecuta comandos del sistema (Java, `DBMS_SCHEDULER`) y lee o
+    escribe archivos (`UTL_FILE`). `odat` automatiza cada técnica según los permisos que tengas.
+defense:
+  - Bloquear o eliminar las cuentas por defecto y aplicar los parches trimestrales (CPU).
+  - Filtrar el 1521 para que solo lleguen los servidores de aplicación.
+  - "`VALID_NODE_CHECKING_REGISTRATION` y contraseña en el listener para que nadie registre servicios falsos."
+---
+
+## Qué es
+
+El **listener** de Oracle (TNS) recibe las conexiones y las pasa a la instancia que corresponde,
+identificada por su **SID** o su *service name*. Sin ese nombre, no hay nada que atacar: por eso el
+primer paso es siempre adivinarlo. Hoy aparece sobre todo en entornos corporativos grandes y en
+aplicaciones heredadas.
+
+Kali no trae `odat` instalado por defecto (`sudo apt install odat`), y es la herramienta de referencia
+para todo lo de esta ficha.
+
+## Qué buscar
+
+- **Versión** del listener.
+- **SID** o nombre del servicio.
+- **Cuentas por defecto**.

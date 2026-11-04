@@ -1,0 +1,16 @@
+# Comandos de smtp-user-enum: usuarios de un servidor SMTP.
+tool: smtp-user-enum
+area: recon
+url: https://pentestmonkey.net/tools/user-enumeration/smtp-user-enum
+commands:
+  - id: smtp-user-enum-vrfy
+    title: Usuarios válidos con VRFY
+    cmd: |
+      smtp-user-enum -M VRFY -U users.txt -t {{RHOST}}
+    phase: enum
+    tags: [smtp, user-enum]
+    notes: >-
+      VRFY pregunta si un buzón existe. Si está desactivado, prueba -M RCPT -D con el dominio (empieza
+      un envío y mira si acepta el destinatario) o -M EXPN. En un Linux, los usuarios del correo
+      suelen ser los del sistema.
+    refs: [https://pentestmonkey.net/tools/user-enumeration/smtp-user-enum]

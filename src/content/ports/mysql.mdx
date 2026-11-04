@@ -1,0 +1,42 @@
+---
+title: MySQL
+name: MySQL y MariaDB
+summary: La base de datos de media web. Expuesta, se prueban root sin contraseña y credenciales reutilizadas; dentro, lee archivos del servidor y escribe webshells si el usuario tiene el privilegio FILE.
+date: 2026-11-04
+ports: [3306/tcp]
+category: database
+tags: [mysql]
+phases:
+  enum: >-
+    Versión y si te deja conectar desde tu IP: `Host is not allowed to connect` significa que solo
+    acepta clientes concretos, y habrá que llegar desde la web o desde la propia máquina. Con acceso,
+    las bases de datos, los usuarios de `mysql.user` y los privilegios del tuyo (`SHOW GRANTS`).
+  credential-access: >-
+    `root` sin contraseña, `root:root` y, sobre todo, las credenciales del archivo de configuración de
+    la web (`wp-config.php`, `.env`). Dentro, las tablas de usuarios de las aplicaciones guardan hashes
+    que se crackean y que muchos reutilizan en SSH.
+  initial-access: >-
+    Con el privilegio **FILE** y `secure_file_priv` vacío, `SELECT ... INTO OUTFILE` escribe una
+    webshell en la carpeta de la web. Si MySQL corre como root (raro hoy), las UDF permiten ejecutar
+    comandos.
+  exfil: >-
+    `LOAD_FILE()` lee cualquier archivo que pueda leer el usuario del servicio, y un `mysqldump`
+    se lleva las bases enteras.
+defense:
+  - Escuchar solo en localhost (`bind-address = 127.0.0.1`) si la aplicación está en la misma máquina.
+  - Un usuario por aplicación, con permisos solo sobre su base y sin el privilegio FILE.
+  - "`secure_file_priv` apuntando a una carpeta propia y MySQL corriendo como su propio usuario."
+  - Contraseñas fuertes para root y nada de cuentas sin contraseña (`mysql_secure_installation`).
+---
+
+## Qué es
+
+MySQL y su bifurcación MariaDB son la base de datos más común detrás de PHP: WordPress, Joomla,
+Drupal y miles de aplicaciones propias. Los usuarios se definen por **nombre y host** (`'web'@'localhost'`
+no es el mismo que `'web'@'%'`), y por eso una credencial puede valer en local y no desde fuera.
+
+## Qué buscar
+
+- **Acceso remoto** permitido.
+- **Credenciales** por defecto o reutilizadas de la web.
+- **Privilegio FILE** y `secure_file_priv`.

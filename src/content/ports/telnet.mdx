@@ -1,0 +1,37 @@
+---
+title: Telnet
+summary: Shell remota sin cifrado, hoy casi solo en routers, impresoras, cámaras y equipos industriales. Credenciales por defecto y todo lo que se teclea viaja en claro.
+date: 2026-11-04
+ports: [23/tcp]
+category: remote-access
+tags: [telnet]
+phases:
+  enum: >-
+    Conéctate con `nc -nv` o `telnet` y lee el banner: suele decir el fabricante y el modelo del
+    dispositivo (un router, un switch, una impresora). Con eso, busca su manual y sus **credenciales
+    de fábrica**.
+  initial-access: >-
+    Credenciales por defecto (`admin:admin`, `root:` vacía, las del manual del fabricante) y, en
+    dispositivos embebidos, firmwares con vulnerabilidades conocidas. Muchos IoT dan directamente una
+    shell de root con BusyBox.
+  credential-access: >-
+    Si estás en posición de capturar tráfico (ARP spoofing en la misma red), cualquier sesión de
+    Telnet enseña usuario y contraseña letra a letra. Fuerza bruta con listas de credenciales por
+    defecto de IoT, como las de Mirai.
+defense:
+  - Desactivar Telnet y usar SSH. Si el equipo no admite SSH, aislarlo en una VLAN de gestión.
+  - Cambiar las credenciales de fábrica de cada dispositivo al instalarlo.
+  - Alertar de cualquier conexión al 23 desde fuera de la red de gestión.
+---
+
+## Qué es
+
+Telnet abre una terminal remota en texto plano: lo que escribes, contraseña incluida, viaja tal cual.
+Se sustituyó por SSH hace décadas en servidores, pero sigue vivo en equipos de red, impresoras,
+cámaras IP, SAIs y PLCs, donde además se cambian poco las credenciales.
+
+## Qué buscar
+
+- **Banner**: fabricante, modelo y a veces versión de firmware.
+- **Credenciales por defecto** de ese modelo.
+- **Otros puertos del mismo equipo** (80, 161 SNMP): el panel web y SNMP suelen compartir credenciales.

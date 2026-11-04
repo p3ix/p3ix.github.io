@@ -1,0 +1,199 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import EmptyState from '@/components/EmptyState.astro';
+import Icon from '@/components/Icon.astro';
+import PageHeader from '@/components/PageHeader.astro';
+import { getCommands, getNotes, getPorts, linkedToPort, portHref } from '@/lib/content';
+import { inlineMarkdown, stripInlineMarkdown } from '@/lib/format';
+import { sectionById } from '@/lib/sections';
+import { PHASE_IDS, PORT_CATEGORY_IDS, phaseShort, phases, portCategories } from '@/lib/taxonomy';
+import { tone } from '@/lib/tone';
+
+const [entries, commands, notes] = await Promise.all([getPorts(), getCommands(), getNotes()]);
+
+const rows = entries.map((entry) => {
+  const linked = linkedToPort(entry, commands, notes);
+  const d = entry.data;
+  return {
+    id: entry.id,
+    d,
+    category: portCategories[d.category],
+    phases: linked.byPhase,
+    commandCount: linked.commands.length,
+    // Lo que encuentra el buscador: números, nombres, etiquetas y el texto de cada fase.
+    search: [
+      ...d.ports,
+      ...d.ports.map((p) => p.split('/')[0]),
+      d.title,
+      d.name ?? '',
+      ...d.tags,
+      d.summary,
+      ...Object.values(d.phases).map((t) => stripInlineMarkdown(t ?? '')),
+    ]
+      .join(' ')
+      .toLowerCase(),
+  };
+});
+
+const categoryFilters = PORT_CATEGORY_IDS.filter((id) => entries.some((e) => e.data.category === id));
+const phaseFilters = PHASE_IDS.filter((id) => rows.some((r) => r.phases.some((g) => g.phase === id)));
+const portCount = entries.reduce((n, e) => n + e.data.ports.length, 0);
+
+const description =
+  'Los puertos que más dan en una auditoría, qué servicio hay detrás y qué hacer con él en cada fase del ataque: enumeración, acceso, credenciales, movimiento lateral... con sus comandos.';
+const chip =
+  'min-h-9 rounded-full border border-line-strong px-3 font-mono text-xs text-muted transition-colors hover:text-fg-strong aria-pressed:border-biblia/55 aria-pressed:bg-biblia/12 aria-pressed:text-fg-strong';
+---
+
+<BaseLayout title="Puertos y servicios" description={description} section="biblia" path={['biblia', 'puertos']} ogImage="/og/biblia/puertos.png">
+  <PageHeader section={sectionById.biblia} kicker="Biblia" title="Puertos y servicios" description={description}>
+    <p class="font-mono text-sm text-subtle">
+      {entries.length} servicios · {portCount} puertos · busca por número (<kbd class="rounded border border-biblia/50 px-1.5 text-biblia">445</kbd>) o por nombre
+    </p>
+  </PageHeader>
+
+  {
+    rows.length === 0 ? (
+      <EmptyState color="biblia">Aún no hay puertos en la biblia.</EmptyState>
+    ) : (
+      <div data-ports-app class="flex flex-col gap-5">
+        <div class="flex flex-col gap-4 rounded-2xl border border-line bg-panel/90 p-4">
+          <div class="flex items-center gap-2.5 rounded-xl border border-line-strong bg-code px-3 focus-within:border-biblia/60">
+            <Icon name="search" size={17} class="shrink-0 text-subtle" />
+            <label for="ports-q" class="sr-only">Buscar puertos y servicios</label>
+            <input
+              id="ports-q"
+              data-ports-query
+              type="search"
+              placeholder="22, smb, kerberos, base de datos…"
+              spellcheck="false"
+              autocomplete="off"
+              class="h-11 w-full min-w-0 bg-transparent font-mono text-sm text-fg-strong outline-none placeholder:text-subtle/70"
+            />
+          </div>
+          <fieldset class="flex flex-col gap-2">
+            <legend class="mb-2 font-mono text-[11px] tracking-[0.18em] text-subtle uppercase">Familia</legend>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" data-filter="category" data-value="all" aria-pressed="true" class={chip}>todas</button>
+              {categoryFilters.map((id) => (
+                <button
+                  type="button"
+                  data-filter="category"
+                  data-value={id}
+                  aria-pressed="false"
+                  style={tone(portCategories[id].color)}
+                  class="inline-flex min-h-9 items-center gap-2 rounded-full border border-line-strong px-3 font-mono text-xs text-muted transition-colors hover:text-fg-strong aria-pressed:tone-border aria-pressed:tone-faint aria-pressed:text-fg-strong"
+                >
+                  <span class="tone-pill size-2 rounded-full" />
+                  {portCategories[id].label.toLowerCase()}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+          <fieldset class="flex flex-col gap-2">
+            <legend class="mb-2 font-mono text-[11px] tracking-[0.18em] text-subtle uppercase">Fase</legend>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" data-filter="phase" data-value="all" aria-pressed="true" class={chip}>todas</button>
+              {phaseFilters.map((id) => (
+                <button type="button" data-filter="phase" data-value={id} aria-pressed="false" class={chip}>
+                  {phases[id].toLowerCase()}
+                </button>
+              ))}
+            </div>
+            <p data-phase-hint class="font-mono text-xs text-subtle">Elige una fase y cada servicio dirá qué hacer con él en ese momento.</p>
+          </fieldset>
+        </div>
+
+        <p data-ports-count aria-live="polite" class="font-mono text-xs text-subtle">
+          {rows.length} servicios
+        </p>
+
+        <div class="flex flex-col gap-2.5">
+          <div aria-hidden="true" class="hidden grid-cols-[150px_minmax(0,1fr)_repeat(8,46px)] items-end gap-x-1 px-4 font-mono text-[10px] tracking-wider text-subtle uppercase lg:grid">
+            <span>Puerto</span>
+            <span>Servicio</span>
+            {PHASE_IDS.map((id) => (
+              <span class="text-center" title={phases[id]}>
+                {phaseShort[id]}
+              </span>
+            ))}
+          </div>
+
+          {rows.map((r) => (
+            <a
+              href={portHref(r.id)}
+              data-port={r.id}
+              data-category={r.d.category}
+              data-phases={r.phases.map((g) => g.phase).join(' ')}
+              data-search={r.search}
+              style={tone(r.category.color)}
+              class="group grid grid-cols-[minmax(0,1fr)] gap-x-1 gap-y-2.5 rounded-xl border border-line bg-panel/90 px-4 py-3.5 transition-colors hover:tone-border lg:grid-cols-[150px_minmax(0,1fr)_repeat(8,46px)] lg:items-center"
+            >
+              <span class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 font-mono">
+                {r.d.ports.map((p) => (
+                  <span class="text-[15px] font-bold text-fg-strong">
+                    {p.split('/')[0]}
+                    <span class="tone-text text-[11px] font-normal">/{p.split('/')[1]}</span>
+                  </span>
+                ))}
+              </span>
+              <span class="flex min-w-0 flex-col gap-0.5">
+                <span class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                  <span class="tone-pill size-2 shrink-0 rounded-full" />
+                  <span class="font-mono font-bold text-fg-strong group-hover:tone-text">{r.d.title}</span>
+                  {r.d.name && <span class="text-[13px] text-subtle">{r.d.name}</span>}
+                </span>
+                <span data-summary class="text-sm leading-relaxed text-muted">{r.d.summary}</span>
+                {r.phases
+                  .filter((g) => g.text)
+                  .map((g) => (
+                    <span data-phase-text={g.phase} hidden class="phase-text text-sm leading-relaxed text-fg">
+                      <span class="tone-text font-mono text-xs font-bold tracking-wider uppercase">{phases[g.phase]}: </span>
+                      <Fragment set:html={inlineMarkdown(g.text ?? '', { links: false })} />
+                    </span>
+                  ))}
+              </span>
+              <span class="flex flex-wrap gap-1.5 lg:contents">
+                {PHASE_IDS.map((id) => {
+                  const g = r.phases.find((x) => x.phase === id);
+                  return g ? (
+                    <span data-cell={id} class="tone-soft tone-text rounded-full px-2 py-0.5 font-mono text-[11px] lg:grid lg:h-7 lg:place-items-center lg:rounded-md lg:px-0">
+                      <span class="lg:sr-only">{phaseShort[id]}</span>
+                      <span aria-hidden="true" class="hidden lg:inline">{g.commands.length > 0 ? g.commands.length : '•'}</span>
+                    </span>
+                  ) : (
+                    <span aria-hidden="true" class="hidden place-items-center lg:grid">
+                      <span class="size-1 rounded-full bg-line-strong" />
+                    </span>
+                  );
+                })}
+              </span>
+            </a>
+          ))}
+
+          <p data-ports-empty hidden class="rounded-2xl border border-dashed border-line-strong px-6 py-10 text-center font-mono text-sm text-subtle">
+            <span class="text-biblia">[*]</span> Ningún servicio coincide. Prueba con otro número o quita algún filtro.
+          </p>
+        </div>
+
+        <p class="font-mono text-xs leading-relaxed text-subtle">
+          En la matriz, el número es cuántos comandos de la biblia hay para ese servicio en esa fase; el punto, que la fase está explicada pero aún sin comandos.
+        </p>
+      </div>
+    )
+  }
+</BaseLayout>
+
+<style>
+  /* Enlaces y código dentro del texto de una fase (viene de inlineMarkdown). */
+  .phase-text :global(code) {
+    font-family: var(--font-mono);
+    font-size: 0.875em;
+    color: var(--color-brand);
+  }
+</style>
+
+<script>
+  import { initPortsPage } from '@/scripts/ports-page';
+  initPortsPage();
+</script>

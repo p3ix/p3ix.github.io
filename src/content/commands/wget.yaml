@@ -1,0 +1,15 @@
+# Comandos de wget: descargas recursivas.
+tool: wget
+area: recon
+url: https://www.gnu.org/software/wget/manual/wget.html
+commands:
+  - id: wget-ftp-mirror
+    title: Descargar un FTP entero
+    cmd: |
+      wget -m --no-passive-ftp ftp://anonymous:anonymous@{{RHOST}}/
+    phase: exfil
+    tags: [ftp]
+    notes: >-
+      -m copia todo recursivo, con fechas. Si se queda colgado en el listado, quita --no-passive-ftp:
+      depende de si el firewall deja pasar el canal de datos activo o el pasivo. Luego, grep -ri pass.
+    refs: [https://www.gnu.org/software/wget/manual/wget.html#FTP-Options]

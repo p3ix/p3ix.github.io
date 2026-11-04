@@ -1,0 +1,41 @@
+---
+title: SMTP
+name: Simple Mail Transfer Protocol
+summary: El protocolo que envía el correo. Sirve para enumerar usuarios con VRFY o RCPT TO, para comprobar si hace relay abierto y, con permiso, para phishing interno que parece legítimo.
+date: 2026-11-04
+ports: [25/tcp, 465/tcp, 587/tcp]
+category: mail
+tags: [smtp]
+phases:
+  enum: >-
+    El banner da el servidor y el nombre del host (a menudo el nombre interno). `EHLO` lista lo que
+    admite: si aparecen **`VRFY`** o **`EXPN`**, preguntan directamente si un usuario existe; si no,
+    `RCPT TO` sirve igual porque el servidor rechaza destinatarios que no conoce. En un Linux, los
+    buzones son los usuarios del sistema: tienes la lista para atacar SSH.
+  initial-access: >-
+    Un servidor que acepta correo sin autenticar desde dentro, con remitente del propio dominio,
+    permite phishing que pasa los filtros. Un **relay abierto** (envía de fuera a fuera) es un
+    hallazgo por sí solo. Algunas versiones tienen RCE conocida (Exim, OpenSMTPD 6.6).
+  credential-access: >-
+    Si anuncia `AUTH` sin `STARTTLS` en el 25 o el 587, las credenciales viajan en Base64, que no es
+    cifrado. Con credenciales del dominio, el 587 autenticado es otro sitio donde probarlas.
+defense:
+  - Desactivar `VRFY` y `EXPN` y no revelar si un destinatario existe en la fase `RCPT TO` (o rechazar al final del mensaje).
+  - Relay solo para redes y usuarios autenticados; comprobarlo desde fuera tras cada cambio.
+  - SPF, DKIM y DMARC con política `reject` para que nadie mande correo como tu dominio.
+  - Exigir TLS para la autenticación (`smtpd_tls_auth_only` en Postfix).
+---
+
+## Qué es
+
+SMTP lleva el correo de un servidor a otro y del cliente a su servidor. El **25** es el de servidor a
+servidor; el **587** (submission, con `STARTTLS`) y el **465** (submissions, TLS implícito) son para
+que los clientes envíen autenticados. La conversación es texto: `HELO`/`EHLO`, `MAIL FROM`,
+`RCPT TO`, `DATA`. Por eso se puede hablar con él a mano con `nc` o `telnet`.
+
+## Qué buscar
+
+- **Nombre interno y software** en el banner y en `EHLO`.
+- **Enumeración de usuarios** con `VRFY`, `EXPN` o `RCPT TO`.
+- **Relay abierto** o envío sin autenticar desde dentro.
+- **Versión vulnerable** del servidor.

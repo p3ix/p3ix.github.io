@@ -1,0 +1,57 @@
+---
+title: SMB
+name: Server Message Block
+summary: Recursos compartidos, administración remota y autenticación de Windows en un solo puerto. Da usuarios y shares sin credenciales, admite spraying y Pass-the-Hash, y es el camino de PsExec y del NTLM relay.
+date: 2026-11-04
+ports: [139/tcp, 445/tcp]
+category: directory
+tags: [smb]
+related: [ad/enumeracion-smb, impacket-ntlmrelayx]
+phases:
+  recon: >-
+    El 445 está en casi todo Windows, así que barrerlo en una red encuentra los equipos aunque no
+    respondan al ping. La negociación ya da el **nombre del equipo, el dominio y la versión** de
+    Windows sin credenciales.
+  enum: >-
+    Prueba **sesión nula** y **invitado**: shares legibles, usuarios por RID cycling y la política de
+    contraseñas. Mira la **firma SMB**: si no es obligatoria, el host acepta NTLM relay. Con cualquier
+    cuenta del dominio, los shares de todos los equipos (`SYSVOL`, `NETLOGON` y los que haya creado
+    alguien). Todo en [enumeración por SMB](/biblia/ad/enumeracion-smb/).
+  initial-access: >-
+    Vulnerabilidades del propio protocolo en sistemas viejos (EternalBlue en SMBv1, Samba
+    `usermap_script`) o un share escribible que algo ejecuta: un script de inicio de sesión, una
+    carpeta que sirve una web.
+  credential-access: >-
+    **Password spraying** de una contraseña común contra todos los usuarios, con la política de
+    bloqueo delante. Con admin local, volcado de la **SAM** y los secretos LSA en remoto. En los shares,
+    búsqueda de contraseñas en scripts y en las GPP de `SYSVOL`.
+  lateral: >-
+    Con admin local en otro equipo, contraseña o hash: **PsExec**, `smbexec` o `nxc -x` para ejecutar
+    comandos, y **Pass-the-Hash** en toda la subred para ver dónde vale una cuenta. Sin firma
+    obligatoria, **NTLM relay** con lo que capture Responder.
+  exfil: >-
+    Descarga recursiva de los shares interesantes y búsqueda de archivos por nombre y contenido
+    (`.kdbx`, `.config`, `password`).
+defense:
+  - Firma SMB obligatoria en todos los equipos, no solo en los DCs, y SMBv1 desactivado.
+  - Sin sesiones nulas ni cuenta de invitado; revisar los permisos de cada share.
+  - LAPS para que cada admin local tenga una contraseña distinta y Pass-the-Hash no sirva en toda la red.
+  - Firewall de Windows que solo deje el 445 desde los equipos de administración; alertas por 4625 en ráfaga y por el servicio que crea PsExec (7045).
+---
+
+## Qué es
+
+SMB es el protocolo de archivos e impresoras de Windows, pero también el transporte de mucha
+administración remota: los *named pipes* por los que viajan RPC de usuarios (SAMR), servicios (SVCCTL)
+o el registro. Por eso un 445 abierto sirve para mucho más que copiar archivos. El 139 es SMB sobre
+NetBIOS, la forma antigua; Samba lo implementa en Linux.
+
+La autenticación es NTLM o Kerberos. NTLM acepta el **hash** de la contraseña en lugar de la
+contraseña (Pass-the-Hash) y, si la firma no es obligatoria, se puede reenviar a otro equipo (relay).
+
+## Qué buscar
+
+- **Versión, dominio y firma** de cada equipo.
+- **Sesión nula e invitado**.
+- **Shares** legibles y escribibles, con y sin credenciales.
+- **Dónde es admin local** cada cuenta que consigas.

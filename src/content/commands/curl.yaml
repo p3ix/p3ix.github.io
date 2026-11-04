@@ -1,0 +1,94 @@
+# Comandos de curl para hablar con servicios a mano: FTP, HTTP, correo y APIs expuestas.
+tool: curl
+area: recon
+url: https://curl.se/docs/manpage.html
+commands:
+  - id: curl-ftp-anonymous
+    title: Listar un FTP con el usuario anonymous
+    cmd: |
+      curl -s --user anonymous:anonymous ftp://{{RHOST}}/
+    phase: enum
+    tags: [ftp]
+    notes: >-
+      Si lista algo, el login anónimo está activo. Añade la ruta al final (ftp://host/pub/) para
+      entrar en carpetas y --list-only para ver solo los nombres.
+    refs: [https://curl.se/docs/manpage.html]
+
+  - id: curl-ftp-upload
+    title: Subir un archivo por FTP
+    cmd: |
+      curl -s -T shell.php --user {{USER}}:'{{PASS}}' ftp://{{RHOST}}/
+    phase: initial-access
+    tags: [ftp, webshell]
+    notes: >-
+      Si la carpeta del FTP es la raíz de una web (wwwroot, /var/www/html), lo que subas se ejecuta
+      al pedirlo por HTTP. Prueba primero con un .txt y búscalo en la web.
+    refs: [https://curl.se/docs/manpage.html]
+
+  - id: curl-http-headers
+    title: Cabeceras de una web sin descargar la página
+    cmd: |
+      curl -skI {{URL}}
+    phase: enum
+    tags: [http, fingerprinting]
+    notes: >-
+      Server, X-Powered-By, las cookies (PHPSESSID, JSESSIONID, ASP.NET_SessionId) y las redirecciones
+      dicen la tecnología antes de abrir el navegador. -k ignora certificados de laboratorio.
+    refs: [https://curl.se/docs/manpage.html]
+
+  - id: curl-http-options
+    title: Métodos HTTP permitidos (WebDAV, PUT)
+    cmd: |
+      curl -sk -i -X OPTIONS {{URL}}
+    phase: enum
+    tags: [http, webdav]
+    notes: >-
+      Las cabeceras Allow y DAV dicen si acepta PUT, MOVE o PROPFIND. Con PUT habilitado se puede
+      subir un archivo directamente con curl -T.
+    refs: [https://curl.se/docs/manpage.html]
+
+  - id: curl-imap-inbox
+    title: Leer el buzón de un usuario por IMAP
+    cmd: |
+      curl -sk --user {{USER}}:'{{PASS}}' 'imaps://{{RHOST}}/INBOX;UID=1'
+    phase: exfil
+    tags: [imap, pop3]
+    notes: >-
+      Sin ;UID= lista los mensajes; con él descarga uno entero. Para POP3, pop3s://host/1. En el
+      correo de los usuarios aparecen contraseñas, resets y nombres de otros sistemas.
+    refs: [https://everything.curl.dev/usingcurl/reademail.html]
+
+  - id: curl-docker-api
+    title: Contenedores de una API de Docker expuesta
+    cmd: |
+      curl -s 'http://{{RHOST}}:2375/containers/json?all=1'
+    phase: enum
+    area: pivoting
+    tags: [docker]
+    notes: >-
+      Lista contenedores, imágenes y montajes sin autenticación. Las variables de entorno de cada
+      contenedor (/containers/ID/json) suelen llevar contraseñas de bases de datos y claves de API.
+    refs: [https://docs.docker.com/reference/api/engine/]
+
+  - id: curl-elastic-indices
+    title: Índices de Elasticsearch sin autenticación
+    cmd: |
+      curl -s 'http://{{RHOST}}:9200/_cat/indices?v'
+    phase: enum
+    tags: [elasticsearch]
+    notes: >-
+      Muestra cada índice con su número de documentos y tamaño. Para leer uno,
+      /NOMBRE/_search?size=50&pretty. Si contesta security_exception, la autenticación está activa.
+    refs: [https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-cat-indices]
+
+  - id: curl-kubelet-pods
+    title: Pods de un kubelet expuesto
+    cmd: |
+      curl -sk https://{{RHOST}}:10250/pods
+    phase: enum
+    area: pivoting
+    tags: [kubernetes]
+    notes: >-
+      Si el kubelet admite peticiones anónimas, lista todos los pods del nodo, y /run/NAMESPACE/POD/
+      CONTENEDOR ejecuta comandos dentro. Un 401 significa que la autenticación anónima está apagada.
+    refs: [https://kubernetes.io/docs/reference/access-authn-authz/kubelet-authn-authz/]

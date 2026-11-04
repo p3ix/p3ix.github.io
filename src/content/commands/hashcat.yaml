@@ -1,0 +1,27 @@
+# Comandos de hashcat: los modos que salen de los servicios de red.
+tool: hashcat
+area: cracking
+url: https://hashcat.net/wiki/doku.php?id=hashcat
+commands:
+  - id: hashcat-netntlmv2
+    title: Crackear hashes NetNTLMv2 de Responder
+    cmd: |
+      hashcat -m 5600 responder.hash {{WORDLIST}}
+    phase: credential-access
+    tags: [ntlm, hash-cracking, llmnr]
+    notes: >-
+      Un NetNTLMv2 es un desafío-respuesta, no el hash NT: solo se usa crackeado. Con -r
+      /usr/share/hashcat/rules/best64.rule sube mucho la tasa de acierto con contraseñas corporativas.
+    refs: [https://hashcat.net/wiki/doku.php?id=example_hashes]
+
+  - id: hashcat-ipmi
+    title: Crackear hashes RAKP de IPMI
+    cmd: |
+      hashcat -m 7300 ipmi.hash {{WORDLIST}}
+    phase: credential-access
+    tags: [ipmi, hash-cracking]
+    notes: >-
+      Las contraseñas de los BMC rara vez se cambian: prueba también las de fábrica (ADMIN/ADMIN en
+      Supermicro, calvin en Dell iDRAC) y la máscara de 8 caracteres de HP iLO (-a 3 ?1?1?1?1?1?1?1?1
+      -1 ?d?u).
+    refs: [https://hashcat.net/wiki/doku.php?id=example_hashes]

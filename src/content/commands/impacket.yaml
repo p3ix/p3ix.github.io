@@ -57,3 +57,38 @@ commands:
       Con admin local saca los hashes NTLM de la SAM, los secretos LSA y las credenciales de dominio
       cacheadas, todo en remoto. Para Pass-the-Hash, -hashes :{{HASH}}. Para volcar la base entera
       del dominio (NTDS.dit) desde un DC, el comando de DCSync (-just-dc-ntlm).
+
+  - id: impacket-mssqlclient
+    title: Cliente de MSSQL con autenticación de Windows
+    cmd: |
+      impacket-mssqlclient {{DOMAIN}}/{{USER}}:'{{PASS}}'@{{RHOST}} -windows-auth
+    phase: enum
+    tags: [mssql]
+    notes: >-
+      Dentro, enum_db, enum_logins y enum_impersonate muestran bases, logins y a quién puedes
+      suplantar (EXECUTE AS). enable_xp_cmdshell y xp_cmdshell whoami ejecutan en el sistema si eres
+      sysadmin, y xp_dirtree hacia tu IP fuerza a la cuenta del servicio a autenticarse contra Responder.
+    refs: [https://github.com/fortra/impacket]
+
+  - id: impacket-rpcdump
+    title: Interfaces RPC expuestas por un Windows
+    cmd: |
+      impacket-rpcdump {{RHOST}} | grep -E 'Protocol|MS-RPRN|MS-PAR|MS-EFSR'
+    phase: enum
+    tags: [rpc, msrpc]
+    notes: >-
+      Pregunta al endpoint mapper (135) qué interfaces escuchan. MS-RPRN o MS-PAR indican el servicio
+      de impresión activo (PrinterBug, PrintNightmare) y MS-EFSR, PetitPotam: formas de obligar al
+      equipo a autenticarse contra ti.
+    refs: [https://github.com/fortra/impacket]
+
+  - id: impacket-ntlmrelayx
+    title: Reenviar autenticaciones NTLM a hosts sin firma SMB
+    cmd: |
+      sudo impacket-ntlmrelayx -tf relay-targets.txt -smb2support
+    phase: lateral
+    tags: [ntlm, relay, smb, llmnr]
+    notes: >-
+      Junto a Responder con SMB y HTTP desactivados en Responder.conf. Si la víctima es admin local
+      del destino, vuelca su SAM; con -i abre una shell SMB interactiva en 127.0.0.1:11000.
+    refs: [https://github.com/fortra/impacket]

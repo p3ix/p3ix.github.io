@@ -1,0 +1,16 @@
+# Comandos de swaks: enviar correo de prueba por SMTP.
+tool: swaks
+area: recon
+url: https://github.com/jetmore/swaks
+commands:
+  - id: swaks-relay-test
+    title: Probar si el servidor deja enviar correo como otro
+    cmd: |
+      swaks --server {{RHOST}} --from it@{{DOMAIN}} --to {{USER}}@{{DOMAIN}} --header 'Subject: prueba' --body 'prueba de relay'
+    phase: initial-access
+    tags: [smtp, phishing]
+    notes: >-
+      Si un servidor interno acepta correo sin autenticar con un remitente del propio dominio, se
+      puede mandar phishing que pasa por legítimo. Con un destinatario externo comprobarías el relay
+      abierto. Solo con autorización expresa.
+    refs: [https://github.com/jetmore/swaks]

@@ -1,0 +1,41 @@
+---
+title: rsync
+summary: Sincronización de carpetas entre máquinas. Su demonio comparte módulos que a menudo no piden contraseña y que son copias de seguridad enteras o, peor, carpetas home escribibles.
+date: 2026-11-04
+ports: [873/tcp]
+category: file-sharing
+tags: [rsync]
+phases:
+  enum: >-
+    Lista los **módulos** (cada uno es una carpeta compartida) y su comentario, que suele decir qué
+    contiene. Luego, el contenido de cada uno: los que no pidan contraseña están abiertos a cualquiera
+    que llegue al puerto.
+  initial-access: >-
+    Si un módulo es escribible y apunta a un home o a la carpeta de una web, sube un
+    `.ssh/authorized_keys` con tu clave o una webshell. El módulo puede tener `read only = false` sin
+    que nadie lo sepa.
+  credential-access: >-
+    Las copias de seguridad que se sirven por rsync contienen de todo: `/etc/shadow`, claves SSH,
+    configuraciones con contraseñas. El archivo `rsyncd.secrets` del servidor guarda las de los
+    módulos en claro.
+  exfil: >-
+    `rsync -av` descarga un módulo entero conservando permisos y fechas. Es rápido y solo transfiere
+    lo que cambia, así que repetirlo es barato.
+defense:
+  - Usar rsync sobre SSH (`rsync -e ssh`) en vez del demonio cuando sea posible.
+  - "Si hace falta el demonio: `auth users` y `secrets file` en cada módulo, `read only = yes` y `hosts allow` con las IP de los clientes."
+  - Nunca compartir con rsync carpetas home ni la raíz del sistema.
+---
+
+## Qué es
+
+rsync copia árboles de archivos transfiriendo solo las diferencias. Se usa de dos formas: sobre SSH,
+donde no abre ningún puerto propio, o con su **demonio** (`rsync --daemon`) en el 873, que publica
+**módulos** definidos en `/etc/rsyncd.conf`. Cada módulo puede tener usuarios propios (no los del
+sistema), ser de solo lectura o no y limitar qué IP se conectan.
+
+## Qué buscar
+
+- **Módulos sin autenticación**.
+- **Módulos escribibles**.
+- **Copias de seguridad** del sistema o de otras máquinas.

