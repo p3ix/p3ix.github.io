@@ -42,7 +42,7 @@ const d = entry.data;
       <h1 class="font-mono text-[34px] leading-tight font-extrabold tracking-tight text-fg-strong sm:text-[40px]">{d.title}</h1>
       <p class="text-[17px] leading-relaxed text-muted">{d.summary}</p>
 
-      <dl class="mt-1 grid grid-cols-2 gap-4 font-mono text-[13px] sm:grid-cols-4">
+      <dl class="mt-1 flex flex-wrap gap-x-8 gap-y-4 font-mono text-[13px]">
         <div>
           <dt class="text-[11px] tracking-[0.14em] text-subtle uppercase">Sistema</dt>
           <dd class="mt-1 text-fg-strong">{targetOs[d.os]}</dd>

