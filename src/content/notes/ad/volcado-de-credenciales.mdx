@@ -2,9 +2,10 @@
 title: Volcado de credenciales
 summary: Sacar hashes y contraseñas de un Windows comprometido (SAM, LSASS, credenciales cacheadas) y, como Domain Admin, la base entera del dominio (NTDS.dit) con secretsdump, mimikatz y NetExec.
 date: 2026-10-28
+updated: 2026-11-04
 area: ad
 order: 80
-related: [ad/movimiento-lateral, impacket-secretsdump-local, impacket-secretsdump-dcsync, mimikatz-logonpasswords, nxc-smb-sam]
+related: [ad/movimiento-lateral, impacket-secretsdump-local, impacket-secretsdump-dcsync, mimikatz-logonpasswords, nxc-smb-sam, hashcat-ntlm]
 tags: [credential-dumping, ntlm, active-directory]
 ---
 
@@ -22,7 +23,7 @@ seguir moviéndose. En Windows hay varios sitios donde viven:
 | NTDS.dit (en el DC) | Hashes de **todas** las cuentas del dominio | Domain Admin / derechos de replicación |
 
 Lo que sacas se **reutiliza** por Pass-the-Hash (ver [movimiento lateral](/biblia/ad/movimiento-lateral/))
-o se **crackea** offline con hashcat (`-m 1000` para un hash NT).
+o se **crackea** offline con [hashcat](/biblia/comandos/#hashcat-ntlm) (`-m 1000` para un hash NT).
 
 ## Requisitos
 

@@ -2,9 +2,10 @@
 title: Post-explotación de Windows
 summary: "Desde un meterpreter en Windows: escalar a SYSTEM con getsystem, incognito y los exploits locales, volcar credenciales con hashdump y kiwi, enumerar con módulos post, keylogging, RDP y persistencia."
 date: 2026-10-28
+updated: 2026-11-04
 area: metasploit
 order: 70
-related: [metasploit/meterpreter, meterpreter-getsystem, meterpreter-hashdump, meterpreter-kiwi, msf-bypassuac, meterpreter-keylogger, meterpreter-enable-rdp, msf-persistence-service]
+related: [metasploit/meterpreter, meterpreter-getsystem, meterpreter-hashdump, john-ntlm, hashcat-ntlm, meterpreter-kiwi, msf-bypassuac, meterpreter-keylogger, meterpreter-enable-rdp, msf-persistence-service]
 tags: [metasploit, post-explotacion, windows]
 ---
 
@@ -58,7 +59,13 @@ sistemas antiguos o con WDigest, contraseñas en claro:
 <Cmd id="meterpreter-kiwi" />
 
 Los hashes quedan en `creds` y de ahí los crackea el [módulo integrado](/biblia/comandos/#msf-crack-windows)
-con John, o los sacas para [hashcat](/biblia/comandos/#meterpreter-hashdump) con `-m 1000`.
+con John. Para crackearlos en tu máquina, copia las líneas del hashdump a un fichero y pásaselo a John:
+
+<Cmd id="john-ntlm" />
+
+O solo los hashes NT, uno por línea, a hashcat con la GPU:
+
+<Cmd id="hashcat-ntlm" />
 
 ## Enumerar
 

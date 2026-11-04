@@ -2,9 +2,10 @@
 title: Explotar servicios con Metasploit
 summary: Cómo elegir un exploit con criterio en vez de dispararlos todos, confirmarlo con check, el porqué de db_autopwn y un catálogo de los exploits de servicio que caen en el eJPT.
 date: 2026-10-28
+updated: 2026-11-04
 area: metasploit
 order: 50
-related: [metasploit/payloads, metasploit/meterpreter, msf-eternalblue, msf-psexec, msf-hfs, msf-vsftpd-backdoor, searchsploit-nmap]
+related: [metasploit/payloads, metasploit/meterpreter, msf-eternalblue, msf-ms17-010-psexec, msf-psexec, msf-hfs, msf-vsftpd-backdoor, searchsploit-nmap]
 tags: [metasploit, exploit-search, rce]
 ---
 
@@ -65,6 +66,7 @@ es `search` → `use` → `set RHOSTS` → `exploit`, confirmando la versión an
 | --- | --- | --- |
 | Rejetto HFS 2.3 | `exploit/windows/http/rejetto_hfs_exec` | RCE → meterpreter en Windows |
 | SMBv1 (MS17-010) | `exploit/windows/smb/ms17_010_eternalblue` | meterpreter SYSTEM, sin credenciales |
+| SMBv1 (MS17-010), versión estable | `exploit/windows/smb/ms17_010_psexec` | SYSTEM sin tocar el kernel; necesita un named pipe accesible |
 | SMB con credenciales de admin | `exploit/windows/smb/psexec` | shell/meterpreter como SYSTEM (acepta pass-the-hash) |
 | WinRM 5985 | `exploit/windows/winrm/winrm_script_exec` | ejecución con credenciales |
 | IIS + WebDAV | `exploit/windows/iis/iis_webdav_upload_asp` | sube una webshell ASP |
@@ -79,6 +81,10 @@ La teoría de cada CVE está en su área. Los más usados en el examen, con sus 
 EternalBlue, el rey del acceso inicial en Windows sin credenciales:
 
 <Cmd id="msf-eternalblue" />
+
+Si EternalBlue tumba el equipo o no llega la shell, la variante psexec explota otros fallos del mismo boletín y es mucho más estable:
+
+<Cmd id="msf-ms17-010-psexec" />
 
 PsExec, el puente lateral con credenciales o con un hash (pass-the-hash):
 
