@@ -1,0 +1,56 @@
+---
+title: Abuso de permisos SUID
+summary: Los binarios con el bit SUID se ejecutan como su propietario. Si uno es de root y permite ejecutar código —como un python mal configurado— es escalada directa; GTFOBins reúne cómo abusar de cada binario.
+date: 2026-11-05
+area: privesc-linux
+order: 20
+related: [find-suid, find-sgid, python-suid-shell]
+tags: [suid, privesc, gtfobins]
+---
+
+## Qué es
+
+El bit **SUID** (la `s` en los permisos del propietario, los `4000` en octal) hace que un binario se ejecute con el **UID efectivo de su propietario**, no con el de quien lo lanza. Está pensado para programas que necesitan un privilegio puntual: `passwd` tiene que escribir en `/etc/shadow`, `ping` abre un socket raw. El problema aparece cuando un binario SUID de **root** permite, de una forma u otra, ejecutar comandos: entonces ejecuta *tus* comandos como root.
+
+Linux distingue el UID **real** (`ruid`, quién eres) del **efectivo** (`euid`, con qué permisos actúas ahora mismo). Al lanzar un SUID de root quedas con `ruid` = tu usuario y `euid` = 0. Si consigues abrir una shell que conserve ese `euid`, eres root.
+
+## Encontrar los binarios SUID
+
+Nada más pisar una shell en Linux, enumera los SUID y compáralos con los de una instalación limpia: lo que sobre es sospechoso.
+
+<Cmd id="find-suid" />
+
+El equivalente con el grupo (SGID) a veces también da juego:
+
+<Cmd id="find-sgid" />
+
+Un intérprete (python, perl, ruby), un editor (vim, nano), una utilidad de copia (cp, tar) o casi cualquier binario de propósito general con SUID de root suele ser escalada. LinPEAS los resalta en rojo automáticamente.
+
+## Abusar de un python con SUID
+
+El caso que me encontré en la máquina [RootMe](/ctf/rootme/): `/usr/bin/python2.7` tenía el bit SUID. Un intérprete con SUID de root es de los fallos más directos, porque ejecuta cualquier código que le pases conservando el `euid` 0.
+
+<Cmd id="python-suid-shell" />
+
+### Por qué el `-p`
+
+bash y sh, por seguridad, **descartan el `euid` elevado nada más arrancar cuando `euid` ≠ `ruid`** (igualan el `euid` al `ruid`), justo para frustrar este abuso. El flag `-p` (*privileged*) le dice a la shell que **no** haga ese descarte y mantenga el `euid` 0. Por eso la técnica lanza `sh -p` y no un `sh` a secas: sin `-p`, abrirías una shell que vuelve a ser de tu usuario. La alternativa es forzar el UID antes de la shell: `os.setuid(0)` y luego `os.system("/bin/bash")`.
+
+## GTFOBins: el catálogo
+
+Cada binario se abusa de una forma distinta (python ejecuta código, `find` tiene `-exec`, `cp` sobrescribe `/etc/passwd`...). No hay que memorizarlas: **[GTFOBins](https://gtfobins.github.io/)** reúne, binario a binario, cómo abusar de cada uno según el contexto (SUID, `sudo`, capabilities...). El flujo es: enumeras los SUID, buscas cada binario en GTFOBins y miras si tiene sección **SUID**. Ahí encontré la de python.
+
+Unos cuantos habituales, para hacerse una idea:
+
+| Binario | Cómo escala con SUID |
+| --- | --- |
+| `bash` | `bash -p` abre una shell que conserva el euid |
+| `find` | `find . -exec /bin/sh -p \; -quit` |
+| `python` | `python -c 'import os; os.execl("/bin/sh","sh","-p")'` |
+| `cp` | sobrescribir `/etc/passwd` con un root sin contraseña |
+
+## Cómo se detecta y se mitiga
+
+- **Auditar los SUID**: pasar `find / -perm -4000` de forma periódica; ninguno debería ser un intérprete ni una utilidad de propósito general. Quitar el bit sobrante con `chmod u-s <binario>`. AIDE o Tripwire avisan si aparece un SUID nuevo.
+- **Mínimo privilegio**: si un programa solo necesita un permiso concreto (abrir un puerto bajo, por ejemplo), dárselo con **capabilities** acotadas o con una regla de `sudo`, no con el SUID entero.
+- **Montajes con `nosuid`**: montar `/tmp`, `/home` y los puntos donde escribe el usuario con la opción `nosuid`, para que un binario SUID copiado ahí no surta efecto.

