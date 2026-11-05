@@ -1,0 +1,74 @@
+---
+// Portada de un writeup de CTF: el diagrama de la máquina en un marco, ampliable a tamaño
+// completo al pulsarlo (como el trofeo de bug bounty, pero sin el brillo holográfico, porque
+// aquí la portada es un dibujo, no una tarjeta de recompensa). Estilos en global.css (.cover-*).
+import type { ImageMetadata } from 'astro';
+import { Image, getImage } from 'astro:assets';
+import Icon from './Icon.astro';
+import { tone, type ColorToken } from '@/lib/tone';
+
+interface Props {
+  src: ImageMetadata;
+  alt: string;
+  /** Token del color del borde y el halo. */
+  color?: ColorToken;
+}
+
+const { src, alt, color = 'ctf' } = Astro.props;
+const full = await getImage({ src, width: Math.min(src.width, 1600) });
+const widths = [480, 960];
+const sizes = '(min-width: 1024px) 24rem, calc(100vw - 4.5rem)';
+---
+
+<figure data-cover style={tone(color)} class="m-0 w-full">
+  <a
+    href={full.src}
+    data-cover-open
+    class="cover-stage tone-border group relative block w-full cursor-zoom-in overflow-hidden rounded-xl border p-1.5"
+  >
+    <Image src={src} alt={alt} widths={widths} sizes={sizes} loading="eager" class="block h-auto w-full rounded-lg" />
+    <span
+      aria-hidden="true"
+      class="tone-text absolute right-2.5 bottom-2.5 grid size-8 place-items-center rounded-lg border border-line-strong bg-code/85 opacity-0 backdrop-blur-sm transition-opacity duration-200 group-hover:opacity-100"
+    >
+      <Icon name="search" size={15} />
+    </span>
+    <span class="sr-only">(ampliar)</span>
+  </a>
+
+  <dialog
+    data-cover-dialog
+    data-pagefind-ignore
+    aria-label={alt}
+    class="tone-border m-auto w-[min(1200px,calc(100vw-2rem))] overflow-hidden rounded-2xl border bg-panel p-0 shadow-[0_0_80px_color-mix(in_oklab,var(--tone)_18%,transparent)] backdrop:bg-base/85 backdrop:backdrop-blur-sm"
+  >
+    <form method="dialog" class="absolute top-3 right-3">
+      <button
+        type="submit"
+        aria-label="Cerrar"
+        class="grid size-11 place-items-center rounded-full border border-line-strong bg-code/85 text-fg-strong hover:text-brand"
+      >
+        <Icon name="close" size={18} />
+      </button>
+    </form>
+    <img src={full.src} width={full.attributes.width} height={full.attributes.height} alt={alt} loading="lazy" decoding="async" class="block h-auto w-full" />
+  </dialog>
+</figure>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-cover]').forEach((cover) => {
+    const stage = cover.querySelector<HTMLAnchorElement>('[data-cover-open]');
+    const dialog = cover.querySelector<HTMLDialogElement>('[data-cover-dialog]');
+    if (!stage || !dialog) return;
+
+    stage.addEventListener('click', (event) => {
+      // Ctrl/Cmd/Shift+clic abre la imagen en otra pestaña, como cualquier enlace.
+      if (event.ctrlKey || event.metaKey || event.shiftKey) return;
+      event.preventDefault();
+      dialog.showModal();
+    });
+    dialog.addEventListener('click', (event) => {
+      if (event.target === dialog) dialog.close();
+    });
+  });
+</script>
