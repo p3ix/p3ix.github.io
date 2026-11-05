@@ -1,0 +1,55 @@
+---
+title: Reverse shells y estabilización
+summary: Cómo pasar de una ejecución de comandos a una shell usable, montando el listener, lanzando la reverse shell (bash con /dev/tcp, netcat o desde una webshell) y estabilizándola con un PTY para tener un TTY completo.
+date: 2026-11-05
+area: shells
+order: 20
+related: [nc-listener, bash-revshell, nc-revshell, webshell-revshell, python-pty-shell]
+tags: [reverse-shell, payloads, webshell]
+---
+
+## Qué es
+
+Una **reverse shell** es una shell en la que la máquina víctima **se conecta a ti**, al revés que una *bind shell* (donde la víctima abre un puerto y te conectas tú). Se prefiere la reverse porque la víctima casi siempre está detrás de un NAT o un firewall que bloquea las conexiones entrantes pero deja salir las salientes: abres el puerto en tu máquina y ella sale a buscarte.
+
+El flujo es siempre el mismo: montas un **listener**, lanzas el **payload** en la víctima (a mano, desde una webshell, desde un `system()`...) y, cuando cae la conexión, **estabilizas** la shell para que sea usable. En la máquina [RootMe](/ctf/rootme/) la cadena fue exactamente esa: webshell → reverse shell → PTY.
+
+## El listener
+
+Primero el oído en tu máquina, antes de lanzar nada en la víctima:
+
+<Cmd id="nc-listener" />
+
+Un puerto como el 443 o el 80 (por debajo de 1024, así que con `sudo`) suele cruzar mejor los firewalls de salida, porque se confunde con tráfico web normal.
+
+## Lanzar la reverse shell
+
+La más socorrida en Linux es la de **bash con `/dev/tcp`**:
+
+<Cmd id="bash-revshell" />
+
+`/dev/tcp` es una función de bash: no existe en `sh` ni en `dash`. Por eso, cuando la ejecución de comandos pasa por `/bin/sh` (como el `system()` de PHP), hay que envolverla en `bash -c`. Si en la víctima no hay bash, tira de **netcat sin `-e`** con una tubería `mkfifo`:
+
+<Cmd id="nc-revshell" />
+
+Y desde una **webshell**, todo en una línea y URL-encodeado para que el `&` y los espacios no rompan la petición:
+
+<Cmd id="webshell-revshell" />
+
+## Estabilizar la shell
+
+La shell que cae en el listener no tiene TTY: no van `sudo`, `su`, los editores ni `Ctrl+C` (que mataría la sesión entera en vez de cortar el comando). El truco estándar, en tres pasos:
+
+<Cmd id="python-pty-shell" />
+
+1. Tras el `pty.spawn`, `Ctrl+Z` para mandar la shell al segundo plano.
+2. En tu Kali: `stty raw -echo; fg`, que pasa las teclas crudas (sin doble eco) a la sesión remota y la trae de vuelta.
+3. Ya dentro: `export TERM=xterm`, para que funcionen `clear`, `less` y el borrado de línea.
+
+Con eso tienes una terminal completa. Si no hay python en la víctima, valen `script -qc /bin/bash /dev/null` o, como mejora rápida, ajustar el tamaño con `stty rows 50 cols 200`.
+
+## Cómo se detecta y se mitiga
+
+- **En el servidor**: que el proceso de una web (`www-data`, `apache`) lance `bash -i`, `nc` o `sh`, o abra `/dev/tcp`, es muy anómalo. `auditd` sobre el `execve` de shells por esos usuarios, y un EDR, lo cazan.
+- **En la red**: el **egress filtering** es lo que más corta esto. Un servidor web no tiene por qué iniciar conexiones salientes; limitar la salida a lo imprescindible deja la reverse shell sin camino, y conviene vigilar conexiones a puertos e IPs raros.
+- **Puertos "de confianza"**: no basta con permitir el 443 de salida, porque por ahí van muchas reverse shells. Filtrar por destino (un proxy con lista de dominios permitidos) es más fiable que filtrar solo por puerto.
