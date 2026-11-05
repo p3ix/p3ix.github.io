@@ -1,4 +1,4 @@
-# Abuso de un binario python con SUID para escalar a root (técnica de GTFOBins).
+# Python en una máquina objetivo: abuso de SUID (GTFOBins) y estabilización de la shell.
 tool: python
 area: privesc-linux
 url: https://gtfobins.github.io/gtfobins/python/
@@ -13,3 +13,14 @@ commands:
       Lánzalo con el binario de python que tenga el SUID (python2.7, python3...), con su ruta completa.
       El flag -p de sh evita que descarte el euid de root al arrancar; sin él vuelves a ser tu usuario.
     refs: [https://gtfobins.github.io/gtfobins/python/#suid]
+
+  - id: python-pty-shell
+    title: Estabilizar una shell con un PTY
+    cmd: |
+      python3 -c 'import pty; pty.spawn("/bin/bash")'
+    phase: initial-access
+    area: shells
+    tags: [reverse-shell]
+    notes: >-
+      Una reverse shell llega sin TTY. Tras el pty.spawn: Ctrl+Z, luego en Kali stty raw -echo; fg y de
+      vuelta export TERM=xterm, para tener Ctrl+C, sudo y editores.

