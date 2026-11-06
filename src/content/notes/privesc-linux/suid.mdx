@@ -2,9 +2,10 @@
 title: Abuso de permisos SUID
 summary: Los binarios con el bit SUID se ejecutan como su propietario. Si uno es de root y permite ejecutar código —como un python mal configurado— es escalada directa; GTFOBins reúne cómo abusar de cada binario.
 date: 2026-11-05
+updated: 2026-11-06
 area: privesc-linux
 order: 20
-related: [find-suid, find-sgid, python-suid-shell]
+related: [find-suid, find-sgid, python-suid-shell, systemctl-suid-service]
 tags: [suid, privesc, gtfobins]
 ---
 
@@ -36,6 +37,12 @@ El caso que me encontré en la máquina [RootMe](/ctf/rootme/): `/usr/bin/python
 
 bash y sh, por seguridad, **descartan el `euid` elevado nada más arrancar cuando `euid` ≠ `ruid`** (igualan el `euid` al `ruid`), justo para frustrar este abuso. El flag `-p` (*privileged*) le dice a la shell que **no** haga ese descarte y mantenga el `euid` 0. Por eso la técnica lanza `sh -p` y no un `sh` a secas: sin `-p`, abrirías una shell que vuelve a ser de tu usuario. La alternativa es forzar el UID antes de la shell: `os.setuid(0)` y luego `os.system("/bin/bash")`.
 
+## Otro ejemplo: systemctl
+
+No todos los SUID peligrosos son intérpretes. En la máquina [Vulnversity](/ctf/vulnversity/) el SUID era `/bin/systemctl`, que no ejecuta código por sí mismo pero le pide a **systemd** (el PID 1, que corre como root) que gestione un servicio; uno sin la directiva `User=` corre como root. Se registra un servicio propio que deja una copia de bash con SUID:
+
+<Cmd id="systemctl-suid-service" />
+
 ## GTFOBins: el catálogo
 
 Cada binario se abusa de una forma distinta (python ejecuta código, `find` tiene `-exec`, `cp` sobrescribe `/etc/passwd`...). No hay que memorizarlas: **[GTFOBins](https://gtfobins.github.io/)** reúne, binario a binario, cómo abusar de cada uno según el contexto (SUID, `sudo`, capabilities...). El flujo es: enumeras los SUID, buscas cada binario en GTFOBins y miras si tiene sección **SUID**. Ahí encontré la de python.
@@ -48,6 +55,7 @@ Unos cuantos habituales, para hacerse una idea:
 | `find` | `find . -exec /bin/sh -p \; -quit` |
 | `python` | `python -c 'import os; os.execl("/bin/sh","sh","-p")'` |
 | `cp` | sobrescribir `/etc/passwd` con un root sin contraseña |
+| `systemctl` | registrar un servicio de systemd que corre como root |
 
 ## Cómo se detecta y se mitiga
 

