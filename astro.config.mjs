@@ -9,6 +9,10 @@ import tailwindcss from '@tailwindcss/vite';
 // https://docs.astro.build/en/reference/configuration-reference/
 export default defineConfig({
   site: 'https://p3ix.github.io',
+  // El whoami es la portada desde noviembre de 2026: los enlaces antiguos siguen funcionando.
+  redirects: {
+    '/whoami': '/',
+  },
   integrations: [
     // expressiveCode tiene que ir antes que mdx para procesar los bloques de código de MDX.
     // Su configuración vive en ec.config.mjs.

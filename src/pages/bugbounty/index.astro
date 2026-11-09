@@ -32,7 +32,7 @@ const description =
         {entries.map((entry) => {
           const d = entry.data;
           const severity = severities[d.severity];
-          const badge = entryBadge(d);
+          const badge = entryBadge(d, { fresh: false });
           const where = [d.program, d.platform && bbPlatforms[d.platform], d.cwe].filter(Boolean).join(' · ');
           return (
             <li>

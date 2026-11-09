@@ -22,10 +22,13 @@ export function monogram(title: string) {
 
 const NEW_DAYS = 30;
 
-/** Etiqueta de la esquina de las tarjetas: los borradores mandan sobre lo reciente. */
-export function entryBadge(data: { date: Date; draft: boolean }) {
+/**
+ * Etiqueta de la esquina de las tarjetas: los borradores mandan sobre lo reciente. Con
+ * `fresh: false` nunca sale NUEVO (los reportes de bug bounty solo marcan los borradores).
+ */
+export function entryBadge(data: { date: Date; draft: boolean }, { fresh = true } = {}) {
   if (data.draft) return 'BORRADOR';
-  if (Date.now() - data.date.valueOf() < NEW_DAYS * 24 * 60 * 60 * 1000) return 'NUEVO';
+  if (fresh && Date.now() - data.date.valueOf() < NEW_DAYS * 24 * 60 * 60 * 1000) return 'NUEVO';
   return undefined;
 }
 

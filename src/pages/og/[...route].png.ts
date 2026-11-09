@@ -67,7 +67,7 @@ export const getStaticPaths = (async () => {
     })),
     {
       route: 'whoami',
-      card: { kicker: 'whoami', title: 'Asier Lara Arroyo', summary: 'Ingeniero informático y bug bounty hunter. Hall of fame, herramientas y experiencia.', color: 'whoami', path: 'whoami' },
+      card: { kicker: 'whoami', title: 'Asier Lara Arroyo', summary: 'Ingeniero informático y bug bounty hunter con la eJPTv2. Experiencia, hall of fame, herramientas y stack.', color: 'whoami', path: 'whoami' },
     },
     {
       route: 'herramientas',

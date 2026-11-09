@@ -1,16 +1,17 @@
 import type { APIRoute } from 'astro';
 import { tools } from '@/data/profile';
 import { utilities, utilityHref } from '@/data/utilities';
-import { getCommands, getNotes, getPorts, getPublished, portHref } from '@/lib/content';
+import { commandPlaces, getCommands, getNotes, getPorts, getPublished, portHref, type CommandPlace } from '@/lib/content';
 import { getTags, tagBreakdown } from '@/lib/tags';
 import { areas, ctfPlatforms, portCategories, severities } from '@/lib/taxonomy';
 
 /**
  * Índice de la paleta Ctrl+K: comandos y páginas. Se genera en el build (en producción sin
- * borradores) y la paleta lo descarga la primera vez que se abre.
+ * borradores) y la paleta lo descarga la primera vez que se abre. Cada comando lleva `where`:
+ * las notas y fichas de puertos donde se lee, la mejor primero (la paleta abre esa).
  */
 export interface SearchIndex {
-  commands: { id: string; title: string; tool: string; cmd: string; tags: string; area: string; color: string }[];
+  commands: { id: string; title: string; tool: string; cmd: string; tags: string; area: string; color: string; where: CommandPlace[] }[];
   pages: { id: string; url: string; title: string; summary: string; kind: string; color: string; tags: string }[];
 }
 
@@ -24,6 +25,8 @@ export const GET: APIRoute = async () => {
     getPorts(),
   ]);
 
+  const places = commandPlaces(commands, notes, ports);
+
   const index: SearchIndex = {
     commands: commands.map((c) => ({
       id: c.id,
@@ -33,9 +36,10 @@ export const GET: APIRoute = async () => {
       tags: c.tags.join(' '),
       area: areas[c.area].label,
       color: areas[c.area].color,
+      where: places.get(c.id) ?? [],
     })),
     pages: [
-      { id: 'home', url: '/', title: 'Inicio', summary: 'Portada de p3i', kind: 'Sección', color: 'home', tags: '' },
+      { id: 'whoami', url: '/', title: 'whoami', summary: 'Perfil, experiencia, formación, certificaciones y stack', kind: 'Sección', color: 'whoami', tags: 'inicio portada cv perfil experiencia formacion certificaciones ejpt stack' },
       { id: 'ctf', url: '/ctf/', title: 'Writeups CTF', summary: 'Máquinas retiradas', kind: 'Sección', color: 'ctf', tags: 'htb hackthebox' },
       { id: 'bb', url: '/bugbounty/', title: 'Bug bounty', summary: 'Reportes divulgados', kind: 'Sección', color: 'bb', tags: 'reportes' },
       { id: 'biblia', url: '/biblia/', title: 'Biblia', summary: 'Notas y metodología', kind: 'Sección', color: 'biblia', tags: 'notas' },
@@ -61,7 +65,6 @@ export const GET: APIRoute = async () => {
         tags: u.keywords,
       })),
       { id: 'herramientas', url: '/herramientas/', title: 'Herramientas', summary: 'Herramientas propias y arsenal de la biblia', kind: 'Sección', color: 'tools', tags: 'github tools' },
-      { id: 'whoami', url: '/whoami/', title: 'whoami', summary: 'Perfil, experiencia y CV', kind: 'Sección', color: 'whoami', tags: 'cv perfil' },
       { id: 'etiquetas', url: '/etiquetas/', title: 'Etiquetas', summary: 'Todo el contenido por tema', kind: 'Sección', color: 'tags', tags: 'tags temas' },
       ...tools.map((t) => ({
         id: `tool/${t.name}`,

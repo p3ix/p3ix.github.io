@@ -1,13 +1,11 @@
 import type { IconName } from './icons';
 
-export type SectionId = 'home' | 'ctf' | 'bb' | 'biblia' | 'tools' | 'whoami' | 'tags';
+export type SectionId = 'whoami' | 'ctf' | 'bb' | 'biblia' | 'tools' | 'tags';
 
 export interface Section {
   id: SectionId;
   /** Texto del menú lateral. */
   label: string;
-  /** Texto de las baldosas de acceso de la home. */
-  tileLabel: string;
   href: string;
   icon: IconName;
   /**
@@ -25,25 +23,24 @@ export interface Section {
 }
 
 export const sections: Section[] = [
+  // La portada es el whoami: perfil, CV, hall of fame y stack.
   {
-    id: 'home',
-    label: 'Inicio',
-    tileLabel: 'Inicio',
+    id: 'whoami',
+    label: 'whoami',
     href: '/',
-    icon: 'home',
+    icon: 'user',
     cls: {
-      text: 'text-home',
-      solid: 'bg-home',
-      soft: 'bg-home/12',
-      faint: 'bg-home/6',
-      border: 'border-home/35',
-      borderStrong: 'border-home/55',
+      text: 'text-whoami',
+      solid: 'bg-whoami',
+      soft: 'bg-whoami/12',
+      faint: 'bg-whoami/6',
+      border: 'border-whoami/35',
+      borderStrong: 'border-whoami/55',
     },
   },
   {
     id: 'ctf',
     label: 'Writeups CTF',
-    tileLabel: 'Writeups CTF',
     href: '/ctf/',
     icon: 'terminal',
     cls: {
@@ -58,7 +55,6 @@ export const sections: Section[] = [
   {
     id: 'bb',
     label: 'Bug bounty',
-    tileLabel: 'Bug bounty',
     href: '/bugbounty/',
     icon: 'bug',
     cls: {
@@ -73,7 +69,6 @@ export const sections: Section[] = [
   {
     id: 'biblia',
     label: 'Biblia',
-    tileLabel: 'Biblia',
     href: '/biblia/',
     icon: 'book',
     cls: {
@@ -88,7 +83,6 @@ export const sections: Section[] = [
   {
     id: 'tools',
     label: 'Herramientas',
-    tileLabel: 'Herramientas',
     href: '/herramientas/',
     icon: 'wrench',
     cls: {
@@ -101,24 +95,8 @@ export const sections: Section[] = [
     },
   },
   {
-    id: 'whoami',
-    label: 'whoami',
-    tileLabel: 'whoami y CV',
-    href: '/whoami/',
-    icon: 'user',
-    cls: {
-      text: 'text-whoami',
-      solid: 'bg-whoami',
-      soft: 'bg-whoami/12',
-      faint: 'bg-whoami/6',
-      border: 'border-whoami/35',
-      borderStrong: 'border-whoami/55',
-    },
-  },
-  {
     id: 'tags',
     label: 'Etiquetas',
-    tileLabel: 'Etiquetas',
     href: '/etiquetas/',
     icon: 'hash',
     cls: {

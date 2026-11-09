@@ -14,8 +14,6 @@ export const profile = {
   role: 'Ingeniero informático · Bug Bounty Hunter',
   tagline: 'rompiendo cosas con permiso',
   location: 'Burgos, España',
-  objective: 'eJPTv2',
-  hallOfFame: 'NASA',
   site: 'p3ix.github.io',
   bio: 'Ingeniero informático con pasión por la seguridad ofensiva. Participo en programas de bug bounty y VDP, con vulnerabilidades aceptadas en Bugcrowd (incluida la NASA), YesWeHack y Grayback. Tengo experiencia en auditorías web y de Active Directory, y desarrollo mis propias herramientas de pentesting.',
 } as const;
@@ -48,7 +46,7 @@ export const platforms: Platform[] = [
   },
 ];
 
-/** Herramientas propias: /herramientas/, whoami y el contador de la home. Datos sacados de cada README. */
+/** Herramientas propias: /herramientas/ y el whoami de la portada. Datos sacados de cada README. */
 export interface Tool {
   name: string;
   description: string;
@@ -138,22 +136,61 @@ export const education = [
 ];
 
 export const certifications = [
-  { name: 'eJPTv2', full: 'eLearnSecurity Junior Penetration Tester', status: 'Examen previsto: octubre 2026' },
+  { name: 'eJPTv2', full: 'eLearnSecurity Junior Penetration Tester v2', issuer: 'INE Security' },
+  { name: 'B2 First', full: 'Cambridge English B2 First (FCE)', issuer: 'Cambridge English' },
 ];
 
-/** Grupos de habilidades del CV; `color` es un token de global.css. */
-export const skills: { area: string; color: ColorToken; items: string[] }[] = [
-  { area: 'Web', color: 'area-web', items: ['Burp Suite', 'OWASP ZAP', 'Nuclei', 'sqlmap', 'Nikto', 'ffuf', 'Gobuster'] },
-  { area: 'Escaneo y explotación', color: 'area-recon', items: ['Nmap', 'Metasploit', 'Hydra', 'Netcat', 'Wireshark'] },
-  { area: 'Active Directory', color: 'area-ad', items: ['BloodHound', 'Impacket', 'NetExec', 'Responder'] },
-  { area: 'Cracking', color: 'area-crack', items: ['Hashcat', 'John the Ripper'] },
-  { area: 'Scripting', color: 'tools', items: ['Bash', 'Python'] },
-  { area: 'Entorno', color: 'muted', items: ['Kali Linux', 'Git', 'GitHub'] },
+/**
+ * Una herramienta del stack. Si tiene comandos en la biblia, su chip enlaza a ellos: se busca
+ * sola por nombre (`'Nmap'` → commands/nmap.yaml); `bible` solo hace falta cuando el nombre no
+ * coincide con el archivo (`{ name: 'Netcat', bible: 'nc' }`).
+ */
+export type StackItem = string | { name: string; bible: string };
+
+/** Grupos de habilidades del CV y de la biblia; `color` es un token de global.css. */
+export const skills: { area: string; color: ColorToken; items: StackItem[] }[] = [
+  {
+    area: 'Web',
+    color: 'area-web',
+    items: ['Burp Suite', 'OWASP ZAP', 'Nuclei', 'sqlmap', 'ffuf', 'Gobuster', 'feroxbuster', 'wfuzz', 'WhatWeb', 'Nikto'],
+  },
+  {
+    area: 'Reconocimiento',
+    color: 'area-recon',
+    items: ['Nmap', 'RustScan', 'Masscan', 'arp-scan', 'netdiscover', 'dig', 'snmpwalk', 'Wireshark'],
+  },
+  { area: 'Explotación', color: 'area-msf', items: ['Metasploit', 'Meterpreter', 'msfvenom', 'searchsploit'] },
+  {
+    area: 'Active Directory',
+    color: 'area-ad',
+    items: ['BloodHound', 'Impacket', 'NetExec', 'Kerbrute', 'Responder', 'Evil-WinRM', 'Mimikatz', 'ldapsearch', 'rpcclient', 'smbclient', 'smbmap', 'enum4linux'],
+  },
+  { area: 'Cracking y fuerza bruta', color: 'area-crack', items: ['Hashcat', { name: 'John the Ripper', bible: 'john' }, 'Hydra'] },
+  {
+    area: 'Shells y pivoting',
+    color: 'area-shell',
+    items: [{ name: 'Netcat', bible: 'nc' }, 'SSH', { name: 'Webshells', bible: 'webshell' }, 'xfreerdp'],
+  },
+  {
+    area: 'Servicios',
+    color: 'area-wpe',
+    items: [
+      'MySQL',
+      { name: 'PostgreSQL', bible: 'psql' },
+      { name: 'MongoDB', bible: 'mongosh' },
+      { name: 'Redis', bible: 'redis-cli' },
+      'NFS',
+      'rsync',
+      'swaks',
+    ],
+  },
+  { area: 'Scripting', color: 'tools', items: ['Bash', 'Python', 'PowerShell'] },
+  { area: 'Entorno', color: 'muted', items: ['Kali Linux', 'Docker', 'Git', 'GitHub'] },
 ];
 
 export const languages = [
   { name: 'Español', level: 'Nativo' },
-  { name: 'Inglés', level: 'B2' },
+  { name: 'Inglés', level: 'B2 · Cambridge First' },
   { name: 'Alemán', level: 'A2' },
 ];
 

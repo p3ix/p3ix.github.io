@@ -81,6 +81,54 @@ export async function getCommand(id: string) {
   return command;
 }
 
+/** Ids de los comandos incrustados con <Cmd id="..." /> en el cuerpo de un MDX, en orden. */
+export const embeddedCommandIds = (body = '') => [...body.matchAll(/<Cmd\s+id=["']([^"']+)["']/g)].map((m) => m[1]);
+
+/** Una página donde se lee un comando: la URL de la página (sin `#id`). */
+export interface CommandPlace {
+  url: string;
+  title: string;
+  kind: 'Nota' | 'Puerto';
+}
+
+/**
+ * Dónde se lee cada comando, de mejor a peor sitio: las notas que lo incrustan con <Cmd> (primero
+ * las de su área, las metodologías al final y, si no, la que trata más comandos) y después las
+ * fichas de puertos que lo muestran. La paleta lleva al comando dentro de la primera.
+ */
+export function commandPlaces(
+  commands: Command[],
+  notes: CollectionEntry<'notes'>[],
+  ports: CollectionEntry<'ports'>[],
+): Map<string, CommandPlace[]> {
+  const embeddedByNote = new Map(notes.map((n) => [n, embeddedCommandIds(n.body)]));
+  const places = new Map<string, CommandPlace[]>();
+
+  for (const c of commands) {
+    const rank = (n: CollectionEntry<'notes'>) =>
+      [n.data.area === c.area ? 0 : 1, n.id.endsWith('/metodologia') ? 1 : 0, -embeddedByNote.get(n)!.length] as const;
+    const inNotes = notes
+      .filter((n) => embeddedByNote.get(n)!.includes(c.id))
+      .sort((a, b) => {
+        const [ra, rb] = [rank(a), rank(b)];
+        return ra[0] - rb[0] || ra[1] - rb[1] || ra[2] - rb[2];
+      })
+      .map((n): CommandPlace => ({ url: `/biblia/${n.id}/`, title: n.data.title, kind: 'Nota' }));
+    places.set(c.id, inNotes);
+  }
+
+  for (const port of ports) {
+    const embedded = embeddedCommandIds(port.body);
+    const { commands: listed } = linkedToPort(port, commands, notes, embedded);
+    const ids = new Set([...embedded, ...listed.map((c) => c.id)]);
+    for (const id of ids) {
+      places.get(id)?.push({ url: portHref(port.id), title: port.data.title, kind: 'Puerto' });
+    }
+  }
+
+  return places;
+}
+
 /** Trozos de un comando: texto literal o una variable {{X}}. */
 export type CommandPart = { text: string } | { variable: VariableName };
 

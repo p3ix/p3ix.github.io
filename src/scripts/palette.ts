@@ -1,11 +1,12 @@
 /**
  * Paleta global Ctrl+K (o /): busca comandos y páginas en /search.json con MiniSearch y, además,
  * en el texto completo de writeups y notas con Pagefind (índice generado en el build).
- * Enter copia el comando con las variables sustituidas o abre la página; Ctrl+Enter lleva
- * el comando a /biblia/comandos/. Todo se carga la primera vez que se abre.
+ * Enter abre la página o lleva el comando a la nota donde se explica (o a su ficha de puerto),
+ * justo a su tarjeta, para copiarlo desde allí; Ctrl+Enter lo abre en /biblia/comandos/.
+ * Todo se carga la primera vez que se abre.
  */
 import type { SearchIndex } from '@/pages/search.json';
-import { copyText, substitute } from './vars';
+import { substitute } from './vars';
 
 type CommandDoc = SearchIndex['commands'][number];
 type PageDoc = SearchIndex['pages'][number];
@@ -41,6 +42,13 @@ function loadPagefind() {
 
 const colorForUrl = (url: string) =>
   url.startsWith('/ctf/') ? 'ctf' : url.startsWith('/bugbounty/') ? 'bb' : url.startsWith('/biblia/') ? 'biblia' : 'brand';
+
+/** La tarjeta del comando en el buscador de comandos (siempre existe). */
+const commandsPageUrl = (command: CommandDoc) => `/biblia/comandos/#${command.id}`;
+
+/** La tarjeta del comando dentro de la nota (o ficha de puerto) donde mejor se explica. */
+const commandUrl = (command: CommandDoc) =>
+  command.where[0] ? `${command.where[0].url}#${command.id}` : commandsPageUrl(command);
 
 /** Pagefind devuelve el extracto como HTML con <mark>; se reconstruye sin innerHTML. */
 function excerptNodes(html: string) {
@@ -126,20 +134,10 @@ export function initPalette() {
   const input = dialog?.querySelector<HTMLInputElement>('[data-palette-input]');
   const list = dialog?.querySelector<HTMLUListElement>('[data-palette-results]');
   const status = dialog?.querySelector<HTMLElement>('[data-palette-status]');
-  const toast = document.querySelector<HTMLElement>('[data-toast]');
   if (!dialog || !input || !list || !status) return;
 
   let results: Result[] = [];
   let active = -1;
-  let toastTimer: number | undefined;
-
-  function showToast(text: string) {
-    if (!toast) return;
-    toast.textContent = text;
-    toast.dataset.shown = '';
-    window.clearTimeout(toastTimer);
-    toastTimer = window.setTimeout(() => delete toast.dataset.shown, 1800);
-  }
 
   function setActive(index: number) {
     active = index;
@@ -177,7 +175,15 @@ export function initPalette() {
           el('span', 'min-w-0 flex-1 truncate font-semibold text-fg-strong', result.doc.title),
           el('span', 'shrink-0 font-mono text-xs text-subtle', result.doc.tool),
         );
-        option.append(head, el('code', 'truncate pl-4.5 font-mono text-xs text-muted', substitute(result.doc.cmd)));
+        // Adónde lleva Enter: la nota (o el puerto) donde está explicado, o el buscador si no sale en ninguna.
+        const [place, ...others] = result.doc.where;
+        const target = el('span', 'flex min-w-0 items-center gap-1.5 pl-4.5 font-mono text-[11px] text-subtle');
+        target.append(
+          el('span', 'shrink-0', '→'),
+          el('span', 'tone-text truncate', place ? `${place.kind} · ${place.title}` : 'Buscador de comandos'),
+        );
+        if (others.length) target.append(el('span', 'shrink-0', `+${others.length}`));
+        option.append(head, el('code', 'truncate pl-4.5 font-mono text-xs text-muted', substitute(result.doc.cmd)), target);
       } else if (result.kind === 'text') {
         const excerpt = el('span', 'line-clamp-2 text-sm text-muted');
         excerpt.append(...excerptNodes(result.doc.excerpt));
@@ -238,20 +244,14 @@ export function initPalette() {
     if (previous > 0) setActive(previous);
   }
 
-  async function run(index: number, openInBible = false) {
+  function run(index: number, toCommandsPage = false) {
     const result = results[index];
     if (!result) return;
-    if (result.kind === 'page' || result.kind === 'text') {
-      window.location.href = result.doc.url;
-      return;
-    }
-    if (openInBible) {
-      window.location.href = `/biblia/comandos/#${result.doc.id}`;
-      return;
-    }
-    const ok = await copyText(substitute(result.doc.cmd));
+    const url =
+      result.kind !== 'command' ? result.doc.url : toCommandsPage ? commandsPageUrl(result.doc) : commandUrl(result.doc);
+    // Se cierra antes: si el destino está en esta misma página, solo cambia el #ancla y no se recarga.
     dialog!.close();
-    showToast(ok ? `Copiado: ${result.doc.title}` : 'No se pudo copiar al portapapeles');
+    window.location.href = url;
   }
 
   function open() {
@@ -276,7 +276,7 @@ export function initPalette() {
       setActive((active + step + results.length) % results.length);
     } else if (event.key === 'Enter') {
       event.preventDefault();
-      void run(active, event.ctrlKey || event.metaKey);
+      run(active, event.ctrlKey || event.metaKey);
     }
   });
 

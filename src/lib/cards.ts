@@ -69,6 +69,6 @@ export function bugbountyCard(entry: CollectionEntry<'bugbounty'>): EntryCardPro
     color: 'bb',
     accent: { text: severity.label.toLowerCase(), color: severity.color },
     cover: d.cover ? { kind: 'image', src: d.cover, alt: d.coverAlt ?? '' } : { kind: 'icon', icon: 'bug' },
-    badge: entryBadge(d),
+    badge: entryBadge(d, { fresh: false }),
   };
 }

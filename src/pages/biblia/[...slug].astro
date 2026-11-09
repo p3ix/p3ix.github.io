@@ -5,7 +5,7 @@ import Cmd from '@/components/Cmd.astro';
 import CommandCard from '@/components/CommandCard.astro';
 import SubnetCalc from '@/components/SubnetCalc.astro';
 import VarBar from '@/components/VarBar.astro';
-import { getCommands, getNotes, variablesIn, type Command } from '@/lib/content';
+import { embeddedCommandIds, getCommands, getNotes, variablesIn, type Command } from '@/lib/content';
 import { formatDate, isoDate, readingTime } from '@/lib/format';
 import { tagHref } from '@/lib/tags';
 import { areas } from '@/lib/taxonomy';
@@ -27,7 +27,7 @@ const area = areas[d.area];
 const [commands, notes] = await Promise.all([getCommands(), getNotes()]);
 
 // Comandos incrustados con <Cmd id="..." /> en el cuerpo de la nota.
-const embeddedIds = [...(entry.body ?? '').matchAll(/<Cmd\s+id=["']([^"']+)["']/g)].map((m) => m[1]);
+const embeddedIds = embeddedCommandIds(entry.body);
 const embedded = commands.filter((c) => embeddedIds.includes(c.id));
 
 // `related` acepta ids de comandos o de notas; cualquier otra cosa rompe el build.

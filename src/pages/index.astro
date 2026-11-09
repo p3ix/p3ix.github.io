@@ -1,167 +1,268 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
-import EmptyState from '@/components/EmptyState.astro';
-import EntryCard from '@/components/EntryCard.astro';
+import Avatar from '@/components/Avatar.astro';
 import Icon from '@/components/Icon.astro';
 import Prompt from '@/components/Prompt.astro';
 import TerminalWindow from '@/components/TerminalWindow.astro';
-import { platforms, profile, tools } from '@/data/profile';
-import { bugbountyCard, ctfCard, noteCard } from '@/lib/cards';
-import { getNotes, getPublished } from '@/lib/content';
-import type { IconName } from '@/lib/icons';
-import { sectionById, sections, type Section } from '@/lib/sections';
+import {
+  certifications,
+  education,
+  experience,
+  languages,
+  platforms,
+  profile,
+  skills,
+  socials,
+  tools,
+  type StackItem,
+} from '@/data/profile';
+import { getCommands } from '@/lib/content';
+import { tone } from '@/lib/tone';
 
-// "P3I" en figlet (fuente ANSI Shadow).
-const figlet = [
-  '██████╗ ██████╗ ██╗',
-  '██╔══██╗╚════██╗██║',
-  '██████╔╝ █████╔╝██║',
-  '██╔═══╝  ╚═══██╗██║',
-  '██║     ██████╔╝██║',
-  '╚═╝     ╚═════╝ ╚═╝',
-];
+// El botón del CV solo aparece si existe src/assets/cv.pdf (la versión sin teléfono).
+const cvFiles = import.meta.glob<string>('/src/assets/cv.pdf', { query: '?url', import: 'default', eager: true });
+const cvUrl = Object.values(cvFiles)[0];
+const github = socials.find((s) => s.icon === 'github');
+const linkedin = socials.find((s) => s.icon === 'linkedin');
 
-const ctfEntries = await getPublished('ctf');
-const bbEntries = await getPublished('bugbounty');
-const noteEntries = await getNotes();
-const writeupCount = ctfEntries.length + bbEntries.length;
+// Stack: cada herramienta con comandos en la biblia enlaza a ellos en el buscador.
+const commands = await getCommands();
+const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+const commandsByFile = Map.groupBy(commands, (c) => normalize(c.file));
+const bibleTools = new Set(commands.map((c) => c.file)).size;
 
-const latest = [
-  ...ctfEntries.map((e) => ({ date: e.data.updated ?? e.data.date, card: ctfCard(e) })),
-  ...bbEntries.map((e) => ({ date: e.data.updated ?? e.data.date, card: bugbountyCard(e) })),
-  ...noteEntries.map((e) => ({ date: e.data.updated ?? e.data.date, card: noteCard(e) })),
-]
-  .sort((a, b) => b.date.valueOf() - a.date.valueOf())
-  .slice(0, 5)
-  .map((x) => x.card);
+function stackChip(item: StackItem) {
+  const name = typeof item === 'string' ? item : item.name;
+  const list = commandsByFile.get(normalize(typeof item === 'string' ? item : item.bible));
+  if (!list) {
+    if (typeof item !== 'string') throw new Error(`Stack de profile.ts: "${item.bible}" no es ningún archivo de src/content/commands/.`);
+    return { name };
+  }
+  return { name, count: list.length, href: `/biblia/comandos/?q=${encodeURIComponent(list[0].tool)}` };
+}
 
-const stats: { label: string; value: string; icon: IconName; section: Section }[] = [
-  { label: 'Objetivo', value: profile.objective, icon: 'flag', section: sectionById.home },
-  { label: 'Writeups', value: String(writeupCount), icon: 'terminal', section: sectionById.ctf },
-  { label: 'Plataformas', value: String(platforms.length), icon: 'bug', section: sectionById.bb },
-  { label: 'Herramientas', value: String(tools.length), icon: 'wrench', section: sectionById.tools },
-  { label: 'Hall of fame', value: profile.hallOfFame, icon: 'trophy', section: sectionById.whoami },
-];
+const stack = skills.map((g) => ({ ...g, chips: g.items.map(stackChip) }));
 
-const tiles = sections.filter((s) => s.id !== 'home');
-const c = (id: keyof typeof sectionById) => sectionById[id].cls.text;
+const description = `${profile.name} (${profile.handle}): ${profile.role}. Experiencia, formación, certificaciones, hall of fame y herramientas.`;
 ---
 
-<BaseLayout section="home" path={['inicio']}>
-  <TerminalWindow label="Presentación">
-    <div role="note" class="flex items-center gap-3.5 rounded-xl border border-warn/55 bg-warn/6 px-4 py-3.5">
-      <span class="grid size-[34px] shrink-0 place-items-center rounded-lg bg-warn/16 text-warn">
-        <Icon name="shield" size={18} strokeWidth={2.2} />
-      </span>
-      <!-- El compilador de Astro 7 recorta los saltos de línea junto a etiquetas: el texto con <strong> va en una sola línea. -->
-      <p class="font-mono text-[13.5px] leading-relaxed text-warn-fg">
-        Todo el contenido tiene <strong class="text-warn">fines educativos</strong>. Las técnicas se aplican solo en <strong class="text-warn">entornos autorizados</strong> o dentro del <strong class="text-warn">alcance</strong> de cada programa.
-      </p>
-    </div>
-
+<BaseLayout description={description} section="whoami" path={['whoami']} ogImage="/og/whoami.png">
+  <TerminalWindow title="p3i@kali: ~" label="Perfil">
     <Prompt>whoami</Prompt>
-
-    <div class="flex flex-wrap items-stretch gap-7">
-      <div
-        class="flex min-w-0 flex-[0_1_320px] flex-col items-center justify-center gap-4 rounded-xl border border-brand/20 bg-code bg-scanlines px-4 py-8 max-sm:flex-auto"
-      >
-        <div role="img" aria-label="p3i en arte ASCII" class="font-mono text-[15px] leading-[1.08] text-brand text-glow">
-          {figlet.map((line) => <div class="whitespace-pre">{line}</div>)}
-        </div>
-        <p class="font-mono text-xs tracking-[0.38em] text-muted">BUG BOUNTY HUNTER</p>
-      </div>
-
-      <div class="flex min-w-0 flex-[1_1_380px] flex-col justify-center gap-4">
-        <h1 class="font-mono text-[34px] leading-tight font-extrabold tracking-tight text-brand text-glow-soft">
-          {profile.name}
-        </h1>
+    <div class="flex flex-wrap items-center gap-8">
+      <Avatar size="lg" />
+      <div class="flex min-w-[260px] flex-1 flex-col gap-3">
+        <h1 class="font-mono text-[34px] leading-tight font-extrabold tracking-tight text-brand text-glow-soft">{profile.name}</h1>
+        <p class="font-mono text-sm text-fg-strong">@{profile.handle} · {profile.role}</p>
+        <p class="inline-flex items-center gap-2 font-mono text-[13px] text-subtle">
+          <Icon name="pin" size={15} />
+          {profile.location}
+        </p>
         <div aria-hidden="true" class="h-0.5 bg-spectrum"></div>
-        <p class="font-mono text-[15px] leading-[1.8] text-fg">
-          Soy <strong class={c('home')}>{profile.firstName}</strong>, ingeniero informático y <strong class={c('bb')}>bug bounty hunter</strong> en Burgos. Aquí documento los <strong class={c('bb')}>reportes</strong> que me aceptan, las <strong class={c('ctf')}>máquinas</strong> que voy rooteando, la <strong class={c('biblia')}>biblia de comandos</strong> que uso en cada auditoría y mis <strong class={c('tools')}>herramientas</strong>.
-        </p>
-        <p class="font-mono text-sm text-subtle italic">
-          Ponte cómodo: la biblia está a un <kbd class="rounded border border-biblia/50 px-1.5 text-biblia not-italic">Ctrl K</kbd> de distancia.
-        </p>
+        <p class="text-[17px] leading-[1.7] text-fg">{profile.bio}</p>
+        <div class="flex flex-wrap gap-3 pt-1">
+          {
+            github && (
+              <a href={github.href} target="_blank" rel="me noopener" class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line-strong px-4 font-mono text-sm text-fg-strong hover:border-brand/45 hover:text-brand">
+                <Icon name="github" size={17} />
+                GitHub
+              </a>
+            )
+          }
+          {
+            linkedin && (
+              <a href={linkedin.href} target="_blank" rel="me noopener" class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line-strong px-4 font-mono text-sm text-fg-strong hover:border-brand/45 hover:text-brand">
+                <Icon name="linkedin" size={17} />
+                LinkedIn
+              </a>
+            )
+          }
+          {
+            cvUrl && (
+              <a href={cvUrl} download="cv-asier-lara.pdf" class="inline-flex min-h-11 items-center gap-2 rounded-xl bg-brand px-4 font-mono text-sm font-bold text-on-accent">
+                <Icon name="download" size={17} />
+                CV en PDF
+              </a>
+            )
+          }
+        </div>
       </div>
     </div>
+  </TerminalWindow>
 
-    <ul class="flex flex-wrap gap-3" aria-label="Datos rápidos">
-      <li class="flex">
-        <a
-          href="https://github.com/p3ix"
-          aria-label="GitHub de p3i"
-          class="grid min-h-16 w-16 place-items-center rounded-xl border border-line-strong bg-panel text-fg-strong transition-colors hover:border-brand/40 hover:text-brand"
-        >
-          <Icon name="github" size={24} />
-        </a>
-      </li>
+  <div class="grid gap-7 lg:grid-cols-2">
+    <section aria-labelledby="exp-title" class="flex flex-col gap-4 rounded-2xl border border-line bg-panel/80 p-5 sm:p-6" style={tone('whoami')}>
+      <h2 id="exp-title" class="inline-flex items-center gap-2.5 font-mono text-xl font-bold text-fg-strong">
+        <Icon name="briefcase" size={20} class="tone-text" />
+        Experiencia
+      </h2>
+      <ol class="flex flex-col gap-5 border-l border-line pl-6">
+        {
+          experience.map((e, i) => (
+            <li class="relative">
+              <span aria-hidden="true" class:list={['absolute top-1.5 -left-[29px] size-2.5 rounded-full ring-4 ring-panel', i === 0 ? 'tone-pill' : 'bg-line-strong']} />
+              <p class="font-mono text-xs text-subtle">{e.period} · {e.place}</p>
+              <p class="font-semibold text-fg-strong">{e.role} <span class="font-normal text-muted">· {e.org}</span></p>
+              {
+                e.points.length > 0 && (
+                  <ul class="mt-2 flex flex-col gap-1.5 text-[15px] leading-relaxed text-muted">
+                    {e.points.map((pt) => (
+                      <li class="flex gap-2">
+                        <span class="tone-text">▹</span>
+                        {pt}
+                      </li>
+                    ))}
+                  </ul>
+                )
+              }
+            </li>
+          ))
+        }
+      </ol>
+    </section>
+
+    <div class="flex flex-col gap-7">
+      <section aria-labelledby="edu-title" class="flex flex-col gap-4 rounded-2xl border border-line bg-panel/80 p-5 sm:p-6" style={tone('whoami')}>
+        <h2 id="edu-title" class="inline-flex items-center gap-2.5 font-mono text-xl font-bold text-fg-strong">
+          <Icon name="cap" size={20} class="tone-text" />
+          Formación
+        </h2>
+        <ol class="flex flex-col gap-4 border-l border-line pl-6">
+          {
+            education.map((e, i) => (
+              <li class="relative">
+                <span aria-hidden="true" class:list={['absolute top-1.5 -left-[29px] size-2.5 rounded-full ring-4 ring-panel', i === 0 ? 'tone-pill' : 'bg-line-strong']} />
+                <p class="font-semibold text-fg-strong">{e.title}</p>
+                <p class="font-mono text-xs text-subtle">{[e.org, e.period].filter(Boolean).join(' · ')}</p>
+              </li>
+            ))
+          }
+        </ol>
+      </section>
+
+      <section aria-labelledby="cert-title" class="flex flex-col gap-4 rounded-2xl border border-line bg-panel/80 p-5 sm:p-6" style={tone('home')}>
+        <h2 id="cert-title" class="inline-flex items-center gap-2.5 font-mono text-xl font-bold text-fg-strong">
+          <Icon name="badge" size={20} class="tone-text" />
+          Certificaciones
+        </h2>
+        <ul class="flex flex-col gap-4">
+          {
+            certifications.map((c) => (
+              <li class="flex flex-col gap-1">
+                <p class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                  <span class="tone-text font-mono text-lg font-extrabold">{c.name}</span>
+                  <span class="inline-flex items-center gap-1 rounded-full border border-ctf/40 bg-ctf/10 px-2 py-0.5 font-mono text-[11px] text-ctf">
+                    <Icon name="check" size={12} strokeWidth={2.6} />
+                    obtenida
+                  </span>
+                </p>
+                <p class="text-[15px] text-muted">{c.full}</p>
+                <p class="font-mono text-xs text-subtle">{c.issuer}</p>
+              </li>
+            ))
+          }
+        </ul>
+      </section>
+    </div>
+  </div>
+
+  <section aria-labelledby="hof-title" class="flex flex-col gap-4" style={tone('bb')}>
+    <h2 id="hof-title" class="font-mono text-xl font-bold text-fg-strong"><span class="tone-text">##</span> Hall of fame</h2>
+    <ul class="grid gap-3.5 md:grid-cols-3">
       {
-        stats.map((s) => (
-          <li
-            class:list={[
-              'flex min-w-0 flex-[1_1_140px] flex-col gap-1.5 rounded-xl border px-3.5 py-3',
-              s.section.cls.border,
-              s.section.cls.faint,
-            ]}
-          >
-            <span class="inline-flex items-center gap-2 font-mono text-[11px] tracking-[0.14em] text-muted uppercase">
-              <Icon name={s.icon} size={13} strokeWidth={2.4} class={s.section.cls.text} />
-              {s.label}
-            </span>
-            <span class="font-mono text-xl font-extrabold text-fg-strong">{s.value}</span>
+        platforms.map((p) => (
+          <li class="grid">
+            <a href={p.url} target="_blank" rel="noopener" class="tone-border tone-faint group flex flex-col gap-2 rounded-2xl border p-5 transition-transform hover:-translate-y-0.5">
+              <span class="flex items-center justify-between gap-3">
+                <span class="text-lg font-semibold text-fg-strong">{p.name}</span>
+                <Icon name="external" size={15} class="tone-text opacity-70 group-hover:opacity-100" />
+              </span>
+              <span class="tone-text font-mono text-xs">@{p.handle}</span>
+              <span class="text-[15px] leading-relaxed text-muted">{p.note}</span>
+            </a>
           </li>
         ))
       }
     </ul>
-
-    <Prompt cursor />
-  </TerminalWindow>
-
-  <section class="relative overflow-hidden rounded-2xl border border-line bg-panel/90 px-6.5 py-6">
-    <div aria-hidden="true" class="absolute inset-x-0 top-0 h-0.5 bg-spectrum"></div>
-    <p class="text-[17px] leading-[1.7] text-fg">
-      Este es mi cuaderno de campo: lo que encuentro cazando bugs, las máquinas que rompo y los comandos que no quiero volver a
-      buscar. Escribo los writeups como me habría gustado leerlos: al grano, explicando el porqué y cómo se detecta.
-    </p>
-    <p class="mt-3.5 text-[15px] leading-relaxed text-subtle">
-      ¿Algo no cuadra o te ha servido? Escríbeme desde los enlaces del lateral.
+    <p class="font-mono text-sm">
+      <a href="/bugbounty/" class="inline-flex min-h-11 items-center text-bb hover:underline">Reportes divulgados →</a>
     </p>
   </section>
 
-  <nav aria-label="Accesos" class="grid grid-cols-2 gap-3.5 sm:grid-cols-3 xl:grid-cols-6">
-    {
-      tiles.map((s) => (
-        <a
-          href={s.href}
-          class:list={[
-            'flex min-h-28 flex-col items-center justify-center gap-3 rounded-2xl border px-2.5 py-4 text-fg-strong transition-transform hover:-translate-y-0.5',
-            s.cls.border,
-            s.cls.faint,
-          ]}
-        >
-          <span class:list={['grid size-11 place-items-center rounded-[10px]', s.cls.soft, s.cls.text]}>
-            <Icon name={s.icon} size={22} strokeWidth={2.1} />
-          </span>
-          <span class="text-center text-[15px] font-semibold">{s.tileLabel}</span>
-        </a>
-      ))
-    }
-  </nav>
+  <section aria-labelledby="tools-title" class="flex flex-col gap-4" style={tone('tools')}>
+    <h2 id="tools-title" class="font-mono text-xl font-bold text-fg-strong"><span class="tone-text">##</span> Herramientas propias</h2>
+    <ul class="grid gap-3.5 md:grid-cols-3">
+      {
+        tools.map((t) => (
+          <li class="grid">
+            <a href={`/herramientas/#${t.name}`} class="tone-border group flex flex-col gap-2 rounded-2xl border bg-panel/90 p-5 transition-transform hover:-translate-y-0.5">
+              <span class="tone-text inline-flex items-center gap-2 font-mono text-base font-bold">
+                <Icon name="wrench" size={16} />
+                {t.name}
+              </span>
+              <span class="text-[15px] leading-relaxed text-muted">{t.description}</span>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+    <p class="flex flex-wrap gap-x-6 gap-y-1 font-mono text-sm">
+      <a href="/herramientas/" class="inline-flex min-h-11 items-center text-tools hover:underline">Todas las herramientas →</a>
+      {github && <a href={github.href} target="_blank" rel="noopener" class="inline-flex min-h-11 items-center text-subtle hover:text-tools">Código en github.com/p3ix</a>}
+    </p>
+  </section>
 
-  <section aria-labelledby="updates-title" class="flex flex-col gap-4.5">
-    <h2 id="updates-title" class="text-[26px] font-bold text-fg-strong">Últimas actualizaciones</h2>
-    {
-      latest.length > 0 ? (
-        <ul class="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          {latest.map((card) => (
-            <li class="grid">
-              <EntryCard {...card} />
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <EmptyState>Aún no hay entradas publicadas. El primer writeup está en camino.</EmptyState>
-      )
-    }
+  <section aria-labelledby="stack-title" class="flex flex-col gap-4">
+    <div class="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+      <h2 id="stack-title" class="font-mono text-xl font-bold text-fg-strong"><span class="text-brand">##</span> Stack</h2>
+      <a href="/biblia/comandos/" class="inline-flex min-h-11 items-center font-mono text-sm text-biblia hover:underline">
+        {commands.length} comandos de {bibleTools} herramientas en la biblia →
+      </a>
+    </div>
+    <p class="-mt-2 text-[15px] text-muted">Las que llevan número tienen sus comandos en la biblia: pulsa para verlos.</p>
+    <div class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+      {
+        stack.map((g) => (
+          <div style={tone(g.color)} class="tone-border flex flex-col gap-3 rounded-2xl border bg-panel/90 p-4">
+            <p class="tone-text font-mono text-xs font-bold tracking-[0.16em] uppercase">{g.area}</p>
+            <ul class="flex flex-wrap gap-2">
+              {g.chips.map((chip) => (
+                <li class="flex">
+                  {chip.href ? (
+                    <a
+                      href={chip.href}
+                      aria-label={`${chip.name}: ${chip.count} ${chip.count === 1 ? 'comando' : 'comandos'} en la biblia`}
+                      class="tone-soft inline-flex min-h-7 items-center gap-1.5 rounded-md border border-transparent px-2 font-mono text-[13px] text-fg-strong transition-colors hover:tone-border"
+                    >
+                      {chip.name}
+                      <span class="tone-text text-[11px] font-bold">{chip.count}</span>
+                    </a>
+                  ) : (
+                    <span class="tone-faint inline-flex min-h-7 items-center rounded-md border border-line px-2 font-mono text-[13px] text-fg">{chip.name}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+
+  <section aria-labelledby="lang-title" class="flex flex-col gap-4">
+    <h2 id="lang-title" class="inline-flex items-center gap-2.5 font-mono text-xl font-bold text-fg-strong">
+      <Icon name="globe" size={20} class="text-whoami" />
+      Idiomas
+    </h2>
+    <ul class="flex flex-wrap gap-3">
+      {
+        languages.map((l) => (
+          <li class="flex items-center gap-3 rounded-xl border border-line-strong bg-panel/90 px-4 py-2.5">
+            <span class="text-fg-strong">{l.name}</span>
+            <span class="rounded-md bg-whoami/15 px-2 py-0.5 font-mono text-xs text-whoami">{l.level}</span>
+          </li>
+        ))
+      }
+    </ul>
   </section>
 </BaseLayout>

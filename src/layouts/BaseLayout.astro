@@ -94,6 +94,11 @@ const ogImageUrl = new URL(ogImage, Astro.site);
         <footer
           class="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-5 font-mono text-[13px] text-subtle sm:px-10"
         >
+          <!-- El compilador de Astro 7 recorta los saltos de línea junto a etiquetas: el texto con <strong> va en una sola línea. -->
+          <p class="flex w-full items-start gap-2.5 leading-relaxed">
+            <Icon name="shield" size={15} class="mt-0.5 shrink-0 text-warn" />
+            <span>Contenido con <strong class="font-normal text-warn">fines educativos</strong>: las técnicas se aplican solo en entornos autorizados o dentro del alcance de cada programa.</span>
+          </p>
           <span>{profile.handle} · hecho en Burgos</span>
           <span class="flex items-center gap-4">
             <a href="/rss.xml" class="inline-flex min-h-11 items-center gap-1.5 hover:text-brand"><Icon name="rss" size={14} />RSS</a>

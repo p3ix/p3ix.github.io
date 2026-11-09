@@ -5,7 +5,7 @@ import ArticleLayout from '@/layouts/ArticleLayout.astro';
 import Cmd from '@/components/Cmd.astro';
 import CommandCard from '@/components/CommandCard.astro';
 import VarBar from '@/components/VarBar.astro';
-import { getCommands, getNotes, getPorts, linkedToPort, portHref, variablesIn } from '@/lib/content';
+import { embeddedCommandIds, getCommands, getNotes, getPorts, linkedToPort, portHref, variablesIn } from '@/lib/content';
 import { formatDate, inlineMarkdown, isoDate } from '@/lib/format';
 import { tagHref } from '@/lib/tags';
 import { areas, phases, portCategories } from '@/lib/taxonomy';
@@ -32,7 +32,7 @@ const category = portCategories[d.category];
 const [commands, notes] = await Promise.all([getCommands(), getNotes()]);
 
 // Los comandos incrustados con <Cmd> en el cuerpo no se repiten en su fase (ni su id en el HTML).
-const embeddedIds = [...(entry.body ?? '').matchAll(/<Cmd\s+id=["']([^"']+)["']/g)].map((m) => m[1]);
+const embeddedIds = embeddedCommandIds(entry.body);
 const embedded = commands.filter((c) => embeddedIds.includes(c.id));
 const linked = linkedToPort(entry, commands, notes, embeddedIds);
 
