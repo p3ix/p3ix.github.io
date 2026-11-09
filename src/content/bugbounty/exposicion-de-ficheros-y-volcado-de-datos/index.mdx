@@ -1,0 +1,274 @@
+---
+title: Ficheros de desarrollo expuestos y volcado de datos en una tienda PrestaShop
+summary: El servidor servía sus ficheros de desarrollo (Makefile, phpstan.neon y el composer de un módulo a medida). Ese mapa interno llevó a un endpoint AJAX del módulo que, sin autenticación, exportaba en JSON toda la base de datos de productos.
+date: 2026-11-09
+program: Programa privado
+platform: yeswehack
+severity: medium
+cvss: 5.3
+cvssVector: CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N
+cwe: CWE-200
+bounty: "450 $"
+# Solo true si el programa ha autorizado la divulgación por escrito.
+disclosurePermission: true
+status: resolved
+cover: ./recompensa.png
+coverAlt: "Tarjeta de recompensa de YesWeHack: 450 $, +20 puntos, CVSS 5.3 Medium, Information Disclosure (CWE-200), 25 de febrero de 2026."
+timeline:
+  - { date: 2026-02-12, event: Reporte enviado }
+  - { date: 2026-02-12, event: "Recibido por el programa: en revisión" }
+  - { date: 2026-02-13, event: "Ampliación: el módulo a medida expone un export sin autenticar que vuelca la base de datos de productos" }
+  - { date: 2026-02-25, event: "Aceptado como Medium (5.3): 450 $ y 13 puntos" }
+  - { date: 2026-02-26, event: Corrección desplegada; verifico que ya no es reproducible }
+  - { date: 2026-02-26, event: "Marcado como resuelto: 7 puntos más" }
+tags: [information-disclosure, source-code-exposure, prestashop, missing-authentication]
+draft: false
+---
+
+## Resumen
+
+El servidor de la tienda dejaba al alcance de cualquiera los ficheros de su flujo de desarrollo y
+despliegue: un `Makefile` con los scripts de build, un `phpstan.neon` que dibujaba el árbol de
+directorios internos y el `config.xml` y el `composer` de un módulo hecho a medida. Nada de esto es
+una vulnerabilidad por sí solo, pero junto forma el plano de la aplicación: versión exacta, dónde
+vive cada cosa y quién programó la parte propietaria.
+
+Ese plano no se quedó en reconocimiento. El `composer` y el `config.xml` apuntaban a un módulo de
+marketplace a medida, y sus controladores resultaron ser la pieza débil: uno de ellos exponía una
+acción AJAX que, **sin pedir sesión ni token**, devolvía en JSON la base de datos entera de
+productos del marketplace.
+
+Son dos problemas encadenados, y conviene separarlos:
+
+```text title="Cadena del ataque"
+1. Fingerprint: PrestaShop 1.7.8.7 + Symfony
+   → la tienda se despliega desde su propio repositorio
+2. Ficheros de desarrollo accesibles en el web root
+   → Makefile, phpstan.neon, config.xml y composer del módulo
+3. El composer y el config.xml nombran un módulo a medida
+   → controladores propios, menos auditados que el core
+4. Una acción AJAX del módulo, sin autenticación
+   → volcado de todo el catálogo de productos en JSON
+```
+
+## Alcance
+
+- **Activo**: `secondchance.example.com`, una tienda clasificada como **Critical** en el alcance del
+  programa. El dominio real va redactado; se conserva el subdominio por acuerdo con el programa.
+- **Stack**: PrestaShop 1.7.8.7 sobre Symfony. La versión es información del objetivo, pero el stack
+  es software libre: nombrarlo no identifica al programa y es parte del aprendizaje.
+- **Programa**: privado, no se nombra. La empresa, sus marcas y el proveedor del módulo a medida
+  están redactados en todo el texto, los bloques de código y los nombres de archivo.
+
+## Cómo lo encontré
+
+### Una tienda que se despliega desde su repositorio
+
+Fingerprintear la tienda la situaba en PrestaShop 1.7.8.7. Lo interesante no era la versión en sí,
+sino una sospecha: que ciertos ficheros estuvieran ahí fuera sugería que el *document root* del
+servidor apuntaba a la raíz del proyecto, no al directorio público, y que el despliegue era un `git
+pull` sin limpiar los artefactos de desarrollo. Si eso es así, el web root sirve cosas que nunca
+deberían salir de la máquina de un desarrollador.
+
+La prueba es barata: pedir, uno a uno, los nombres de fichero típicos de un proyecto PHP moderno
+(`Makefile`, `composer.json`, `phpstan.neon`, `.env`, `.git/config`...) y ver cuáles responden
+`200` en vez de `404`.
+
+### El phpstan.neon es el plano del proyecto
+
+```bash title="El mapa de directorios, servido en claro"
+curl -i -H "User-Agent: BugBounty-[programa]-[alias]" https://secondchance.example.com/phpstan.neon
+```
+
+El `phpstan.neon` es la configuración del analizador estático: lista las rutas que analiza. Al
+servirse en claro, entregaba el árbol interno del proyecto —`src`, `webservice`,
+`.github/workflows/...`— sin tener que adivinar nada. Dos entradas valen su peso:
+
+- **`webservice`**: PrestaShop expone una API (la *Webservice API*) bajo `/api/`. Saber que existe y
+  está en el proyecto orienta la siguiente fase hacia el abuso de claves de webservice.
+- **`.github/workflows`**: si los workflows de CI están versionados y accesibles, son el sitio donde
+  rebuscar secretos (tokens de despliegue, variables de entorno embebidas).
+
+El `Makefile` completaba el cuadro: revelaba los pasos de build y despliegue (`install: composer
+assets`, `./tools/assets/build.sh`), es decir, cómo se monta la aplicación en producción.
+
+### El módulo a medida es la pieza débil
+
+```bash title="La ficha del módulo propietario"
+curl -i -H "User-Agent: BugBounty-[programa]-[alias]" https://secondchance.example.com/modules/marketplace/config.xml
+curl -i -H "User-Agent: BugBounty-[programa]-[alias]" https://secondchance.example.com/modules/marketplace/composer
+```
+
+El `config.xml` es la ficha que PrestaShop lee de cada módulo: nombre, autor y versión. Confirmaba
+que el marketplace **no era un módulo del catálogo oficial**, sino uno desarrollado a medida por un
+proveedor externo (redactado). El `composer` acompañante iba más allá: su mapeo PSR-4 revelaba la
+estructura de clases del módulo y, de paso, el **email corporativo del desarrollador principal**
+(`[redactado]`).
+
+> El código a medida es casi siempre la parte menos auditada de una aplicación. El core de
+> PrestaShop lo revisan miles de ojos; un módulo propietario escrito para un cliente, muchos menos.
+> Por eso, en una tienda hecha de core + módulos, el hallazgo grave suele estar en los módulos.
+
+### Del plano al impacto: el export sin autenticar
+
+El módulo expone sus acciones como hace cualquier módulo de PrestaShop, a través del despachador de
+front controllers:
+
+```text
+index.php?fc=module&module=<modulo>&controller=<controlador>&action=<accion>
+```
+
+Conocer que el módulo era de *marketplace* y tener su estructura de clases delante acotaba mucho qué
+acciones probar. Una, pensada para exportar el catálogo, respondía a una petición anónima: ni
+cookie de sesión, ni token, ni cabecera de autorización. Devolvía, en JSON, la tabla de productos
+del marketplace completa. Eso convirtió un hallazgo de reconocimiento en una fuga de datos real, y
+fue la ampliación que envié al día siguiente del reporte inicial.
+
+### Una anomalía en el backoffice
+
+Entre los metadatos expuestos aparecía además un token administrativo. Usado contra la ruta de
+login del backoffice, la respuesta del servidor incluía una cabecera anómala `login: true`. Lo
+dejé anotado en el reporte como señal a revisar por el equipo; no perseguí el acceso al panel ni
+entré en él. El valor estaba en avisar de que un token filtrado alteraba el estado de autenticación
+que reporta el servidor.
+
+## Prueba de concepto
+
+El `User-Agent` solo etiqueta el tráfico como pruebas de bug bounty (muchos programas lo exigen); no
+influye en ningún fallo.
+
+**1.** Metadatos de build —el `Makefile` responde en vez de dar `404`:
+
+```bash
+curl -i -H "User-Agent: BugBounty-[programa]-[alias]" https://secondchance.example.com/Makefile
+# Revela: install: composer assets, ./tools/assets/build.sh
+```
+
+**2.** Mapa de directorios internos —vía `phpstan.neon`:
+
+```bash
+curl -i -H "User-Agent: BugBounty-[programa]-[alias]" https://secondchance.example.com/phpstan.neon
+# Revela rutas: src, webservice, .github/workflows/...
+```
+
+**3.** Ficha del módulo a medida —autor y mapeo de clases:
+
+```bash
+curl -i -H "User-Agent: BugBounty-[programa]-[alias]" https://secondchance.example.com/modules/marketplace/config.xml
+curl -i -H "User-Agent: BugBounty-[programa]-[alias]" https://secondchance.example.com/modules/marketplace/composer
+# El composer filtra el email del desarrollador y el PSR-4 del módulo
+```
+
+**4.** Volcado de la base de datos de productos, **sin autenticación**:
+
+```bash
+curl -s "https://secondchance.example.com/index.php?fc=module&module=marketplace&controller=ajax&action=marketplaceExport"
+```
+
+Respuesta: `200 OK` con el catálogo entero en JSON (campos inventados con el mismo formato):
+
+```json title="Respuesta del export (redactada)"
+[
+  {
+    "id_product": "[id]",
+    "reference": "[SKU]",
+    "name": "[producto]",
+    "price": "[precio]",
+    "quantity": "[stock]",
+    "trade_in_value": "[valoración de retoma]"
+  }
+]
+```
+
+Solo verifiqué que el endpoint respondía y qué estructura devolvía; no descargué ni almacené el
+catálogo completo.
+
+## Impacto
+
+- **Reconocimiento avanzado**: la versión exacta de PrestaShop, el árbol de directorios y la
+  existencia de `/webservice/` y `/.github/` rebajan el listón para encontrar fallos más graves
+  (LFI, SQLi, RCE) en un activo marcado como **Critical**. Se pasa de adivinar la arquitectura a
+  tenerla delante.
+- **Inteligencia de negocio**: el export devolvía el catálogo completo —referencias, precios,
+  inventario y las valoraciones de retoma—. Permite monitorizar stock y precios de forma automática
+  y conocer la lógica de negocio del marketplace.
+- **PII del equipo**: el `composer` filtraba el email corporativo del desarrollador principal, lo que
+  habilita ingeniería social dirigida contra quien mantiene el código.
+- **Superficie propietaria identificada**: saber que el módulo es a medida y de qué proveedor dirige
+  la investigación hacia controladores propios, estadísticamente menos seguros que el core.
+
+### Por qué es Medium: el CVSS métrica a métrica
+
+| Métrica | Valor | Por qué |
+|---|---|---|
+| Attack Vector | Network | Basta con acceso a Internet |
+| Attack Complexity | Low | Peticiones directas, sin condiciones |
+| Privileges Required | None | Sin cuenta ni token |
+| User Interaction | None | Ninguna víctima tiene que hacer nada |
+| Scope | Unchanged | El impacto se queda en el propio servicio |
+| Confidentiality | Low | Metadatos técnicos y catálogo de negocio, no PII de clientes a escala |
+| Integrity | None | Solo lectura |
+| Availability | None | El servicio sigue funcionando |
+
+`CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N` da un **5.3 (Medium)**. Pedí una subida de severidad al
+reportar el export sin autenticar, y el programa lo mantuvo en Medium: los datos expuestos son
+metadatos y catálogo de negocio, no datos personales de clientes en volumen.
+
+> CWE-200 (exposición de información) describe la *consecuencia*. Por debajo hay dos causas: CWE-540
+> (información sensible en el código fuente/ficheros de desarrollo servidos) para la fuga de
+> metadatos, y CWE-306 (falta de autenticación en una función crítica) para el export. Nombrar la
+> causa ayuda al equipo a arreglar lo correcto: no basta con esconder un fichero, hay que poner
+> autenticación delante del endpoint.
+
+## Corrección
+
+La raíz son dos descuidos de despliegue y uno de diseño: el web root sirve lo que no debería, y un
+endpoint de datos no comprueba quién llama.
+
+1. **Bloquear los ficheros sensibles** en el servidor web: devolver `403`/`404` para extensiones y
+   nombres de artefactos de desarrollo.
+
+   ```nginx title="nginx: bloquear ficheros de build y desarrollo" ins={1-3}
+   location ~* \.(neon|ya?ml|log|sh|lock|dist|env)$ { deny all; }
+   location ~* ^/(Makefile|composer\.(json|lock)|phpstan\.neon)$ { deny all; }
+   location ~ /\.(git|github) { deny all; }
+   ```
+
+2. **Document root correcto**: apuntar el servidor al directorio público de la aplicación, no a la
+   raíz del repositorio. No desplegar con `git pull` en producción; publicar solo los artefactos de
+   build y limpiar el web root de cualquier fichero de desarrollo.
+
+3. **Autenticar y autorizar cada acción del módulo**: la acción de export no es pública. Debe exigir
+   una sesión válida y permiso para exportar antes de devolver un solo registro.
+
+   ```php title="El controlador AJAX del módulo" del={2} ins={3-6}
+   public function ajaxProcessMarketplaceExport() {
+       echo Tools::jsonEncode($this->getAllProducts());   // responde a cualquiera
+       if (!$this->isAuthorized()) {                       // ¿sesión válida y con permiso?
+           http_response_code(403);
+           exit;
+       }
+       echo Tools::jsonEncode($this->getAllProducts());
+   }
+   ```
+
+4. **Rotar el token filtrado** y corregir la anomalía `login: true` del backoffice, de modo que un
+   token conocido no altere el estado de autenticación que el servidor reporta.
+
+**Cómo detectarlo antes de producción**: un test de despliegue que pida una lista de rutas sensibles
+(`/Makefile`, `/phpstan.neon`, `/.env`, `/.git/config`, `/composer`) y falle en CI si alguna no
+devuelve `403`/`404`; y, en revisión de código, la regla de que todo controlador AJAX de un módulo
+compruebe autenticación y autorización antes de responder con datos.
+
+## Lo que me llevo
+
+- Los ficheros de desarrollo en el web root son un mapa gratis de la aplicación. Probar nombres
+  típicos (`Makefile`, `*.neon`, `composer`, `.env`, `.git`) es reconocimiento barato con mucho
+  retorno, y delata cómo se despliega el sitio.
+- En una aplicación de core + módulos, el código a medida es el eslabón débil: su propio `config.xml`
+  y su `composer` te dicen quién lo escribió y dónde viven sus controladores.
+- El reconocimiento no es el final. Encadenar los metadatos con los endpoints del propio módulo
+  convirtió una "exposición de información" en un volcado de datos sin autenticar.
+- Documenta la escalada en el mismo hilo: reporté primero la fuga de metadatos y, al día siguiente,
+  amplié con el export sin autenticación y pedí reevaluar la severidad. Un reporte que cuenta la
+  cadena completa le da al programa el contexto para valorarla bien.
