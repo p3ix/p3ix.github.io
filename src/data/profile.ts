@@ -28,7 +28,7 @@ export interface Platform {
 export const platforms: Platform[] = [
   { name: 'Bugcrowd', handle: 'p3iv2', url: 'https://bugcrowd.com/h/p3iv2' },
   { name: 'YesWeHack', handle: 'p3i', url: 'https://yeswehack.com/hunters/p3i' },
-  { name: 'Grayback', handle: 'p3i', url: 'https://app.grayback.es/profile/p3i' },
+  { name: 'Grayback', handle: 'p3i', url: 'https://app.grayback.es/profile/OZretViYXDU8FZ6DrmBoPvcywuu2' },
 ];
 
 /** Herramientas propias: /herramientas/ y el whoami de la portada. Datos sacados de cada README. */
