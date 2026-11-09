@@ -20,17 +20,8 @@ export function monogram(title: string) {
   return letters.charAt(0).toUpperCase() + letters.charAt(1).toLowerCase();
 }
 
-const NEW_DAYS = 30;
-
-/**
- * Etiqueta de la esquina de las tarjetas: los borradores mandan sobre lo reciente. Con
- * `fresh: false` nunca sale NUEVO (los reportes de bug bounty solo marcan los borradores).
- */
-export function entryBadge(data: { date: Date; draft: boolean }, { fresh = true } = {}) {
-  if (data.draft) return 'BORRADOR';
-  if (fresh && Date.now() - data.date.valueOf() < NEW_DAYS * 24 * 60 * 60 * 1000) return 'NUEVO';
-  return undefined;
-}
+/** Etiqueta de la esquina de las tarjetas: solo los borradores (que no salen en producción). */
+export const entryBadge = (data: { draft: boolean }) => (data.draft ? 'BORRADOR' : undefined);
 
 const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
