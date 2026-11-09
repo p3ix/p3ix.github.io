@@ -1,0 +1,246 @@
+---
+title: "Control de acceso roto en un checkout: omitir la sesión filtraba datos del comprador"
+summary: "El endpoint que carga un pedido lo servía por su orderId sin autenticar. Un usuario distinto sí era denegado, pero quitar la cookie saltaba el control de propiedad: a un anónimo le devolvía el email y el teléfono del comprador en claro."
+date: 2026-11-09
+program: Programa privado
+platform: yeswehack
+severity: low
+cvss: 3.7
+cvssVector: CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:N/A:N
+cwe: CWE-284
+bounty: "20 $"
+# Solo true si el programa ha autorizado la divulgación por escrito.
+disclosurePermission: true
+status: resolved
+cover: ./recompensa.png
+coverAlt: "Tarjeta de recompensa de YesWeHack: 20 $, +13 puntos, CVSS 3.7 Low, Improper Access Control (CWE-284), 7 de agosto de 2026."
+timeline:
+  - { date: 2026-07-22, event: Reporte enviado }
+  - { date: 2026-07-24, event: "En revisión (Under Review)" }
+  - { date: 2026-08-07, event: "Aceptado y recompensado: 20 $ y 6 puntos" }
+  - { date: 2026-08-07, event: "CVSS reajustado de Medium (5.9) a Low (3.7)" }
+  - { date: 2026-08-24, event: "Marcado como resuelto: 7 puntos más" }
+tags: [broken-access-control, information-disclosure, api, pii]
+draft: false
+---
+
+## Resumen
+
+El checkout de la tienda carga el pedido antes de pagar con una llamada a `getPaymentInfo`, servida
+por el *gateway* del webshop. Ese endpoint tenía el control de acceso roto: devolvía los datos de un
+pedido a partir de su `orderId` **sin ninguna autenticación**.
+
+Lo interesante es cómo fallaba. Un usuario autenticado **distinto** del dueño era rechazado
+correctamente (`101 "order data not exist"`), pero una petición **sin sesión** sí recibía el pedido.
+La comprobación de propiedad solo se ejecutaba cuando había una sesión presente: quitar la cookie no
+la saltaba por la fuerza, la dejaba sin ejecutar. A ese llamante anónimo el servidor le devolvía, en
+claro, el **email y el teléfono** del titular de la cuenta, además de la ciudad, el producto y los
+importes. El bloque de dirección postal sí iba enmascarado para el anónimo; el email y el teléfono de
+la cuenta, no.
+
+El fallo cabe en tres líneas:
+
+```text title="El control de acceso, según quién llama"
+Con sesión del dueño       → 200: pedido completo        (correcto)
+Con sesión de otro usuario → 101 "order data not exist"  (denegado, correcto)
+Sin sesión (anónimo)       → 200: pedido + email y teléfono en claro   (el fallo)
+```
+
+## Alcance
+
+- **Activo**: `eumallglobalgateway.example.com`, el *gateway* del webshop europeo del programa (la
+  tienda, `www.example.com/es`), dentro del alcance. El dominio real va redactado; se conserva el
+  subdominio por acuerdo con el programa.
+- **Endpoint**: `POST /mallseaservice/getPaymentInfo`.
+- **Programa**: privado, no se nombra. La marca, el producto comprado, el email, el teléfono y los
+  identificadores están redactados en todo el texto y los bloques de código.
+
+## Cómo lo encontré
+
+### El checkout carga el pedido con una llamada
+
+Al llegar a la pantalla de pago, el frontend pide el pedido para pintarlo: una llamada a
+`getPaymentInfo` con el `orderId`. Interceptando mi propio checkout aparecía esa petición. Ante
+cualquier endpoint que sirve un recurso por su id, la pregunta es siempre la misma: **¿quién
+comprueba que ese pedido es mío?**
+
+### La prueba de las tres llamadas
+
+Para un fallo de control de acceso, la prueba limpia es la comparación de tres llamantes, con dos
+cuentas propias (A, la compradora; B, otra mía):
+
+1. **Como dueño (A)**: `200`, el pedido completo. Normal.
+2. **Como otro usuario autenticado (B)**: `101 "order data not exist"`. Denegado. **La propiedad sí
+   se comprueba** cuando hay sesión.
+
+Mucha gente se para aquí: "a otro usuario lo rechaza, no hay bug". Pero falta la tercera, la que de
+verdad importa:
+
+3. **Sin sesión, sin ninguna cookie**: `200 success`, el pedido devuelto, con el email y el teléfono
+   en claro.
+
+La conclusión salta a la vista: la comprobación de propiedad estaba **colgada de "¿hay sesión?"**.
+Con la sesión equivocada, se ejecuta y deniega; sin sesión, no se ejecuta y el pedido se trata como
+una lectura pública.
+
+### Qué devuelve a un anónimo (y qué no)
+
+Para el llamante anónimo, el bloque de dirección postal iba enmascarado (destinatario, calle, código
+postal y el teléfono/email a nivel de dirección, ofuscados). Es decir: **alguien pensó en enmascarar
+para los no-dueños**. Pero los campos de cuenta `data.email` y `data.mobile` salían en claro. El
+enmascarado estaba aplicado a la dirección y olvidado en la cuenta: una inconsistencia, no una
+ausencia total.
+
+### El endpoint hermano confirma que es un defecto
+
+El endpoint gemelo del mismo flujo, `POST /mallpaygatewayservice/oversea/cashier`, **sí** exigía la
+propiedad: devolvía `913 "User name is inconsistent"` tanto para un usuario distinto como para una
+petición sin sesión. Mismo flujo, comportamiento correcto.
+
+> Comparar endpoints hermanos es una de las formas más limpias de demostrar que algo es un defecto y
+> no una decisión de diseño. Si la ruta de al lado, del mismo flujo, valida la propiedad incluso sin
+> sesión, la que no lo hace está rota, no "pensada así".
+
+### Por qué no es un volcado masivo (y por qué lo dije yo)
+
+Antes de puntuarlo, comprobé si el `orderId` era enumerable. Su formato es un prefijo de fecha
+(`YYYYMMDD`) seguido de 11 dígitos de alta entropía, no secuenciales: dos pedidos del mismo día se
+diferenciaban en ~1,04 × 10¹⁰, y el más reciente tenía el valor **menor**. No se puede recorrer. Y
+el registro es efímero: caduca a los ~3 días y solo los pedidos **sin pagar** devuelven datos (los
+caducados dan `301 "Data is expired"`).
+
+Es decir: un atacante necesita **ya conocer** un `orderId` válido y reciente (un enlace de pago
+compartido o filtrado, una fuga por `Referer`, el historial del navegador). No hay forma de sacar la
+base de clientes entera. Anoté esa limitación yo mismo en el reporte, porque marca la diferencia
+entre una fuga puntual y un volcado masivo, y es lo que lo mantiene en severidad baja.
+
+## Prueba de concepto
+
+**1.** Consigue un `orderId` válido y reciente. No es enumerable: tiene que conocerse de antemano
+(enlace de pago compartido, fuga por `Referer`, historial).
+
+**2.** Una sola petición `POST`, **sin sesión** (solo `Content-Type`; sin `Cookie`, sin
+`Origin`/`Referer`):
+
+```bash
+curl -s -X POST 'https://eumallglobalgateway.example.com/mallseaservice/getPaymentInfo' \
+  -H 'Content-Type: application/json' \
+  --data '{"orderId":"<ORDER_ID>","with":["address","products","payments","billingAddress"]}'
+```
+
+**3.** El servidor responde `200 success` con el email y el teléfono de la cuenta **en claro** (datos
+redactados):
+
+```json title="Respuesta para el anónimo (redactada)"
+{
+  "code": "success",
+  "data": {
+    "email": "victima@example.com",
+    "mobile": "[teléfono]",
+    "city": "[ciudad]",
+    "product": "[producto]",
+    "amount": "29.99 EUR",
+    "orderAddressVO": { "consignee": "T*****t", "address": "t**t", "zipcode": "0***6" }
+  }
+}
+```
+
+Las dos tablas que mandé en el reporte resumen el hallazgo. La primera, qué ve cada llamante del
+**mismo** pedido:
+
+| Campo | Dueño (autenticado) | Anónimo (sin sesión) |
+|---|---|---|
+| `data.email` (cuenta) | `victima@example.com` | `victima@example.com` (en claro) |
+| `data.mobile` (cuenta) | `[teléfono]` | `[teléfono]` (en claro) |
+| `orderAddressVO.consignee` | `Nombre Apellido` | `N*****o` (enmascarado) |
+| dirección / código postal | `calle / [CP]` | `c***e / 0***6` (enmascarado) |
+| producto / importe | `[producto]` / `29,99 €` | igual (en claro) |
+
+Y la segunda, el control de acceso del **mismo** `orderId` según quién llama:
+
+| Llamante | Resultado |
+|---|---|
+| Dueño del pedido (autenticado) | `200 success` — pedido completo, con dirección en claro |
+| Otro usuario autenticado | `101 "order data not exist"` — denegado correctamente |
+| Sin sesión (anónimo) | `200 success` — pedido + email/teléfono de la cuenta en claro; dirección enmascarada |
+
+Las dos cuentas usadas en las pruebas son mías; solo leí mi propio pedido. No accedí a datos de
+terceros, conforme a la política de PII del programa.
+
+## Impacto
+
+- **Phishing dirigido**: quien consiga un `orderId` válido y reciente obtiene el email y el teléfono
+  del comprador en claro, más el producto, el importe y la ciudad. Es munición exacta para un
+  phishing o *smishing* creíble contra un comprador identificado ("su pedido de `[producto]` por
+  29,99 €...").
+- **Alcance acotado**: no es un volcado masivo. El `orderId` no es enumerable y el registro caduca,
+  así que la exposición es **por pedido conocido**, no de toda la base de clientes. Eso es lo que lo
+  mantiene en *Low*.
+- **El fondo es de consistencia**: los datos de cuenta deberían ir enmascarados para los no-dueños,
+  igual que ya lo está la dirección. El servidor tiene la lógica de enmascarado; no la aplica a esos
+  dos campos.
+
+### Por qué es Low: el CVSS métrica a métrica
+
+| Métrica | Valor | Por qué |
+|---|---|---|
+| Attack Vector | Network | Una petición HTTP desde Internet |
+| Attack Complexity | High | Hay que conocer un `orderId` válido y reciente; no es enumerable |
+| Privileges Required | None | Sin cuenta ni sesión |
+| User Interaction | None | La víctima no hace nada |
+| Scope | Unchanged | El impacto se queda en la propia aplicación |
+| Confidentiality | Low | Email y teléfono de un comprador por `orderId` conocido, no en masa |
+| Integrity | None | Solo lectura |
+| Availability | None | El servicio sigue funcionando |
+
+`CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:N/A:N` da un **3.7 (Low)**. El programa lo recibió primero
+como *Medium* (5.9, con *Confidentiality High*) y lo cerró en *Low* (3.7). La diferencia está en el
+alcance: con la `AC:H` (hace falta conocer el `orderId`) y una confidencialidad acotada a un pedido,
+el vector baja. Coincidía con el límite que yo mismo había marcado en el reporte.
+
+> CWE-284 (control de acceso incorrecto) es la etiqueta del programa. Por debajo, la causa es que la
+> comprobación de propiedad es condicional a que exista una sesión. El `101` para "otro usuario"
+> engaña: parece que el control funciona, cuando solo funciona a medias.
+
+## Corrección
+
+La raíz es un control de acceso colgado de la sesión: `if (hay sesión) { comprueba propiedad }`. El
+anónimo se salta el `if` entero.
+
+1. **Comprobar la propiedad siempre, también sin sesión**: una petición anónima tiene que tratarse
+   como un no-dueño y rechazarse, exactamente como ya hace el endpoint hermano `cashier`. El control
+   no puede depender de que haya sesión.
+
+   ```js title="El control de propiedad colgado de la sesión" del={2} ins={3}
+   function getPaymentInfo(req, res) {
+     if (req.session && req.session.userId !== order.userId)  // el anónimo se salta la comprobación
+     if (!req.session || req.session.userId !== order.userId) // sin sesión = no-dueño: denegar
+       return res.json({ code: 101 }); // "order data not exist"
+     return res.json(maskForViewer(order, req.session));      // enmascara según quién mira
+   }
+   ```
+
+2. **Enmascarar también el email y el teléfono de la cuenta** para los no-dueños, con la misma lógica
+   que ya oculta la dirección. El enmascarado existe; solo falta aplicarlo a `data.email` y
+   `data.mobile`.
+
+3. **Defensa en profundidad**: identificadores de pedido no adivinables (aquí ya lo son: prefijo de
+   fecha + 11 dígitos de alta entropía). Es una capa más, no el control principal.
+
+**Cómo detectarlo antes de producción**: un test de autorización que pida el mismo pedido como (a)
+dueño, (b) otro usuario y (c) sin sesión, y que exija datos **solo** en el caso (a); y un test de
+contrato que falle si una respuesta para un no-dueño contiene `email` o `mobile` sin enmascarar. La
+regresión salta en CI en cuanto alguien añade un endpoint al flujo y se olvida del caso anónimo.
+
+## Lo que me llevo
+
+- En control de acceso, prueba **siempre las tres llamadas**: dueño, otro usuario y sin sesión. Que a
+  "otro usuario" lo rechacen no implica que al anónimo también; el control puede estar colgado de
+  "¿hay sesión?".
+- Un endpoint hermano del mismo flujo que **sí** valida es la mejor prueba de que lo tuyo es un
+  defecto y no una decisión de diseño. Busca el gemelo antes de escribir el reporte.
+- El enmascarado parcial es una pista enorme: si ocultan la dirección pero no el email, la lógica
+  está a medio aplicar, y ahí suele haber hallazgo.
+- Sé honesto con el alcance. Marcar yo mismo que el `orderId` no es enumerable y que el pedido caduca
+  rebajó la severidad, pero hizo la valoración más rápida y creíble. Un reporte que exagera se pelea;
+  uno que acota su propio impacto se acepta.
