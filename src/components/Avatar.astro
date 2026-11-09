@@ -1,5 +1,6 @@
 ---
 import { Image } from 'astro:assets';
+import { profile } from '@/data/profile';
 
 interface Props {
   size?: 'md' | 'lg';
@@ -8,11 +9,10 @@ interface Props {
 const { size = 'md' } = Astro.props;
 const large = size === 'lg';
 
-// Si existe src/assets/avatar.(png|jpg|jpeg|webp) se usa la foto; si no, la firma "p3i".
-const found = import.meta.glob<{ default: ImageMetadata }>('/src/assets/avatar.{png,jpg,jpeg,webp}', {
-  eager: true,
-});
+// La foto de la sidebar y del whoami: src/assets/avatar.(png|jpg|jpeg|webp); sin ella, la firma "p3i".
+const found = import.meta.glob<{ default: ImageMetadata }>('/src/assets/avatar.{png,jpg,jpeg,webp}', { eager: true });
 const avatar = Object.values(found)[0]?.default;
+const alt = `Foto de ${profile.name}`;
 ---
 
 <div
@@ -26,7 +26,7 @@ const avatar = Object.values(found)[0]?.default;
   >
     {
       avatar ? (
-        <Image src={avatar} alt="Avatar de p3i" width={large ? 336 : 248} height={large ? 336 : 248} class="size-full object-cover" />
+        <Image src={avatar} alt={alt} width={large ? 336 : 248} height={large ? 336 : 248} class="size-full object-cover" />
       ) : (
         <span aria-label="p3i" role="img" class:list={['-rotate-8 font-tag leading-none text-brand text-glow', large ? 'text-[70px]' : 'text-[52px]']}>
           p3i

@@ -15,35 +15,20 @@ export const profile = {
   tagline: 'rompiendo cosas con permiso',
   location: 'Burgos, España',
   site: 'p3ix.github.io',
-  bio: 'Ingeniero informático con pasión por la seguridad ofensiva. Participo en programas de bug bounty y VDP, con vulnerabilidades aceptadas en Bugcrowd (incluida la NASA), YesWeHack y Grayback. Tengo experiencia en auditorías web y de Active Directory, y desarrollo mis propias herramientas de pentesting.',
+  bio: 'Ingeniero informático con pasión por la seguridad ofensiva. Participo en programas de bug bounty y VDP, con vulnerabilidades aceptadas en Bugcrowd, YesWeHack y Grayback. Tengo experiencia en auditorías web y de Active Directory, y desarrollo mis propias herramientas de pentesting.',
 } as const;
 
+/** Perfiles del hall of fame: solo el enlace a cada plataforma. */
 export interface Platform {
   name: string;
   handle: string;
   url: string;
-  note: string;
 }
 
 export const platforms: Platform[] = [
-  {
-    name: 'Bugcrowd',
-    handle: 'p3iv2',
-    url: 'https://bugcrowd.com/h/p3iv2',
-    note: 'NASA VDP: vulnerabilidad reportada y aceptada',
-  },
-  {
-    name: 'YesWeHack',
-    handle: 'p3i',
-    url: 'https://yeswehack.com/hunters/p3i',
-    note: 'IDOR, information disclosure en API, ficheros expuestos y reglas de Firestore',
-  },
-  {
-    name: 'Grayback',
-    handle: 'p3i',
-    url: 'https://app.grayback.es/profile/p3i',
-    note: 'Reportes aceptados',
-  },
+  { name: 'Bugcrowd', handle: 'p3iv2', url: 'https://bugcrowd.com/h/p3iv2' },
+  { name: 'YesWeHack', handle: 'p3i', url: 'https://yeswehack.com/hunters/p3i' },
+  { name: 'Grayback', handle: 'p3i', url: 'https://app.grayback.es/profile/p3i' },
 ];
 
 /** Herramientas propias: /herramientas/ y el whoami de la portada. Datos sacados de cada README. */

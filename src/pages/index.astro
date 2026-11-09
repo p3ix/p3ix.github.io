@@ -16,7 +16,8 @@ import {
   tools,
   type StackItem,
 } from '@/data/profile';
-import { getCommands } from '@/lib/content';
+import { getCommands, getPublished } from '@/lib/content';
+import { SEVERITY_IDS, severities } from '@/lib/taxonomy';
 import { tone } from '@/lib/tone';
 
 // El botón del CV solo aparece si existe src/assets/cv.pdf (la versión sin teléfono).
@@ -42,6 +43,13 @@ function stackChip(item: StackItem) {
 }
 
 const stack = skills.map((g) => ({ ...g, chips: g.items.map(stackChip) }));
+
+// Acceso a los reportes bajo el hall of fame: cuántos hay y de qué severidad (de más a menos grave).
+const reports = await getPublished('bugbounty');
+const severityCounts = [...SEVERITY_IDS]
+  .reverse()
+  .map((id) => ({ ...severities[id], count: reports.filter((r) => r.data.severity === id).length }))
+  .filter((s) => s.count > 0);
 
 const description = `${profile.name} (${profile.handle}): ${profile.role}. Experiencia, formación, certificaciones, hall of fame y herramientas.`;
 ---
@@ -178,15 +186,41 @@ const description = `${profile.name} (${profile.handle}): ${profile.role}. Exper
                 <Icon name="external" size={15} class="tone-text opacity-70 group-hover:opacity-100" />
               </span>
               <span class="tone-text font-mono text-xs">@{p.handle}</span>
-              <span class="text-[15px] leading-relaxed text-muted">{p.note}</span>
             </a>
           </li>
         ))
       }
     </ul>
-    <p class="font-mono text-sm">
-      <a href="/bugbounty/" class="inline-flex min-h-11 items-center text-bb hover:underline">Reportes divulgados →</a>
-    </p>
+    {
+      reports.length > 0 && (
+        <a
+          href="/bugbounty/"
+          aria-label={`Ver los reportes divulgados: ${reports.length} en total, ${severityCounts.map((s) => `${s.count} ${s.label}`).join(', ')}`}
+          class="tone-border group flex flex-wrap items-center gap-x-5 gap-y-4 rounded-2xl border bg-[linear-gradient(100deg,color-mix(in_oklab,var(--color-bb)_14%,transparent),transparent_70%)] px-5 py-4.5 transition-[translate,border-color] hover:-translate-y-0.5 hover:border-bb/60 sm:px-6"
+        >
+          <span class="tone-soft tone-text grid size-12 shrink-0 place-items-center rounded-xl border border-bb/35">
+            <Icon name="trophy" size={24} strokeWidth={2.1} />
+          </span>
+          <span class="flex min-w-0 flex-[1_1_240px] flex-col gap-1.5">
+            <span class="font-mono text-lg font-bold text-fg-strong">Reportes divulgados</span>
+            <span class="text-[15px] text-muted">
+              {reports.length} {reports.length === 1 ? 'hallazgo real publicado' : 'hallazgos reales publicados'} con permiso del programa
+            </span>
+            <span class="flex flex-wrap gap-1.5 pt-0.5">
+              {severityCounts.map((s) => (
+                <span style={tone(s.color)} class="tone-soft tone-text rounded-md px-2 py-0.5 font-mono text-[11px] font-bold tracking-wider uppercase">
+                  {s.count} {s.label}
+                </span>
+              ))}
+            </span>
+          </span>
+          <span class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-bb px-4.5 font-mono text-sm font-bold text-on-accent max-sm:w-full">
+            Ver reportes
+            <Icon name="arrow-right" size={17} strokeWidth={2.4} class="transition-transform group-hover:translate-x-1" />
+          </span>
+        </a>
+      )
+    }
   </section>
 
   <section aria-labelledby="tools-title" class="flex flex-col gap-4" style={tone('tools')}>
