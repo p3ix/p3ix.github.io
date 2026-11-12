@@ -4,8 +4,8 @@ import Avatar from '@/components/Avatar.astro';
 import Icon from '@/components/Icon.astro';
 import Prompt from '@/components/Prompt.astro';
 import TerminalWindow from '@/components/TerminalWindow.astro';
+import { Image } from 'astro:assets';
 import {
-  certifications,
   education,
   experience,
   languages,
@@ -16,7 +16,9 @@ import {
   tools,
   type StackItem,
 } from '@/data/profile';
+import { certHref, certs } from '@/lib/certs';
 import { getCommands, getPublished } from '@/lib/content';
+import { formatDate } from '@/lib/format';
 import { SEVERITY_IDS, severities } from '@/lib/taxonomy';
 import { tone } from '@/lib/tone';
 
@@ -148,28 +150,46 @@ const description = `${profile.name} (${profile.handle}): ${profile.role}. Exper
         </ol>
       </section>
 
-      <section aria-labelledby="cert-title" class="flex flex-col gap-4 rounded-2xl border border-line bg-panel/80 p-5 sm:p-6" style={tone('home')}>
+      <section aria-labelledby="cert-title" class="flex flex-col gap-4 rounded-2xl border border-line bg-panel/80 p-5 sm:p-6" style={tone('certs')}>
         <h2 id="cert-title" class="inline-flex items-center gap-2.5 font-mono text-xl font-bold text-fg-strong">
           <Icon name="badge" size={20} class="tone-text" />
           Certificaciones
         </h2>
         <ul class="flex flex-col gap-4">
           {
-            certifications.map((c) => (
-              <li class="flex flex-col gap-1">
-                <p class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                  <span class="tone-text font-mono text-lg font-extrabold">{c.name}</span>
-                  <span class="inline-flex items-center gap-1 rounded-full border border-ctf/40 bg-ctf/10 px-2 py-0.5 font-mono text-[11px] text-ctf">
-                    <Icon name="check" size={12} strokeWidth={2.6} />
-                    obtenida
-                  </span>
-                </p>
-                <p class="text-[15px] text-muted">{c.full}</p>
-                <p class="font-mono text-xs text-subtle">{c.issuer}</p>
+            certs.map((c) => (
+              <li class="flex items-center gap-4">
+                <div class="flex min-w-0 flex-1 flex-col gap-1">
+                  <p class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                    <span class="tone-text font-mono text-lg font-extrabold">{c.name}</span>
+                    <span class="inline-flex items-center gap-1 rounded-full border border-ctf/40 bg-ctf/10 px-2 py-0.5 font-mono text-[11px] text-ctf">
+                      <Icon name="check" size={12} strokeWidth={2.6} />
+                      obtenida
+                    </span>
+                  </p>
+                  <p class="text-[15px] text-muted">{c.full}</p>
+                  <p class="font-mono text-xs text-subtle">{[c.issuer, c.awarded && formatDate(c.awarded)].filter(Boolean).join(' · ')}</p>
+                </div>
+                {c.image && (
+                  <a
+                    href={certHref(c)}
+                    aria-label={`Ver el certificado ${c.name}`}
+                    class="tone-border group relative block w-24 shrink-0 overflow-hidden rounded-lg border shadow-[0_10px_24px_-14px_rgb(0_0_0/0.9)] transition-transform hover:-translate-y-0.5 sm:w-32"
+                  >
+                    <Image src={c.image} alt="" widths={[192, 384]} sizes="(min-width: 640px) 128px, 96px" class="block h-auto w-full" />
+                    <span aria-hidden="true" class="tone-text absolute inset-0 grid place-items-center bg-base/65 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                      <Icon name="expand" size={20} strokeWidth={2.2} />
+                    </span>
+                  </a>
+                )}
               </li>
             ))
           }
         </ul>
+        <a href="/certificados/" class="tone-text mt-auto inline-flex min-h-11 items-center gap-1.5 self-start font-mono text-sm hover:underline">
+          Ver certificados
+          <Icon name="arrow-right" size={15} />
+        </a>
       </section>
     </div>
   </div>

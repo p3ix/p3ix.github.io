@@ -120,9 +120,39 @@ export const education = [
   { title: 'Bachillerato de Investigación/Excelencia (BIE)', org: 'IES Comuneros de Castilla, Burgos', period: '' },
 ];
 
-export const certifications = [
-  { name: 'eJPTv2', full: 'eLearnSecurity Junior Penetration Tester v2', issuer: 'INE Security' },
-  { name: 'B2 First', full: 'Cambridge English B2 First (FCE)', issuer: 'Cambridge English' },
+/**
+ * Certificaciones: portada y /certificados/. La imagen y el PDF se buscan solos por id en
+ * src/assets/certs/ (`ejpt.png`, `ejpt.pdf`; ver lib/certs.ts). Con imagen, la certificación sale
+ * en /certificados/ con su vitrina y su visor a pantalla completa; sin ella, en una tarjeta simple.
+ */
+export interface Certification {
+  /** kebab-case: ancla en /certificados/ (#ejpt) y nombre de sus archivos en src/assets/certs/. */
+  id: string;
+  name: string;
+  full: string;
+  issuer: string;
+  /** Fecha de obtención, AAAA-MM-DD. */
+  date?: string;
+  /** ID de la credencial tal cual sale en el certificado. */
+  credentialId?: string;
+  /** Página pública de verificación del emisor (la del QR del certificado). */
+  verifyUrl?: string;
+  /** Qué cubre: dominios del examen. */
+  topics?: string[];
+}
+
+export const certifications: Certification[] = [
+  {
+    id: 'ejpt',
+    name: 'eJPTv2',
+    full: 'eLearnSecurity Junior Penetration Tester v2',
+    issuer: 'INE Security',
+    date: '2026-11-11',
+    credentialId: '200108342',
+    verifyUrl: 'https://certs.ine.com/7965ed3a-4772-4940-b951-b2f7eb1956e0',
+    topics: ['Metodologías de evaluación', 'Auditoría de hosts y redes', 'Pentesting de hosts y redes', 'Pentesting de aplicaciones web'],
+  },
+  { id: 'b2-first', name: 'B2 First', full: 'Cambridge English B2 First (FCE)', issuer: 'Cambridge English' },
 ];
 
 /**

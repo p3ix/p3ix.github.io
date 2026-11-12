@@ -1,0 +1,56 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Certificate from '@/components/Certificate.astro';
+import Icon from '@/components/Icon.astro';
+import PageHeader from '@/components/PageHeader.astro';
+import { certs, type Cert } from '@/lib/certs';
+import { formatDate } from '@/lib/format';
+import { sectionById } from '@/lib/sections';
+import { tone } from '@/lib/tone';
+
+// Con imagen: vitrina y visor. Sin ella: tarjeta simple, hasta que se añada su certificado.
+const withImage = certs.filter((c): c is Cert & { image: NonNullable<Cert['image']> } => Boolean(c.image));
+const others = certs.filter((c) => !c.image);
+
+const description = 'Las certificaciones que he obtenido, con el certificado original a tamaño completo y el enlace para verificarlo en la web del emisor.';
+---
+
+<BaseLayout title="Certificados" description={description} section="certs" path={['certificados']} ogImage="/og/certificados.png">
+  <PageHeader section={sectionById.certs} title="Certificados" description={description}>
+    <p class="font-mono text-sm text-subtle">
+      {certs.length} {certs.length === 1 ? 'certificación' : 'certificaciones'}{withImage.length > 0 && ' · pulsa un certificado para verlo en grande'}
+    </p>
+  </PageHeader>
+
+  {withImage.map((c) => <Certificate cert={c} />)}
+
+  {
+    others.length > 0 && (
+      <section aria-labelledby="others-title" class="flex flex-col gap-4">
+        <h2 id="others-title" class="font-mono text-xl font-bold text-fg-strong">
+          <span class="text-certs">##</span> {withImage.length > 0 ? 'Otras certificaciones' : 'Certificaciones'}
+        </h2>
+        <ul class="grid gap-3.5 md:grid-cols-2">
+          {others.map((c) => (
+            <li id={c.id} style={tone('certs')} class="tone-border flex scroll-mt-24 items-start gap-4 rounded-2xl border bg-panel/90 p-5 target:ring-2 target:ring-certs/60">
+              <span class="tone-soft tone-text grid size-11 shrink-0 place-items-center rounded-xl">
+                <Icon name="badge" size={21} strokeWidth={2.1} />
+              </span>
+              <span class="flex min-w-0 flex-col gap-1">
+                <span class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                  <span class="tone-text font-mono text-lg font-extrabold">{c.name}</span>
+                  <span class="inline-flex items-center gap-1 rounded-full border border-ctf/40 bg-ctf/10 px-2 py-0.5 font-mono text-[11px] text-ctf">
+                    <Icon name="check" size={12} strokeWidth={2.6} />
+                    obtenida
+                  </span>
+                </span>
+                <span class="text-[15px] text-muted">{c.full}</span>
+                <span class="font-mono text-xs text-subtle">{[c.issuer, c.awarded && formatDate(c.awarded)].filter(Boolean).join(' · ')}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )
+  }
+</BaseLayout>

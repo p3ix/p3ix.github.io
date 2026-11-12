@@ -1,6 +1,6 @@
 import type { IconName } from './icons';
 
-export type SectionId = 'whoami' | 'ctf' | 'bb' | 'biblia' | 'tools' | 'tags';
+export type SectionId = 'whoami' | 'ctf' | 'bb' | 'certs' | 'biblia' | 'tools' | 'tags';
 
 export interface Section {
   id: SectionId;
@@ -64,6 +64,20 @@ export const sections: Section[] = [
       faint: 'bg-bb/6',
       border: 'border-bb/35',
       borderStrong: 'border-bb/55',
+    },
+  },
+  {
+    id: 'certs',
+    label: 'Certificados',
+    href: '/certificados/',
+    icon: 'badge',
+    cls: {
+      text: 'text-certs',
+      solid: 'bg-certs',
+      soft: 'bg-certs/12',
+      faint: 'bg-certs/6',
+      border: 'border-certs/35',
+      borderStrong: 'border-certs/55',
     },
   },
   {

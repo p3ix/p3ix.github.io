@@ -53,8 +53,7 @@ const sizes = '(min-width: 640px) 440px, calc(100vw - 4.5rem)';
 </figure>
 
 <script>
-  // Con ratón (y sin reducir movimiento) la tarjeta se inclina hacia el puntero y la luz lo sigue.
-  const canTilt = window.matchMedia('(hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)');
+  import { initTilt } from '@/scripts/tilt';
 
   document.querySelectorAll<HTMLElement>('[data-trophy]').forEach((trophy) => {
     const stage = trophy.querySelector<HTMLAnchorElement>('[data-trophy-open]');
@@ -72,20 +71,6 @@ const sizes = '(min-width: 640px) 440px, calc(100vw - 4.5rem)';
       if (event.target === dialog) dialog.close();
     });
 
-    stage.addEventListener('pointermove', (event) => {
-      if (!canTilt.matches) return;
-      const r = stage.getBoundingClientRect();
-      const x = (event.clientX - r.left) / r.width;
-      const y = (event.clientY - r.top) / r.height;
-      card.classList.add('is-tracking');
-      card.style.setProperty('--rx', `${((0.5 - y) * 14).toFixed(2)}deg`);
-      card.style.setProperty('--ry', `${((x - 0.5) * 20).toFixed(2)}deg`);
-      card.style.setProperty('--mx', `${(x * 100).toFixed(1)}%`);
-      card.style.setProperty('--my', `${(y * 100).toFixed(1)}%`);
-    });
-    stage.addEventListener('pointerleave', () => {
-      card.classList.remove('is-tracking');
-      for (const prop of ['--rx', '--ry', '--mx', '--my']) card.style.removeProperty(prop);
-    });
+    initTilt(stage, card);
   });
 </script>

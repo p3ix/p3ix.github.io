@@ -31,6 +31,7 @@ const HEX: Record<string, string> = {
   tools: '#ff5fa2',
   whoami: '#4da3ff',
   tags: '#ffe45c',
+  certs: '#00e5ff',
   'area-recon': '#00e5ff',
   'area-web': '#ff8a3d',
   'area-ad': '#b98cff',

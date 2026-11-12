@@ -44,6 +44,7 @@
   --color-tools: #ff5fa2;
   --color-whoami: #4da3ff;
   --color-tags: #ffe45c;
+  --color-certs: #00e5ff;
 
   /* áreas de la biblia */
   --color-area-recon: #00e5ff;
@@ -328,6 +329,70 @@
   @media (prefers-reduced-motion: reduce) {
     .trophy-card::after {
       display: none;
+    }
+  }
+
+  /* Certificado (Certificate.astro): la misma tarjeta del trofeo, más grande y con menos giro. */
+  .cert-stage {
+    perspective: 1800px;
+
+    & .trophy-card {
+      --rx: 2.5deg;
+      --ry: -5deg;
+    }
+  }
+
+  /* Visor a pantalla completa del certificado. Encajado, la imagen cabe entera; con .is-zoomed se
+     queda al ancho que le pone el script y el contenedor hace scroll. */
+  :root:has(.cert-viewer[open]) {
+    overflow: hidden;
+    scrollbar-gutter: stable;
+  }
+
+  .cert-viewer[open] {
+    animation: cert-viewer-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+
+    &::backdrop {
+      animation: cert-backdrop-in 0.24s ease-out;
+    }
+  }
+
+  .cert-scroller {
+    & img {
+      min-width: 0;
+      min-height: 0;
+      max-width: 100%;
+      max-height: 100%;
+      cursor: zoom-in;
+    }
+
+    &.is-zoomed {
+      cursor: grab;
+
+      & img {
+        flex: none;
+        max-width: none;
+        max-height: none;
+        cursor: inherit;
+      }
+    }
+
+    &.is-dragging {
+      cursor: grabbing;
+      user-select: none;
+    }
+  }
+
+  @keyframes cert-viewer-in {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.98);
+    }
+  }
+
+  @keyframes cert-backdrop-in {
+    from {
+      opacity: 0;
     }
   }
 

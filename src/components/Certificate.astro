@@ -1,0 +1,302 @@
+---
+// Vitrina de una certificación con imagen (/certificados/): el certificado en una tarjeta inclinada
+// con brillo holográfico (las clases .trophy-* de global.css, como el trofeo de bug bounty), debajo
+// sus datos, y un visor a pantalla completa. En el visor, un clic acerca la imagen a ese punto y se
+// recorre arrastrando o con scroll; otro clic, o el botón de la lupa, la vuelve a encajar.
+import { Image, getImage } from 'astro:assets';
+import Icon from './Icon.astro';
+import { profile } from '@/data/profile';
+import type { Cert } from '@/lib/certs';
+import { formatDate, isoDate } from '@/lib/format';
+import { tone } from '@/lib/tone';
+
+interface Props {
+  cert: Cert & { image: NonNullable<Cert['image']> };
+}
+
+const { cert } = Astro.props;
+const { id, name, full: fullName, issuer, image, pdf, awarded, credentialId, verifyUrl, topics = [] } = cert;
+
+const alt = [
+  `Certificado ${name} (${fullName}) de ${issuer} a nombre de ${profile.shortName}`,
+  awarded && `obtenido el ${formatDate(awarded)}`,
+  credentialId && `con el ID de credencial ${credentialId}`,
+]
+  .filter(Boolean)
+  .join(', ');
+
+// El visor carga una sola imagen grande (al abrirlo: loading="lazy" dentro del <dialog> cerrado),
+// con resolución de sobra para leer el certificado al acercarlo.
+const big = await getImage({ src: image, width: Math.min(image.width, 3000), quality: 90 });
+const widths = [640, 960, 1600];
+const sizes = '(min-width: 1024px) 780px, calc(100vw - 4.5rem)';
+const pdfName = `${id}-${profile.shortName.toLowerCase().replaceAll(' ', '-')}.pdf`;
+
+const btn =
+  'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-line-strong px-4 font-mono text-sm text-fg-strong transition-colors hover:tone-border hover:tone-text';
+const viewerBtn =
+  'inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-line-strong bg-panel px-3 font-mono text-sm text-fg-strong transition-colors hover:tone-border hover:tone-text';
+---
+
+<article
+  id={id}
+  data-cert
+  aria-labelledby={`cert-${id}`}
+  style={tone('certs')}
+  class="tone-border relative flex scroll-mt-24 flex-col overflow-hidden rounded-3xl border bg-panel/90 target:ring-2 target:ring-certs/60"
+>
+  {/* Escenario: el certificado en grande sobre la rejilla, con un halo del color de la sección. */}
+  <div class="bg-grid relative flex justify-center border-b border-line px-4 pt-8 pb-9 sm:px-10 sm:pt-12 sm:pb-14">
+    <span
+      aria-hidden="true"
+      class="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_70%_at_50%_45%,color-mix(in_oklab,var(--tone)_12%,transparent),transparent)]"
+    ></span>
+    <a href={big.src} data-cert-open aria-haspopup="dialog" class="trophy-stage cert-stage group relative block w-full max-w-[780px] cursor-zoom-in rounded-[0.9rem] p-2">
+      <Image src={image} alt="" aria-hidden="true" widths={[320]} sizes="320px" class="trophy-ambient" />
+      <span data-cert-card class="trophy-card">
+        <Image src={image} alt={alt} widths={widths} sizes={sizes} loading="eager" fetchpriority="high" class="block h-auto w-full" />
+        <span aria-hidden="true" class="trophy-foil"></span>
+        <span aria-hidden="true" class="trophy-shine"></span>
+      </span>
+      <span
+        aria-hidden="true"
+        class="tone-text absolute right-4 bottom-4 inline-flex items-center gap-1.5 rounded-lg border border-line-strong bg-code/85 p-1.5 font-mono text-xs font-bold backdrop-blur-sm transition-[border-color,translate] group-hover:-translate-y-0.5 group-hover:tone-border sm:right-5 sm:bottom-5 sm:px-2.5"
+      >
+        <Icon name="expand" size={14} strokeWidth={2.2} />
+        <span class="max-sm:hidden">Ampliar</span>
+      </span>
+      <span class="sr-only">(ver a pantalla completa)</span>
+    </a>
+  </div>
+
+  <div class="grid gap-7 p-5 sm:p-8 xl:grid-cols-[minmax(0,1fr)_22rem] xl:gap-10">
+    <div class="flex min-w-0 flex-col gap-5">
+      <div class="flex flex-col gap-2">
+        <p class="tone-text font-mono text-[13px] tracking-[0.2em] uppercase">{issuer}</p>
+        <h2 id={`cert-${id}`} class="tone-text text-glow-soft font-mono text-4xl font-extrabold tracking-tight sm:text-5xl">{name}</h2>
+        <p class="text-lg leading-snug text-fg-strong">{fullName}</p>
+      </div>
+
+      {
+        topics.length > 0 && (
+          <div class="flex flex-col gap-2.5">
+            <p class="font-mono text-[11px] tracking-[0.16em] text-subtle uppercase">Qué evalúa</p>
+            <ul class="flex flex-wrap gap-2">
+              {topics.map((t) => (
+                <li class="tone-soft rounded-md px-2.5 py-1 font-mono text-[13px] text-fg-strong">{t}</li>
+              ))}
+            </ul>
+          </div>
+        )
+      }
+    </div>
+
+    <div class="flex min-w-0 flex-col gap-5">
+      <dl class="grid grid-cols-2 gap-3">
+        {
+          awarded && (
+            <div class="flex flex-col gap-1 rounded-xl border border-line bg-code/70 px-3.5 py-3">
+              <dt class="flex items-center gap-1.5 font-mono text-[11px] tracking-[0.16em] text-subtle uppercase">
+                <Icon name="calendar" size={13} />
+                Obtenida
+              </dt>
+              <dd class="font-mono text-[15px] font-bold text-fg-strong">
+                <time datetime={isoDate(awarded)}>{formatDate(awarded)}</time>
+              </dd>
+            </div>
+          )
+        }
+        {
+          credentialId && (
+            <div class="flex flex-col gap-1 rounded-xl border border-line bg-code/70 px-3.5 py-3">
+              <dt class="flex items-center gap-1.5 font-mono text-[11px] tracking-[0.16em] text-subtle uppercase">
+                <Icon name="hash" size={13} />
+                Credencial
+              </dt>
+              <dd class="font-mono text-[15px] font-bold break-all text-fg-strong">{credentialId}</dd>
+            </div>
+          )
+        }
+      </dl>
+
+      <div class="flex flex-wrap gap-3">
+        {
+          verifyUrl && (
+            <a href={verifyUrl} target="_blank" rel="noopener" class="tone-pill inline-flex min-h-11 items-center gap-2 rounded-xl px-4 font-mono text-sm font-bold transition-[filter] hover:brightness-110">
+              <Icon name="shield" size={17} strokeWidth={2.2} />
+              Verificar en {issuer.split(' ')[0]}
+              <Icon name="external" size={13} strokeWidth={2.2} />
+            </a>
+          )
+        }
+        <button type="button" data-cert-view class={btn}>
+          <Icon name="expand" size={16} />
+          Pantalla completa
+        </button>
+        {
+          pdf && (
+            <a href={pdf} download={pdfName} class={btn}>
+              <Icon name="download" size={16} />
+              PDF
+            </a>
+          )
+        }
+      </div>
+    </div>
+  </div>
+
+  <dialog
+    data-cert-dialog
+    data-pagefind-ignore
+    aria-labelledby={`cert-${id}-viewer`}
+    class="cert-viewer tone-border m-auto h-[calc(100dvh-2rem)] max-h-none w-[min(1600px,calc(100vw-2rem))] max-w-none flex-col overflow-hidden rounded-2xl border bg-panel p-0 text-fg shadow-[0_0_80px_color-mix(in_oklab,var(--tone)_16%,transparent)] open:flex backdrop:bg-base/90 backdrop:backdrop-blur-sm max-sm:h-dvh max-sm:w-screen max-sm:rounded-none max-sm:border-0"
+  >
+    <div class="flex items-center gap-2 border-b border-line bg-code/80 py-2 pr-2 pl-4 sm:gap-2.5">
+      <Icon name="badge" size={18} class="tone-text shrink-0 max-sm:hidden" />
+      <p id={`cert-${id}-viewer`} class="min-w-0 flex-1 truncate font-mono text-sm font-bold text-fg-strong">
+        {name}<span class="font-normal text-subtle"> · {issuer}</span>
+      </p>
+      <p aria-hidden="true" class="mr-2 font-mono text-xs text-subtle max-lg:hidden">clic para acercar · Esc para cerrar</p>
+      <button type="button" data-cert-zoom aria-pressed="false" aria-label="Acercar" class:list={[viewerBtn, 'group/zoom']}>
+        <Icon name="zoom-in" size={18} class="group-aria-pressed/zoom:hidden" />
+        <Icon name="zoom-out" size={18} class="hidden group-aria-pressed/zoom:block" />
+      </button>
+      {
+        verifyUrl && (
+          <a href={verifyUrl} target="_blank" rel="noopener" class:list={[viewerBtn, 'max-sm:hidden']}>
+            <Icon name="shield" size={16} />
+            Verificar
+          </a>
+        )
+      }
+      {
+        pdf && (
+          <a href={pdf} download={pdfName} aria-label="Descargar el PDF" class={viewerBtn}>
+            <Icon name="download" size={16} />
+            <span class="max-sm:hidden">PDF</span>
+          </a>
+        )
+      }
+      <form method="dialog" class="flex">
+        <button type="submit" autofocus aria-label="Cerrar" class={viewerBtn}>
+          <Icon name="close" size={18} />
+        </button>
+      </form>
+    </div>
+    <div
+      data-cert-scroller
+      tabindex="0"
+      role="region"
+      aria-label={`${name}: certificado a tamaño completo`}
+      class="cert-scroller bg-grid flex min-h-0 flex-1 overflow-auto overscroll-contain p-3 sm:p-6"
+    >
+      <img
+        data-cert-full
+        src={big.src}
+        width={big.attributes.width}
+        height={big.attributes.height}
+        alt={alt}
+        loading="lazy"
+        decoding="async"
+        draggable="false"
+        class="m-auto block rounded-md shadow-[0_24px_60px_-24px_rgb(0_0_0/0.9)]"
+      />
+    </div>
+  </dialog>
+</article>
+
+<script>
+  import { initTilt } from '@/scripts/tilt';
+
+  document.querySelectorAll<HTMLElement>('[data-cert]').forEach((root) => {
+    const stage = root.querySelector<HTMLAnchorElement>('[data-cert-open]');
+    const card = root.querySelector<HTMLElement>('[data-cert-card]');
+    const viewButton = root.querySelector<HTMLButtonElement>('[data-cert-view]');
+    const dialog = root.querySelector<HTMLDialogElement>('[data-cert-dialog]');
+    const scroller = root.querySelector<HTMLElement>('[data-cert-scroller]');
+    const img = root.querySelector<HTMLImageElement>('[data-cert-full]');
+    const zoomButton = root.querySelector<HTMLButtonElement>('[data-cert-zoom]');
+    if (!stage || !card || !dialog || !scroller || !img || !zoomButton) return;
+
+    initTilt(stage, card, { x: 8, y: 12 });
+
+    stage.addEventListener('click', (event) => {
+      // Ctrl/Cmd/Shift+clic abre la imagen en otra pestaña, como cualquier enlace.
+      if (event.ctrlKey || event.metaKey || event.shiftKey) return;
+      event.preventDefault();
+      dialog.showModal();
+    });
+    viewButton?.addEventListener('click', () => dialog.showModal());
+    // Clic en el fondo, fuera del visor: cerrar.
+    dialog.addEventListener('click', (event) => {
+      if (event.target === dialog) dialog.close();
+    });
+
+    let zoomed = false;
+
+    /** Acerca la imagen (al doble y como mínimo a 1400 px) dejando el punto `at` bajo el puntero. */
+    function setZoom(on: boolean, at?: { x: number; y: number }) {
+      if (!scroller || !img || !zoomButton || on === zoomed) return;
+      if (on) {
+        const before = img.getBoundingClientRect();
+        const target = Math.min(img.naturalWidth || before.width, Math.max(before.width * 2, 1400));
+        if (target < before.width * 1.15) return;
+        const box = scroller.getBoundingClientRect();
+        const fx = at ? (at.x - before.left) / before.width : 0.5;
+        const fy = at ? (at.y - before.top) / before.height : 0.5;
+        const ox = at ? at.x - box.left : box.width / 2;
+        const oy = at ? at.y - box.top : box.height / 2;
+        scroller.classList.add('is-zoomed');
+        img.style.width = `${target}px`;
+        const after = img.getBoundingClientRect();
+        scroller.scrollLeft = after.left - box.left + fx * after.width - ox;
+        scroller.scrollTop = after.top - box.top + fy * after.height - oy;
+      } else {
+        scroller.classList.remove('is-zoomed');
+        img.style.width = '';
+        scroller.scrollTo(0, 0);
+      }
+      zoomed = on;
+      zoomButton.setAttribute('aria-pressed', String(on));
+      zoomButton.setAttribute('aria-label', on ? 'Alejar' : 'Acercar');
+    }
+
+    zoomButton.addEventListener('click', () => setZoom(!zoomed));
+    dialog.addEventListener('close', () => setZoom(false));
+
+    // Con ratón, la imagen acercada se arrastra; en pantallas táctiles, el scroll nativo ya lo hace.
+    let drag: { x: number; y: number; left: number; top: number; moved: boolean } | undefined;
+    let dragged = false;
+
+    scroller.addEventListener('pointerdown', (event) => {
+      dragged = false;
+      if (!zoomed || event.pointerType !== 'mouse' || event.button !== 0) return;
+      drag = { x: event.clientX, y: event.clientY, left: scroller.scrollLeft, top: scroller.scrollTop, moved: false };
+      scroller.setPointerCapture(event.pointerId);
+    });
+    scroller.addEventListener('pointermove', (event) => {
+      if (!drag) return;
+      const dx = event.clientX - drag.x;
+      const dy = event.clientY - drag.y;
+      if (!drag.moved && Math.hypot(dx, dy) < 5) return;
+      drag.moved = true;
+      scroller.classList.add('is-dragging');
+      scroller.scrollLeft = drag.left - dx;
+      scroller.scrollTop = drag.top - dy;
+    });
+    const endDrag = () => {
+      dragged = drag?.moved ?? false;
+      drag = undefined;
+      scroller.classList.remove('is-dragging');
+    };
+    scroller.addEventListener('pointerup', endDrag);
+    scroller.addEventListener('pointercancel', endDrag);
+
+    scroller.addEventListener('click', (event) => {
+      if (dragged) return;
+      if (zoomed) setZoom(false);
+      else if (event.target === img) setZoom(true, { x: event.clientX, y: event.clientY });
+      else dialog.close();
+    });
+  });
+</script>

@@ -1,5 +1,5 @@
 import type { APIRoute, GetStaticPaths } from 'astro';
-import { tools } from '@/data/profile';
+import { certifications, tools } from '@/data/profile';
 import { utilities } from '@/data/utilities';
 import { getNotes, getPorts, getPublished } from '@/lib/content';
 import { monogram } from '@/lib/format';
@@ -30,6 +30,17 @@ export const getStaticPaths = (async () => {
     {
       route: 'bugbounty',
       card: { kicker: 'Bug bounty', title: 'Reportes divulgados', summary: 'Hallazgos reales, publicados con permiso del programa y redactados.', color: 'bb', path: 'bugbounty' },
+    },
+    {
+      route: 'certificados',
+      card: {
+        kicker: 'Certificados',
+        title: 'Certificaciones',
+        summary: 'Cada certificado a tamaño completo, con su enlace de verificación en la web del emisor.',
+        color: 'certs',
+        path: 'certificados',
+        chips: certifications.map((c) => ({ text: c.name, color: 'certs' })),
+      },
     },
     {
       route: 'biblia',

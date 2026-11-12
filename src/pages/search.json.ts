@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
-import { tools } from '@/data/profile';
+import { certifications, tools } from '@/data/profile';
 import { utilities, utilityHref } from '@/data/utilities';
+import { certHref } from '@/lib/certs';
 import { commandPlaces, getCommands, getNotes, getPorts, getPublished, portHref, type CommandPlace } from '@/lib/content';
 import { getTags, tagBreakdown } from '@/lib/tags';
 import { areas, ctfPlatforms, portCategories, severities } from '@/lib/taxonomy';
@@ -42,6 +43,16 @@ export const GET: APIRoute = async () => {
       { id: 'whoami', url: '/', title: 'whoami', summary: 'Perfil, experiencia, formación, certificaciones y stack', kind: 'Sección', color: 'whoami', tags: 'inicio portada cv perfil experiencia formacion certificaciones ejpt stack' },
       { id: 'ctf', url: '/ctf/', title: 'Writeups CTF', summary: 'Máquinas retiradas', kind: 'Sección', color: 'ctf', tags: 'htb hackthebox' },
       { id: 'bb', url: '/bugbounty/', title: 'Bug bounty', summary: 'Reportes divulgados', kind: 'Sección', color: 'bb', tags: 'reportes' },
+      { id: 'certificados', url: '/certificados/', title: 'Certificados', summary: 'Certificaciones con el certificado original y su verificación', kind: 'Sección', color: 'certs', tags: 'certificaciones certificates ejpt' },
+      ...certifications.map((c) => ({
+        id: `cert/${c.id}`,
+        url: certHref(c),
+        title: c.name,
+        summary: c.full,
+        kind: 'Certificado',
+        color: 'certs',
+        tags: [c.issuer, ...(c.topics ?? [])].join(' '),
+      })),
       { id: 'biblia', url: '/biblia/', title: 'Biblia', summary: 'Notas y metodología', kind: 'Sección', color: 'biblia', tags: 'notas' },
       { id: 'comandos', url: '/biblia/comandos/', title: 'Buscador de comandos', summary: 'Todos los comandos con variables', kind: 'Sección', color: 'biblia', tags: 'cheatsheet' },
       { id: 'puertos', url: '/biblia/puertos/', title: 'Puertos y servicios', summary: 'Qué hacer con cada puerto en cada fase', kind: 'Sección', color: 'biblia', tags: 'ports services servicios' },
