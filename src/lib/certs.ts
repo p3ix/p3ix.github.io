@@ -30,12 +30,20 @@ export interface Cert extends Certification {
   pdf?: string;
   /** Fecha de obtención como Date (medianoche UTC, como las del contenido). */
   awarded?: Date;
+  /** false si aún está en preparación. */
+  earned: boolean;
 }
 
 export const certs: Cert[] = certifications.map((c) => {
+  const earned = c.status !== 'in-progress';
+  const image = imageById.get(c.id);
+  const pdf = pdfById.get(c.id);
+  if (!earned && (c.date || c.credentialId || c.verifyUrl || image || pdf)) {
+    throw new Error(`data/profile.ts: "${c.id}" está en preparación y no puede tener fecha, credencial ni certificado; quita su status al aprobarla.`);
+  }
   const awarded = c.date ? new Date(`${c.date}T00:00:00Z`) : undefined;
   if (awarded && Number.isNaN(awarded.getTime())) throw new Error(`data/profile.ts: la fecha de "${c.id}" no es AAAA-MM-DD.`);
-  return { ...c, image: imageById.get(c.id), pdf: pdfById.get(c.id), awarded };
+  return { ...c, image, pdf, awarded, earned };
 });
 
 if (new Set(certs.map((c) => c.id)).size !== certs.length) throw new Error('data/profile.ts: hay dos certificaciones con el mismo id.');

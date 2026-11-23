@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import Avatar from '@/components/Avatar.astro';
+import CertStatus from '@/components/CertStatus.astro';
 import Icon from '@/components/Icon.astro';
 import Prompt from '@/components/Prompt.astro';
 import TerminalWindow from '@/components/TerminalWindow.astro';
@@ -162,10 +163,7 @@ const description = `${profile.name} (${profile.handle}): ${profile.role}. Exper
                 <div class="flex min-w-0 flex-1 flex-col gap-1">
                   <p class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                     <span class="tone-text font-mono text-lg font-extrabold">{c.name}</span>
-                    <span class="inline-flex items-center gap-1 rounded-full border border-ctf/40 bg-ctf/10 px-2 py-0.5 font-mono text-[11px] text-ctf">
-                      <Icon name="check" size={12} strokeWidth={2.6} />
-                      obtenida
-                    </span>
+                    <CertStatus earned={c.earned} />
                   </p>
                   <p class="text-[15px] text-muted">{c.full}</p>
                   <p class="font-mono text-xs text-subtle">{[c.issuer, c.awarded && formatDate(c.awarded)].filter(Boolean).join(' · ')}</p>

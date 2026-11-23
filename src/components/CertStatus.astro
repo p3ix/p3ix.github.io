@@ -1,0 +1,24 @@
+---
+import Icon from '@/components/Icon.astro';
+
+// Insignia de estado de una certificación: obtenida (verde) o en preparación (ámbar).
+interface Props {
+  earned: boolean;
+}
+
+const { earned } = Astro.props;
+---
+
+{
+  earned ? (
+    <span class="inline-flex items-center gap-1 rounded-full border border-ctf/40 bg-ctf/10 px-2 py-0.5 font-mono text-[11px] text-ctf">
+      <Icon name="check" size={12} strokeWidth={2.6} />
+      obtenida
+    </span>
+  ) : (
+    <span class="inline-flex items-center gap-1 rounded-full border border-bb/40 bg-bb/10 px-2 py-0.5 font-mono text-[11px] text-bb">
+      <Icon name="clock" size={12} strokeWidth={2.4} />
+      en preparación
+    </span>
+  )
+}

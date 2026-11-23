@@ -1,6 +1,7 @@
 import type { APIRoute, GetStaticPaths } from 'astro';
-import { certifications, tools } from '@/data/profile';
+import { tools } from '@/data/profile';
 import { utilities } from '@/data/utilities';
+import { certs } from '@/lib/certs';
 import { getNotes, getPorts, getPublished } from '@/lib/content';
 import { monogram } from '@/lib/format';
 import { renderOg, type OgCard } from '@/lib/og';
@@ -39,7 +40,7 @@ export const getStaticPaths = (async () => {
         summary: 'Cada certificado a tamaño completo, con su enlace de verificación en la web del emisor.',
         color: 'certs',
         path: 'certificados',
-        chips: certifications.map((c) => ({ text: c.name, color: 'certs' })),
+        chips: certs.filter((c) => c.earned).map((c) => ({ text: c.name, color: 'certs' })),
       },
     },
     {

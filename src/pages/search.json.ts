@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
-import { certifications, tools } from '@/data/profile';
+import { tools } from '@/data/profile';
 import { utilities, utilityHref } from '@/data/utilities';
-import { certHref } from '@/lib/certs';
+import { certHref, certs } from '@/lib/certs';
 import { commandPlaces, getCommands, getNotes, getPorts, getPublished, portHref, type CommandPlace } from '@/lib/content';
 import { getTags, tagBreakdown } from '@/lib/tags';
 import { areas, ctfPlatforms, portCategories, severities } from '@/lib/taxonomy';
@@ -44,12 +44,12 @@ export const GET: APIRoute = async () => {
       { id: 'ctf', url: '/ctf/', title: 'Writeups CTF', summary: 'Máquinas retiradas', kind: 'Sección', color: 'ctf', tags: 'htb hackthebox' },
       { id: 'bb', url: '/bugbounty/', title: 'Bug bounty', summary: 'Reportes divulgados', kind: 'Sección', color: 'bb', tags: 'reportes' },
       { id: 'certificados', url: '/certificados/', title: 'Certificados', summary: 'Certificaciones con el certificado original y su verificación', kind: 'Sección', color: 'certs', tags: 'certificaciones certificates ejpt' },
-      ...certifications.map((c) => ({
+      ...certs.map((c) => ({
         id: `cert/${c.id}`,
         url: certHref(c),
         title: c.name,
         summary: c.full,
-        kind: 'Certificado',
+        kind: c.earned ? 'Certificado' : 'Certificado · en preparación',
         color: 'certs',
         tags: [c.issuer, ...(c.topics ?? [])].join(' '),
       })),

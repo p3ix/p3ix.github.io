@@ -124,6 +124,8 @@ export const education = [
  * Certificaciones: portada y /certificados/. La imagen y el PDF se buscan solos por id en
  * src/assets/certs/ (`ejpt.png`, `ejpt.pdf`; ver lib/certs.ts). Con imagen, la certificación sale
  * en /certificados/ con su vitrina y su visor a pantalla completa; sin ella, en una tarjeta simple.
+ * Una en preparación (`status: 'in-progress'`) va sin fecha, credencial ni archivos; al aprobarla,
+ * se quita `status` y se añaden.
  */
 export interface Certification {
   /** kebab-case: ancla en /certificados/ (#ejpt) y nombre de sus archivos en src/assets/certs/. */
@@ -131,6 +133,8 @@ export interface Certification {
   name: string;
   full: string;
   issuer: string;
+  /** Por defecto `earned` (obtenida). */
+  status?: 'earned' | 'in-progress';
   /** Fecha de obtención, AAAA-MM-DD. */
   date?: string;
   /** ID de la credencial tal cual sale en el certificado. */
@@ -153,6 +157,13 @@ export const certifications: Certification[] = [
     topics: ['Metodologías de evaluación', 'Auditoría de hosts y redes', 'Pentesting de hosts y redes', 'Pentesting de aplicaciones web'],
   },
   { id: 'b2-first', name: 'B2 First', full: 'Cambridge English B2 First (FCE)', issuer: 'Cambridge English' },
+  {
+    id: 'ewptx',
+    name: 'eWPTX',
+    full: 'eLearnSecurity Web Application Penetration Tester eXtreme',
+    issuer: 'INE Security',
+    status: 'in-progress',
+  },
 ];
 
 /**
