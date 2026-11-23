@@ -124,7 +124,7 @@ export const education = [
  * Certificaciones: portada y /certificados/. La imagen y el PDF se buscan solos por id en
  * src/assets/certs/ (`ejpt.png`, `ejpt.pdf`; ver lib/certs.ts). Con imagen, la certificación sale
  * en /certificados/ con su vitrina y su visor a pantalla completa; sin ella, en una tarjeta simple.
- * Una en preparación (`status: 'in-progress'`) va sin fecha, credencial ni archivos; al aprobarla,
+ * Una en curso (`status: 'in-progress'`) va sin fecha, credencial ni archivos; al aprobarla,
  * se quita `status` y se añaden.
  */
 export interface Certification {

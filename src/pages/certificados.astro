@@ -10,7 +10,7 @@ import { sectionById } from '@/lib/sections';
 import { tone } from '@/lib/tone';
 
 // Con imagen: vitrina y visor. Sin ella: tarjeta simple, hasta que se añada su certificado.
-// Las que están en preparación van aparte, al final.
+// Las que están en curso van aparte, al final.
 const earned = certs.filter((c) => c.earned);
 const withImage = earned.filter((c): c is Cert & { image: NonNullable<Cert['image']> } => Boolean(c.image));
 const others = earned.filter((c) => !c.image);
@@ -18,12 +18,12 @@ const inProgress = certs.filter((c) => !c.earned);
 
 const groups = [
   { id: 'others', title: withImage.length > 0 ? 'Otras certificaciones' : 'Certificaciones', items: others },
-  { id: 'in-progress', title: 'En preparación', items: inProgress },
+  { id: 'in-progress', title: 'En curso', items: inProgress },
 ].filter((g) => g.items.length > 0);
 
 const summary = [
   `${earned.length} ${earned.length === 1 ? 'certificación' : 'certificaciones'}`,
-  inProgress.length > 0 && `${inProgress.length} en preparación`,
+  inProgress.length > 0 && `${inProgress.length} en curso`,
   withImage.length > 0 && 'pulsa un certificado para verlo en grande',
 ]
   .filter(Boolean)

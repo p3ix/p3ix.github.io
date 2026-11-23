@@ -1,7 +1,7 @@
 ---
 import Icon from '@/components/Icon.astro';
 
-// Insignia de estado de una certificación: obtenida (verde) o en preparación (ámbar).
+// Insignia de estado de una certificación: obtenida (verde) o en curso (ámbar).
 interface Props {
   earned: boolean;
 }
@@ -18,7 +18,7 @@ const { earned } = Astro.props;
   ) : (
     <span class="inline-flex items-center gap-1 rounded-full border border-bb/40 bg-bb/10 px-2 py-0.5 font-mono text-[11px] text-bb">
       <Icon name="clock" size={12} strokeWidth={2.4} />
-      en preparación
+      en curso
     </span>
   )
 }

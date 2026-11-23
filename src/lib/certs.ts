@@ -30,7 +30,7 @@ export interface Cert extends Certification {
   pdf?: string;
   /** Fecha de obtención como Date (medianoche UTC, como las del contenido). */
   awarded?: Date;
-  /** false si aún está en preparación. */
+  /** false si aún está en curso. */
   earned: boolean;
 }
 
@@ -39,7 +39,7 @@ export const certs: Cert[] = certifications.map((c) => {
   const image = imageById.get(c.id);
   const pdf = pdfById.get(c.id);
   if (!earned && (c.date || c.credentialId || c.verifyUrl || image || pdf)) {
-    throw new Error(`data/profile.ts: "${c.id}" está en preparación y no puede tener fecha, credencial ni certificado; quita su status al aprobarla.`);
+    throw new Error(`data/profile.ts: "${c.id}" está en curso y no puede tener fecha, credencial ni certificado; quita su status al aprobarla.`);
   }
   const awarded = c.date ? new Date(`${c.date}T00:00:00Z`) : undefined;
   if (awarded && Number.isNaN(awarded.getTime())) throw new Error(`data/profile.ts: la fecha de "${c.id}" no es AAAA-MM-DD.`);

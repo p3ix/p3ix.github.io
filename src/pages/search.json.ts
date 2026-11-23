@@ -49,7 +49,7 @@ export const GET: APIRoute = async () => {
         url: certHref(c),
         title: c.name,
         summary: c.full,
-        kind: c.earned ? 'Certificado' : 'Certificado · en preparación',
+        kind: c.earned ? 'Certificado' : 'Certificado · en curso',
         color: 'certs',
         tags: [c.issuer, ...(c.topics ?? [])].join(' '),
       })),
